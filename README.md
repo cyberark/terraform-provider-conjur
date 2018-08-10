@@ -1,6 +1,13 @@
 # terraform-provider-conjur
 
-Terraform Conjur provider 
+Terraform Conjur provider
+
+[![GitHub release](https://img.shields.io/github/release/cyberark/terraform-provider-conjur.svg)](https://github.com/cyberark/terraform-provider-conjur/releases/latest)
+[![pipeline status](https://gitlab.com/cyberark/terraform-provider-conjur/badges/master/pipeline.svg)](https://gitlab.com/cyberark/terraform-provider-conjur/pipelines)
+
+[![Github commits (since latest release)](https://img.shields.io/github/commits-since/cyberark/terraform-provider-conjur/latest.svg)](https://github.com/cyberark/terraform-provider-conjur/commits/master)
+
+---
 
 ## Usage
 
