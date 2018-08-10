@@ -70,14 +70,14 @@ Install dependencies:
 dep ensure
 ```
 
-Run tests:
-
-```
-./bin/test
-```
-
 Build binaries:
 
 ```
 ./bin/build
+```
+
+Run integration tests:
+
+```
+./bin/test
 ```

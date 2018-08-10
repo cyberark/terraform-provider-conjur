@@ -12,17 +12,10 @@ function finish() {
 trap finish EXIT
 
 function main() {
-  buildProvider
   launchConjur
   configureConjur
   runTerraform
   validateResults
-}
-
-function buildProvider() {
-  echo "> Building Terraform Conjur provider"
-
-  go build
 }
 
 function launchConjur() {
