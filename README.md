@@ -39,6 +39,8 @@ provider "conjur" {}
 **main.tf**
 
 ```
+# ... provider configuration above
+
 data "conjur_secret" "dbpass" {
   name = "my/shiny/dbpass"
 }

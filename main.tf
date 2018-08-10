@@ -9,7 +9,7 @@ data "conjur_secret" "secret1" {
   name = "my/shiny/dbpass"
 }
 
-output "latest_secret" {
+output "secret1" {
   value = "${data.conjur_secret.secret1.value}"
   sensitive = false
 }

@@ -28,8 +28,8 @@ function buildProvider() {
 function launchConjur() {
   echo "> Launching local Conjur environment"
 
-  export CONJUR_DATA_KEY="gkJp0GKhybIdLiJjxV6ocFr7fcMZLVbkXk1tf1eTDyM="
-# export CONJUR_DATA_KEY="$(docker-compose run --rm --no-deps conjur data-key generate)"
+  # export CONJUR_DATA_KEY="gkJp0GKhybIdLiJjxV6ocFr7fcMZLVbkXk1tf1eTDyM="
+  export CONJUR_DATA_KEY="$(docker-compose run --rm --no-deps conjur data-key generate)"
 
   docker-compose pull
 
