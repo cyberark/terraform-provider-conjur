@@ -68,3 +68,9 @@ Run tests:
 ```
 ./bin/test
 ```
+
+Build binaries:
+
+```
+./bin/build
+```

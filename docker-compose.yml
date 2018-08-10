@@ -23,5 +23,11 @@ services:
       CONJUR_ACCOUNT: ${CONJUR_ACCOUNT}
       CONJUR_AUTHN_LOGIN: admin
       CONJUR_AUTHN_API_KEY: ${CONJUR_AUTHN_API_KEY}
-    volumes: 
+    volumes:
       - $PWD/test:/test
+
+  goreleaser:
+    image: cyberark/goreleaser
+    volumes:
+      - .:/go/src/github.com/cyberark/terraform-provider-conjur
+    working_dir: /go/src/github.com/cyberark/terraform-provider-conjur
