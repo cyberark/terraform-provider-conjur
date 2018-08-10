@@ -1,0 +1,89 @@
+#!/bin/bash -e
+
+CONJUR_ACCOUNT='cucumber'
+LOCAL_SECRET_FILE='secret1'
+
+function finish() {
+  echo "> Terminating local Conjur environment"
+
+  rm -f $LOCAL_SECRET_FILE
+  docker-compose down -v
+}
+trap finish EXIT
+
+function main() {
+  buildProvider
+  launchConjur
+  configureConjur
+  runTerraform
+  validateResults
+}
+
+function buildProvider() {
+  echo "> Building Terraform Conjur provider"
+
+  go build
+}
+
+function launchConjur() {
+  echo "> Launching local Conjur environment"
+
+  export CONJUR_DATA_KEY="gkJp0GKhybIdLiJjxV6ocFr7fcMZLVbkXk1tf1eTDyM="
+# export CONJUR_DATA_KEY="$(docker-compose run --rm --no-deps conjur data-key generate)"
+
+  docker-compose pull
+
+  docker-compose up -d conjur
+  conjurExec conjurctl wait
+}
+
+function configureConjur() {
+  echo "> Configuring local Conjur environment"
+
+  conjurExec conjurctl account create $CONJUR_ACCOUNT
+
+  local api_key=$(conjurExec conjurctl role retrieve-key $CONJUR_ACCOUNT:user:admin | tr -d '\r')
+  export CONJUR_ACCOUNT=$CONJUR_ACCOUNT
+  export CONJUR_AUTHN_API_KEY=$api_key
+
+  docker-compose up -d client
+
+  clientExec conjur policy load root /test/policy.yml  # policy file mounted in docker-compose
+  clientExec conjur list
+  clientExec conjur variable values add my/shiny/dbpass testing
+}
+
+function runTerraform() {
+  echo "> Planning and applying main.tf Terraform manifest"
+
+  export CONJUR_ACCOUNT="$CONJUR_ACCOUNT"
+  export CONJUR_AUTHN_LOGIN="admin"
+  export CONJUR_AUTHN_API_KEY="$(conjurExec conjurctl role retrieve-key $CONJUR_ACCOUNT:user:admin | tr -d '\r')"
+  export TF_LOG=INFO
+  
+  terraform init
+  terraform plan
+  terraform apply -auto-approve
+}
+
+function validateResults() {
+  local expectedValue="testing"
+  local actualValue=$(cat $LOCAL_SECRET_FILE)
+
+  if [[ "$expectedValue" == "$actualValue" ]]; then
+    echo "Secret succesfully retrieved!"
+  else
+    echo "Secret not successfully retrieved."
+    exit 1
+  fi
+}
+
+function conjurExec() {
+  docker-compose exec -T conjur "$@"
+}
+
+function clientExec() {
+  docker-compose exec -T client "$@"
+}
+
+main
