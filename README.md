@@ -57,4 +57,14 @@ Secrets like `data.conjur_secret.dbpass.value` can be used in any Terraform reso
 
 ## Development
 
-To run end to end tests: `./bin/test`.
+Install dependencies:
+
+```
+dep ensure
+```
+
+Run tests:
+
+```
+./bin/test
+```
