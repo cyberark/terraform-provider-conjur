@@ -74,6 +74,7 @@ function validateResults() {
     echo "Secret succesfully retrieved!"
   else
     echo "Secret not successfully retrieved."
+    echo "Expected '$expectedValue', got '$actualValue'"
     exit 1
   fi
 }
