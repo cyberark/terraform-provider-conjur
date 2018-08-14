@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/bin/bash -ex
 
 CONJUR_ACCOUNT='cucumber'
 LOCAL_SECRET_FILE='secret1'
