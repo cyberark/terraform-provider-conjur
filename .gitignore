@@ -2,7 +2,6 @@ terraform-provider-conjur
 vendor/
 .terraform/
 *.tfstate*
-Gopkg.lock
 dist/
 
 # Binaries for programs and plugins
