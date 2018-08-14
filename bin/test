@@ -21,9 +21,9 @@ function main() {
 function launchConjur() {
   echo "> Launching local Conjur environment"
 
-  export CONJUR_DATA_KEY="$(docker-compose run --rm --no-deps conjur data-key generate)"
-
   docker-compose pull
+
+  export CONJUR_DATA_KEY="$(docker-compose run --rm --no-deps conjur data-key generate)"
 
   docker-compose up -d conjur
   conjurExec conjurctl wait
@@ -48,6 +48,9 @@ function configureConjur() {
 function runTerraform() {
   echo "> Planning and applying main.tf Terraform manifest"
 
+  if [ ! -z "$GITLAB_CI" ]; then
+    export CONJUR_APPLIANCE_URL="http://docker:8080"  # https://docs.gitlab.com/ce/ci/docker/using_docker_build.html#use-docker-in-docker-executor
+  fi
   export CONJUR_ACCOUNT="$CONJUR_ACCOUNT"
   export CONJUR_AUTHN_LOGIN="admin"
   export CONJUR_AUTHN_API_KEY="$(conjurExec conjurctl role retrieve-key $CONJUR_ACCOUNT:user:admin | tr -d '\r')"
