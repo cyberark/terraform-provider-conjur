@@ -4,7 +4,10 @@ git fetch --tags  # jenkins does not do this automatically yet
 
 docker-compose pull goreleaser
 
+echo "> Building and packaging binaries"
 docker-compose run --rm -T --entrypoint sh goreleaser -es <<EOF
-dep ensure --vendor-only
+dep ensure -v
 goreleaser release --rm-dist --skip-validate --snapshot
 EOF
+
+cp dist/linux_amd64/terraform-provider-conjur .  # for following test stages
