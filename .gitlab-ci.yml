@@ -18,7 +18,7 @@ build:
     paths:
       - dist/*.tar.gz
       - dist/*.zip
-      - dist/linux_amd64/terraform-provider-conjur  # for next stage
+      - terraform-provider-conjur  # for next stage
 
 test:
   stage: test

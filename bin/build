@@ -10,4 +10,8 @@ dep ensure -v
 goreleaser release --rm-dist --skip-validate --snapshot
 EOF
 
-cp dist/linux_amd64/terraform-provider-conjur .  # for following test stages
+bin_name='terraform-provider-conjur'
+goos="$(uname -s | tr '[:upper:]' '[:lower:]')"
+goarch="amd64"
+
+cp "dist/${goos}_${goarch}/${bin_name}" .  # for following test stages
