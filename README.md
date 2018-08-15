@@ -60,6 +60,10 @@ output "dbpass_output" {
 
 Secrets like `data.conjur_secret.dbpass.value` can be used in any Terraform resources.
 
+## Alternate Workflow
+
+TODO, talk about summon + terraform
+
 ---
 
 ## Development
