@@ -60,29 +60,38 @@ output "dbpass_output" {
 
 Secrets like `data.conjur_secret.dbpass.value` can be used in any Terraform resources.
 
-## Alternate Workflow
-
-TODO, talk about summon + terraform
-
 ---
 
-## Development
+## Alternate Workflow with Summon
 
-Install dependencies:
+If this Terraform provider does not fit your needs, you can also use
+[summon](https://github.com/cyberark/summon) with the
+[summon-conjur](https://github.com/cyberark/summon-conjur) provider
+to provide secrets to Terraform via environment variables.
+The user running `terraform` must already be authenticated with Conjur.
+
+Terraform's [`TF_VAR_name` syntax](https://www.terraform.io/docs/configuration/environment-variables.html#tf_var_name)
+allows a user to set Terraform variables via environment variables.
+To use Terraform with Summon, prefix the environment variable names in secrets.yml with `TF_VAR_`.
+
+### Example
+
+**variables.tf**
 
 ```
-dep ensure
+variable "access_key" {}
+variable "secret_key" {}
 ```
 
-Build binaries:
+**secrets.yml**
 
 ```
-./bin/build
+TF_VAR_access_key: !var aws/dev/sys_powerful/access_key_id
+TF_VAR_secret_key: !var aws/dev/sys_powerful/secret_access_key
 ```
 
-Run integration tests:
+Run Terraform with Summon:
 
 ```
-./bin/test
+summon terraform apply
 ```
-
