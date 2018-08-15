@@ -1,19 +1,27 @@
 ## Development
 
-Install dependencies:
+### Install dependencies:
 
 ```
 dep ensure
 ```
 
-Build binaries:
+### Build binaries:
 
 ```
 ./bin/build
 ```
 
-Run integration tests:
+### Run integration tests:
+
+#### Conjur 5 OSS
 
 ```
-./bin/test
+./bin/test oss
+```
+
+#### Conjur 5 Enterprise
+
+```
+./bin/test enterprise
 ```

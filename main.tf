@@ -3,6 +3,8 @@ provider "conjur" {
   # account = "quick-start"
   # login = "test"
   # api_key = "test"
+  # ssl_cert = "-----BEGIN CERTIFICATE-----..."
+  # ssl_cert_path = "/etc/conjur.pem"
 }
 
 data "conjur_secret" "secret1" {

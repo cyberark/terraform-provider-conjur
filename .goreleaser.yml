@@ -27,35 +27,5 @@ archive:
 checksum:
   name_template: 'SHA256SUMS.txt'
 
-# brew:
-#   description: Conjur provider for Summon
-#   homepage: https://github.com/cyberark/summon-conjur
-#   url_template: https://github.com/cyberark/summon-conjur/releases/download/v{{.Version}}/summon-conjur-darwin-amd64.tar.gz
-#   install: |
-#     target = lib/"summon"
-#     target.install "summon-conjur"
-#   test: |
-#     system lib/"summon"/"summon-conjur", "-V"
-  
-#   github:
-#     owner: cyberark
-#     name: homebrew-tools
-#   skip_upload: true
-
-# nfpm:
-#   name_template: "{{.ProjectName}}"
-#   vendor: CyberArk
-#   homepage: https://github.com/cyberark/summon-conjur
-#   maintainer: Dustin Collins <dustin.collins@cyberark.com>
-
-#   description: Conjur provider for Summon
-#   recommends:
-#     - summon
-#   license: MIT
-#   formats:
-#   - deb
-#   - rpm
-#   bindir: /usr/local/lib/summon  # where the binary is placed, default summon provider dir
-
 release:
   disable: true
