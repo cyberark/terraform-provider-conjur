@@ -43,6 +43,18 @@ func Provider() terraform.ResourceProvider {
 				DefaultFunc: schema.EnvDefaultFunc("CONJUR_AUTHN_API_KEY", nil),
 				Description: "Conjur API key",
 			},
+			"ssl_cert": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				DefaultFunc: schema.EnvDefaultFunc("CONJUR_SSL_CERTIFICATE", nil),
+				Description: "Content of Conjur public SSL certificate",
+			},
+			"ssl_cert_path": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				DefaultFunc: schema.EnvDefaultFunc("CONJUR_CERT_FILE", nil),
+				Description: "Path to Conjur public SSL certificate",
+			},
 		},
 		ConfigureFunc: providerConfig,
 	}
@@ -53,8 +65,15 @@ func providerConfig(d *schema.ResourceData) (interface{}, error) {
 	account := d.Get("account").(string)
 	login := d.Get("login").(string)
 	apiKey := d.Get("api_key").(string)
+	sslCert := d.Get("ssl_cert").(string)
+	sslCertPath := d.Get("ssl_cert_path").(string)
 
-	config := conjurapi.Config{ApplianceURL: applianceURL, Account: account}
+	config := conjurapi.Config{
+		ApplianceURL: applianceURL,
+		Account:      account,
+		SSLCert:      sslCert,
+		SSLCertPath:  sslCertPath,
+	}
 
 	loginPair := authn.LoginPair{Login: login, APIKey: apiKey}
 

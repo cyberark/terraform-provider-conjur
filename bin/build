@@ -11,7 +11,7 @@ goreleaser release --rm-dist --skip-validate --snapshot
 EOF
 
 bin_name='terraform-provider-conjur'
-goos="$(uname -s | tr '[:upper:]' '[:lower:]')"
+goos='linux'  # uname -s | tr '[:upper:]' '[:lower:]'
 goarch="amd64"
 
 cp "dist/${goos}_${goarch}/${bin_name}" .  # for following test stages
