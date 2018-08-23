@@ -27,7 +27,11 @@ services:
       - $PWD/test:/test
 
   terraform:
-    image: hashicorp/terraform:0.11.7
+    build:
+      context: .
+      dockerfile: Dockerfile.terraform
+      
+    entrypoint: sleep infinity
     environment:
       CONJUR_APPLIANCE_URL: http://conjur
       CONJUR_ACCOUNT:

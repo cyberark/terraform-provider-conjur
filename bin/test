@@ -22,7 +22,7 @@ function finish() {
   rm -f $LOCAL_SECRET_FILE
   dockerCompose down -v
 }
-trap finish EXIT
+# trap finish EXIT
 
 function main() {
   launchConjur
@@ -81,6 +81,8 @@ function runTerraform() {
     export CONJUR_SSL_CERTIFICATE="$(conjurExec cat /opt/conjur/etc/ssl/conjur.pem)"
   fi
 
+  dockerCompose up -d terraform
+  
   terraformRun <<EOF
 terraform init
 terraform plan
@@ -114,7 +116,7 @@ function clientExec() {
 }
 
 function terraformRun() {
-  dockerCompose run --rm -T --entrypoint sh terraform -es "$"
+  dockerCompose exec -T terraform sh -es "$@"
 }
 
 function fetchConjurAdminAPIKey() {
