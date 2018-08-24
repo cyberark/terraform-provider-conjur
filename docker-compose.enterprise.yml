@@ -8,27 +8,3 @@ services:
     ports:
       - "443"
 
-  client:
-    image: cyberark/conjur-cli:5
-    depends_on: [ conjur ]
-    entrypoint: sleep
-    command: infinity
-    environment:
-      CONJUR_APPLIANCE_URL: https://conjur/api
-      CONJUR_ACCOUNT:
-      CONJUR_SSL_CERTIFICATE:
-    volumes:
-      - $PWD/test:/test
-
-  terraform:
-    image: hashicorp/terraform:0.11.7
-    environment:
-      CONJUR_APPLIANCE_URL: https://conjur/api
-      CONJUR_ACCOUNT:
-      CONJUR_AUTHN_LOGIN:
-      CONJUR_AUTHN_API_KEY:
-      CONJUR_SSL_CERTIFICATE:
-      TF_LOG: "${TF_LOG:-INFO}"
-    working_dir: /src
-    volumes:
-      - $PWD:/src
