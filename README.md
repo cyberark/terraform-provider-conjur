@@ -13,21 +13,10 @@ Terraform Conjur provider
 
 ### Provider configuration
 
-With embedded values:
+#### Using environment variables
 
-**main.tf**
-
-```
-provider "conjur" {
-  appliance_url = "http://localhost:8080"
-  account = "quick-start"
-  login = "admin"
-  api_key = "3ahcddy39rcxzh3ggac4cwk3j2r8pqwdg33059y835ys2rh2kzs2a"
-  ssl_cert_path = "/etc/conjur.pem"
-}
-```
-
-With environment variables:
+The provider uses [conjur-api-go](https://github.com/cyberark/conjur-api-go) to load its
+configuration. `conjur-api-go` can be configured using environment variables:
 
 ```
 export CONJUR_APPLIANCE_URL="https://localhost:8443"
@@ -37,17 +26,35 @@ export CONJUR_AUTHN_API_KEY="3ahcddy39rcxzh3ggac4cwk3j2r8pqwdg33059y835ys2rh2kzs
 export CONJUR_CERT_FILE="/etc/conjur.pem"
 ```
 
-**main.tf**
+No other configuration is necessary in `main.tf`:
 
 ```
+# main.tf
 provider "conjur" {}
 ```
 
-### Fetch secrets
+#### Using attributes
 
-**main.tf**
+In addition, the provider can be configured using attributes in the
+configuration. Attributes specified in `main.tf` override the configuration loaded by
+`conjur-api-go`.
+
+For example, if the environment is initialized as above, this configuration would
+authenticate as `terraform-user` instead of `admin`:
 
 ```
+# main.tf
+provider "conjur" {
+  login = "terraform-user"
+  api_key = "x0dwqc3jrqkye3xhn7k62rw31c6216ewfe1wv71291jrqm4j15b3dg9"
+}
+```
+
+
+### Fetch secrets
+
+```
+# main.tf
 # ... provider configuration above
 
 data "conjur_secret" "dbpass" {
@@ -78,16 +85,15 @@ To use Terraform with Summon, prefix the environment variable names in secrets.y
 
 ### Example
 
-**variables.tf**
-
 ```
+# variables.tf
 variable "access_key" {}
 variable "secret_key" {}
 ```
 
-**secrets.yml**
 
 ```
+# secrets.yml
 TF_VAR_access_key: !var aws/dev/sys_powerful/access_key_id
 TF_VAR_secret_key: !var aws/dev/sys_powerful/secret_access_key
 ```
