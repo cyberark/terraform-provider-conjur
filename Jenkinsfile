@@ -15,6 +15,11 @@ pipeline {
         archiveArtifacts artifacts: "dist/*.tar.gz,dist/*.zip", fingerprint: true
       }
     }
+    stage('Run integration tests (OSS)') {
+      steps {
+        sh './bin/test oss'
+      }
+    }
     stage('Run integration tests (Conjur 5 Enterprise)') {
       steps {
         sh './bin/test enterprise'

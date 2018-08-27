@@ -1,17 +1,21 @@
-#!/bin/bash -e
+#!/bin/bash -ex
 
 TARGET="${1:-oss}"  # can also be set to 'enterprise'
 
-if [[ "$TARGET" == "oss" ]]; then
-  DOCKER_COMPOSE_ARGS=""
+case "$TARGET" in
+"oss")
+  DOCKER_COMPOSE_ARGS="-f docker-compose.oss.yml -f docker-compose.yml"
   CONJUR_WAIT_COMMAND="conjurctl wait"
-elif [[ "$TARGET" == "enterprise" ]]; then
-  DOCKER_COMPOSE_ARGS="-f docker-compose.enterprise.yml"
+  ;;
+"enterprise")
+  DOCKER_COMPOSE_ARGS="-f docker-compose.enterprise.yml -f docker-compose.yml"
   CONJUR_WAIT_COMMAND="/opt/conjur/evoke/bin/wait_for_conjur"
-else
+  ;;
+*)
   echo "> '$TARGET' is not a supported target"
   exit 1
-fi
+  ;;
+esac
 
 CONJUR_ACCOUNT='cucumber'
 LOCAL_SECRET_FILE='secret1'
@@ -22,7 +26,10 @@ function finish() {
   rm -f $LOCAL_SECRET_FILE
   dockerCompose down -v
 }
-trap finish EXIT
+
+if [[ -z "$KEEP_CONTAINERS" ]]; then
+  trap finish EXIT
+fi
 
 function main() {
   launchConjur
@@ -37,7 +44,7 @@ function launchConjur() {
   dockerCompose pull
 
   if [[ "$TARGET" == "oss" ]]; then
-    export CONJUR_DATA_KEY="$(docker-compose run --rm --no-deps conjur data-key generate)"
+    export CONJUR_DATA_KEY="$(docker-compose $DOCKER_COMPOSE_ARGS run --rm --no-deps conjur data-key generate)"
   fi
 
   dockerCompose up -d conjur
@@ -50,14 +57,17 @@ function configureConjur() {
   export CONJUR_ACCOUNT="$CONJUR_ACCOUNT"
   export CONJUR_AUTHN_LOGIN="admin"
 
-  if [[ "$TARGET" == "oss" ]]; then
+  case "$TARGET" in
+  "oss")
+    export CONJUR_APPLIANCE_URL=http://conjur
     conjurExec conjurctl account create $CONJUR_ACCOUNT
     export CONJUR_AUTHN_API_KEY="$(fetchConjurAdminAPIKey)"
-  fi
-
-  if [[ "$TARGET" == "enterprise" ]]; then
+    ;;
+  "enterprise")
+    export CONJUR_APPLIANCE_URL=https://conjur
     export CONJUR_SSL_CERTIFICATE="$(conjurExec cat /opt/conjur/etc/ssl/conjur.pem)"
-  fi
+    ;;
+  esac
 
   dockerCompose up -d client
 
@@ -77,10 +87,18 @@ function runTerraform() {
   export CONJUR_AUTHN_API_KEY="$(fetchConjurAdminAPIKey)"
   export TF_LOG=INFO
 
-  if [[ "$TARGET" == "enterprise" ]]; then
+  case "$TARGET" in
+  "oss")
+    export CONJUR_APPLIANCE_URL=http://conjur
+    ;;
+  "enterprise")
+    export CONJUR_APPLIANCE_URL=https://conjur
     export CONJUR_SSL_CERTIFICATE="$(conjurExec cat /opt/conjur/etc/ssl/conjur.pem)"
-  fi
-
+    ;;
+  esac
+         
+  dockerCompose up -d terraform
+  
   terraformRun <<EOF
 terraform init
 terraform plan
@@ -114,15 +132,18 @@ function clientExec() {
 }
 
 function terraformRun() {
-  dockerCompose run --rm -T --entrypoint sh terraform -es "$"
+  dockerCompose exec -T terraform sh -es "$@"
 }
 
 function fetchConjurAdminAPIKey() {
-  if [[ "$TARGET" == "oss" ]]; then
+  case "$TARGET" in
+  "oss")
     conjurExec conjurctl role retrieve-key $CONJUR_ACCOUNT:user:admin | tr -d '\r'
-  elif [[ "$TARGET" == "enterprise" ]]; then
+    ;;
+  "enterprise")
     clientExec conjur user rotate_api_key
-  fi
+    ;;
+  esac
 }
 
 main

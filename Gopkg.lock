@@ -98,16 +98,17 @@
   version = "v3.5.1"
 
 [[projects]]
-  digest = "1:891b858eea5309452f25bf2f7b1526e2ef8746e4ba25fadfedfe4619d0ef2bd1"
+  branch = "master"
+  digest = "1:a105bee29e6f114f9c43429ff28748c3c7d2ae64e0d00a62a6bd406e37fc6e18"
   name = "github.com/cyberark/conjur-api-go"
   packages = [
     "conjurapi",
     "conjurapi/authn",
+    "conjurapi/logging",
     "conjurapi/response",
   ]
   pruneopts = "UT"
-  revision = "fc11334077dd0b550c8f589ad9f3102ff9420738"
-  version = "v0.3.3"
+  revision = "e558ab28a93b7e044ac169b860ee5a19e41b70c1"
 
 [[projects]]
   digest = "1:865079840386857c809b72ce300be7580cb50d3d3129ce11bf9aa6ca2bc1934a"

@@ -5,11 +5,11 @@ import (
 	"encoding/hex"
 	"log"
 
-	"github.com/cyberark/conjur-api-go/conjurapi/authn"
-
-	"github.com/cyberark/conjur-api-go/conjurapi"
 	"github.com/hashicorp/terraform/helper/schema"
 	"github.com/hashicorp/terraform/terraform"
+
+	"github.com/cyberark/conjur-api-go/conjurapi"
+	"github.com/cyberark/conjur-api-go/conjurapi/authn"
 )
 
 // Provider implements Conjur as a terraform.ResourceProvider
@@ -21,38 +21,32 @@ func Provider() terraform.ResourceProvider {
 		Schema: map[string]*schema.Schema{
 			"appliance_url": {
 				Type:        schema.TypeString,
-				Required:    true,
-				DefaultFunc: schema.EnvDefaultFunc("CONJUR_APPLIANCE_URL", "http://localhost:8080"),
+				Optional:    true,
 				Description: "Conjur endpoint URL",
 			},
 			"account": {
 				Type:        schema.TypeString,
-				Required:    true,
-				DefaultFunc: schema.EnvDefaultFunc("CONJUR_ACCOUNT", nil),
+				Optional:    true,
 				Description: "Conjur account",
 			},
 			"login": {
 				Type:        schema.TypeString,
-				Required:    true,
-				DefaultFunc: schema.EnvDefaultFunc("CONJUR_AUTHN_LOGIN", nil),
+				Optional:    true,
 				Description: "Conjur login",
 			},
 			"api_key": {
 				Type:        schema.TypeString,
-				Required:    true,
-				DefaultFunc: schema.EnvDefaultFunc("CONJUR_AUTHN_API_KEY", nil),
+				Optional:    true,
 				Description: "Conjur API key",
 			},
 			"ssl_cert": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				DefaultFunc: schema.EnvDefaultFunc("CONJUR_SSL_CERTIFICATE", nil),
 				Description: "Content of Conjur public SSL certificate",
 			},
 			"ssl_cert_path": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				DefaultFunc: schema.EnvDefaultFunc("CONJUR_CERT_FILE", nil),
 				Description: "Path to Conjur public SSL certificate",
 			},
 		},
@@ -61,30 +55,20 @@ func Provider() terraform.ResourceProvider {
 }
 
 func providerConfig(d *schema.ResourceData) (interface{}, error) {
-	applianceURL := d.Get("appliance_url").(string)
-	account := d.Get("account").(string)
+
+	config := conjurapi.LoadConfig()
+
+	// If creds have been specified in the schema, use them. Otherwise,
+	// assume the environment has everything needed.
 	login := d.Get("login").(string)
 	apiKey := d.Get("api_key").(string)
-	sslCert := d.Get("ssl_cert").(string)
-	sslCertPath := d.Get("ssl_cert_path").(string)
+	if login != "" && apiKey != "" {
+		loginPair := authn.LoginPair{Login: login, APIKey: apiKey}
 
-	config := conjurapi.Config{
-		ApplianceURL: applianceURL,
-		Account:      account,
-		SSLCert:      sslCert,
-		SSLCertPath:  sslCertPath,
+		return conjurapi.NewClientFromKey(config, loginPair)
 	}
 
-	loginPair := authn.LoginPair{Login: login, APIKey: apiKey}
-
-	conjur, err := conjurapi.NewClientFromKey(config, loginPair)
-
-	// _, err = conjur.Authenticate(loginPair)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	return conjur, err
+	return conjurapi.NewClientFromEnvironment(config)
 }
 
 func dataSourceSecret() *schema.Resource {

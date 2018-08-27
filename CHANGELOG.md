@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+* Use `conjur-api-go` to read configuration.
+
 ## [v0.1.0](https://github.com/cyberark/terraform-provider-conjur/releases/tag/v0.1.0) - 2018-08-XX
 ### Added
 - Initial release
