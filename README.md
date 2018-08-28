@@ -32,7 +32,25 @@ $ mv terraform-provider-conjur*/terraform-provider-conjur ~/.terraform.d/plugins
 
 ### Homebrew (MacOS)
 
-[coming soon...](https://github.com/cyberark/terraform-provider-conjur/issues/3)
+Add and update the CyberArk Tools Homebrew tap.
+
+```sh-session
+$ brew tap cyberark/tools
+```
+
+Install the provider and symlink it to Terraform's plugins directory.
+
+```sh-session
+$ brew install terraform-provider-conjur
+
+$ mkdir -p ~/.terraform.d/plugins/
+$ ln -sf /usr/local/Cellar/terraform-provider-conjur/<VERSION>/bin/terraform-provider-conjur
+```
+
+Symlinking is necessary because
+[Homebrew is sandboxed and cannot write to your home directory](https://github.com/Homebrew/brew/issues/2986).
+Replace `<VERSION>` above.
+If Homebrew is installing somewhere other than `/usr/local/Cellar`, update the path as well.
 
 ### Compile from Source
 
