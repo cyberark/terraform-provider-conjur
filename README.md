@@ -30,11 +30,11 @@ $ mkdir -p ~/.terraform.d/plugins/
 $ mv terraform-provider-conjur*/terraform-provider-conjur ~/.terraform.d/plugins/
 ```
 
-### Homebrew
+### Homebrew (MacOS)
 
 [coming soon...](https://github.com/cyberark/terraform-provider-conjur/issues/3)
 
-### From Source
+### Compile from Source
 
 If you wish to compile the provider from source code, you'll first need Go installed on your machine (version >=1.9 is required).
 
