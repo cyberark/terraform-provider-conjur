@@ -23,7 +23,7 @@ $ wget https://github.com/cyberark/terraform-provider-conjur/releases/download/v
 $ tar -xvf terraform-provider-conjur*.tar.gz
 ```
 
-Now copy the binary to the Terraform's plugins folder, if is your first plugin maybe isn't present.
+Now copy the binary to the Terraform's plugins folder. If this is your first plugin, you'll need to create the folder first.
 
 ```sh-session
 $ mkdir -p ~/.terraform.d/plugins/
@@ -53,7 +53,7 @@ $ cd $GOPATH/src/github.com/cyberark/terraform-provider-conjur
 $ make build
 ```
 
-Now copy the compiled binary to the Terraform's plugins folder, if is your first plugin maybe isn't present.
+Now copy the binary to the Terraform's plugins folder. If this is your first plugin, you'll need to create the folder first.
 
 ```sh-session
 $ mkdir -p ~/.terraform.d/plugins/
