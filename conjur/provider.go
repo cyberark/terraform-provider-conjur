@@ -85,7 +85,7 @@ func dataSourceSecret() *schema.Resource {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "version of the secret",
-				Default:     "",
+				Default:     "latest",
 			},
 			"value": {
 				Type:        schema.TypeString,
@@ -101,9 +101,9 @@ func dataSourceSecretRead(d *schema.ResourceData, meta interface{}) error {
 	client := meta.(*conjurapi.Client)
 
 	name := d.Get("name").(string)
-	// version := d.Get("version").(string)
+	version := d.Get("version").(string)
 
-	log.Printf("[DEBUG] Getting secret for name=%q version=%q", name, "latest")
+	log.Printf("[DEBUG] Getting secret for name=%q version=%q", name, version)
 
 	secretValue, err := client.RetrieveSecret(name)
 
