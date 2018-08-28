@@ -9,6 +9,57 @@ Terraform Conjur provider
 
 ---
 
+## Installation
+
+### Binaries (Recommended)
+The recommended way to install `terraform-provider-conjur` is to use the binary distributions from this project's
+[GitHub Releases page](https://github.com/cyberark/terraform-provider-conjur/releases).
+The packages are available for Linux, macOS and Windows.
+
+Download and uncompress the latest release for your OS. This example uses the linux binary.
+
+```sh-session
+$ wget https://github.com/cyberark/terraform-provider-conjur/releases/download/v0.1.0/terraform-provider-conjur-linux-amd64.tar.gz
+$ tar -xvf terraform-provider-conjur*.tar.gz
+```
+
+Now copy the binary to the Terraform's plugins folder. If this is your first plugin, you'll need to create the folder first.
+
+```sh-session
+$ mkdir -p ~/.terraform.d/plugins/
+$ mv terraform-provider-conjur*/terraform-provider-conjur ~/.terraform.d/plugins/
+```
+
+### Homebrew
+
+[coming soon...](https://github.com/cyberark/terraform-provider-conjur/issues/3)
+
+### From Source
+
+If you wish to compile the provider from source code, you'll first need Go installed on your machine (version >=1.9 is required).
+
+Clone repository to: `$GOPATH/src/github.com/cyberark/terraform-provider-conjur`
+
+```sh-session
+$ mkdir -p $GOPATH/src/github.com/cyberark
+
+$ git clone https://github.com/cyberark/terraform-provider-conjur.git $GOPATH/src/github.com/cyberark/terraform-provider-conjur
+```
+
+Enter the provider directory and build the provider
+
+```sh-session
+$ cd $GOPATH/src/github.com/cyberark/terraform-provider-conjur
+$ make build
+```
+
+Now copy the binary to the Terraform's plugins folder. If this is your first plugin, you'll need to create the folder first.
+
+```sh-session
+$ mkdir -p ~/.terraform.d/plugins/
+$ mv terraform-provider-conjur ~/.terraform.d/plugins/
+```
+
 ## Usage
 
 ### Provider configuration

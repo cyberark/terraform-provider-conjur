@@ -23,6 +23,7 @@ build:
     paths:
       - dist/*.tar.gz
       - dist/*.zip
+      - dist/*.txt
       - terraform-provider-conjur  # for next stage
 
 test:
