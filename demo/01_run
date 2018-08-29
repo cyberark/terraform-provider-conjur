@@ -1,0 +1,30 @@
+#!/bin/bash -ex
+
+make
+terraform init
+
+docker-compose up -d
+docker-compose exec conjur /opt/conjur/evoke/bin/wait_for_conjur
+
+appliance_url=https://localhost:4443
+account=cucumber
+conjurrc=$PWD/conjurrc
+
+conjur-cli-go init -force -f ${conjurrc} -u ${appliance_url} -a ${account}
+
+export CONJUR_AUTHN_LOGIN=admin
+passwd=secret
+
+# XXX Use the CLI instead of curl, once it supports logging in
+#
+# For now, though, we want to fail if the login fails. Bash makes this harder, so
+#  * use "set -e" in the command substitution
+#  * export CONJUR_AUTHN_API_KEY separately from the assignment
+CONJUR_AUTHN_API_KEY=$(set -e; curl -fsS --user ${CONJUR_AUTHN_LOGIN}:${passwd} --cacert $PWD/conjur-${account}.pem ${appliance_url}/authn/${account}/login)
+export CONJUR_AUTHN_API_KEY
+
+export CONJURRC=${conjurrc}
+conjur-cli-go policy load root policy.yml
+conjur-cli-go variable values add postgres/admin-password $(openssl rand -base64 33)
+
+terraform apply
