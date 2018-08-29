@@ -19,9 +19,11 @@ The packages are available for Linux, macOS and Windows.
 Download and uncompress the latest release for your OS. This example uses the linux binary.
 
 ```sh-session
-$ wget https://github.com/cyberark/terraform-provider-conjur/releases/download/v0.1.0/terraform-provider-conjur-linux-amd64.tar.gz
+$ wget https://github.com/cyberark/terraform-provider-conjur/releases/download/<VERSION>/terraform-provider-conjur-linux-amd64.tar.gz
 $ tar -xvf terraform-provider-conjur*.tar.gz
 ```
+
+Replace `<VERSION>` above.
 
 Now copy the binary to the Terraform's plugins folder. If this is your first plugin, you'll need to create the folder first.
 
