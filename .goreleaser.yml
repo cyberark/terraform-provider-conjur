@@ -35,10 +35,10 @@ brew:
     After installation, you must symlink the provider into Terraform's plugins directory.
 
     mkdir -p ~/.terraform.d/plugins/
-    ln -sf /usr/local/Cellar/terraform-provider-conjur/<VERSION>/bin/terraform-provider-conjur ~/.terraform.d/plugins/terraform-provider-conjur
+    ln -sf /usr/local/Cellar/terraform-provider-conjur/$VERSION/bin/terraform-provider-conjur ~/.terraform.d/plugins/terraform-provider-conjur
 
     Symlinking is necessary because Homebrew is sandboxed and cannot write to your home directory.
-    Replace <VERSION> above.
+    Replace $VERSION above.
     If Homebrew is installing somewhere other than /usr/local/Cellar, update the path as well.
   dependencies:
     - terraform
