@@ -140,6 +140,9 @@ output "dbpass_output" {
 
 Secrets like `data.conjur_secret.dbpass.value` can be used in any Terraform resources.
 
+View an example Terraform manifest and Conjur policies in the
+[test/](test/) directory in this project.
+
 ---
 
 ## Alternate Workflow with Summon
