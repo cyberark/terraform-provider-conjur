@@ -1,6 +1,9 @@
 - &secrets
   - !variable dbpass
 
+- !layer authorized
+- !layer unauthorized
+
 - !group secrets-users
 - !group secrets-admins
 
@@ -16,3 +19,7 @@
   privileges: [update]
   roles:
   - !group secrets-admins
+
+- !grant
+  role: !group secrets-users
+  member: !layer authorized
