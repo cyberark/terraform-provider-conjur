@@ -16,6 +16,7 @@ function finish() {
     echo "> KEEP_CONTAINERS is set, not terminating local Conjur environment"
   fi
 }
+trap finish EXIT
 
 function main() {
   checkTarget
@@ -30,12 +31,12 @@ function main() {
 function checkTarget() {
   case "$TARGET" in
   "oss")
-    DOCKER_COMPOSE_ARGS="-f docker-compose.oss.yml -f docker-compose.yml"
-    CONJUR_WAIT_COMMAND="conjurctl wait"
+    export DOCKER_COMPOSE_ARGS="-f docker-compose.oss.yml -f docker-compose.yml"
+    export CONJUR_WAIT_COMMAND="conjurctl wait"
     ;;
   "enterprise")
-    DOCKER_COMPOSE_ARGS="-f docker-compose.enterprise.yml -f docker-compose.yml"
-    CONJUR_WAIT_COMMAND="/opt/conjur/evoke/bin/wait_for_conjur"
+    export DOCKER_COMPOSE_ARGS="-f docker-compose.enterprise.yml -f docker-compose.yml"
+    export CONJUR_WAIT_COMMAND="/opt/conjur/evoke/bin/wait_for_conjur"
     ;;
   *)
     echo "> '$TARGET' is not a supported target"
@@ -115,7 +116,7 @@ function runTerraform() {
   dockerCompose up -d terraform
 
   terraformRun <<EOF
-terraform init
+terraform init test/
 terraform plan test/
 terraform apply -auto-approve test/
 EOF
