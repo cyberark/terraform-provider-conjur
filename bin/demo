@@ -1,0 +1,45 @@
+#!/bin/bash -e
+
+TARGET="${1:-oss}"  # can also be set to 'enterprise'
+
+case "$TARGET" in
+"oss")
+  DOCKER_COMPOSE_ARGS="-f docker-compose.oss.yml -f docker-compose.yml"
+  CONJUR_WAIT_COMMAND="conjurctl wait"
+  ;;
+"enterprise")
+  DOCKER_COMPOSE_ARGS="-f docker-compose.enterprise.yml -f docker-compose.yml"
+  CONJUR_WAIT_COMMAND="/opt/conjur/evoke/bin/wait_for_conjur"
+  ;;
+*)
+  echo "> '$TARGET' is not a supported target"
+  exit 1
+  ;;
+esac
+
+cwd="$(dirname "$0")"
+# shellcheck source=_utils
+. "$cwd/_utils"
+
+CONJUR_ACCOUNT='cucumber'
+LOCAL_SECRET_FILE='secret1'
+# KEEP_CONTAINERS=1
+
+function finish() {
+  if [[ -z "$KEEP_CONTAINERS" ]]; then
+    echo "> Terminating local Conjur environment"
+
+    rm -f $LOCAL_SECRET_FILE
+    dockerCompose down -v
+  else
+    echo "> KEEP_CONTAINERS is set, not terminating local Conjur environment"
+  fi
+}
+trap finish EXIT
+
+function main() {
+  echo "I'm a demo!"
+}
+
+main
+

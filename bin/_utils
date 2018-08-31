@@ -1,0 +1,32 @@
+#!/bin/bash
+
+declare DOCKER_COMPOSE_ARGS
+
+# shellcheck disable=SC2086
+# DOCKER_COMPOSE_ARGS needs to stay unquoted to work 
+function dockerCompose() {
+  docker-compose $DOCKER_COMPOSE_ARGS "$@"
+}
+
+function conjurExec() {
+  dockerCompose exec -T conjur "$@"
+}
+
+function clientExec() {
+  dockerCompose exec -T client "$@"
+}
+
+function terraformRun() {
+  dockerCompose exec -T terraform sh -es "$@"
+}
+
+function fetchConjurAdminAPIKey() {  
+  case "$TARGET" in
+  "oss")
+    conjurExec conjurctl role retrieve-key "$CONJUR_ACCOUNT:user:admin" | tr -d '\r'
+    ;;
+  "enterprise")
+    clientExec conjur user rotate_api_key
+    ;;
+  esac
+}

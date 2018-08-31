@@ -17,6 +17,10 @@ case "$TARGET" in
   ;;
 esac
 
+cwd="$(dirname "$0")"
+# shellcheck source=_utils
+. "$cwd/_utils"
+
 CONJUR_ACCOUNT='cucumber'
 LOCAL_SECRET_FILE='secret1'
 
@@ -96,9 +100,9 @@ function runTerraform() {
     export CONJUR_SSL_CERTIFICATE="$(conjurExec cat /opt/conjur/etc/ssl/conjur.pem)"
     ;;
   esac
-         
+
   dockerCompose up -d terraform
-  
+
   terraformRun <<EOF
 terraform init
 terraform plan
@@ -117,33 +121,6 @@ function validateResults() {
     echo "Expected '$expectedValue', got '$actualValue'"
     exit 1
   fi
-}
-
-function dockerCompose() {
-  docker-compose $DOCKER_COMPOSE_ARGS "$@"
-}
-
-function conjurExec() {
-  dockerCompose exec -T conjur "$@"
-}
-
-function clientExec() {
-  dockerCompose exec -T client "$@"
-}
-
-function terraformRun() {
-  dockerCompose exec -T terraform sh -es "$@"
-}
-
-function fetchConjurAdminAPIKey() {
-  case "$TARGET" in
-  "oss")
-    conjurExec conjurctl role retrieve-key $CONJUR_ACCOUNT:user:admin | tr -d '\r'
-    ;;
-  "enterprise")
-    clientExec conjur user rotate_api_key
-    ;;
-  esac
 }
 
 main
