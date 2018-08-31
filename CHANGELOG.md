@@ -6,9 +6,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
-## [v0.2.0](https://github.com/cyberark/terraform-provider-conjur/releases/tag/v0.2.0) - 2018-08-29
+## [v0.2.0](https://github.com/cyberark/terraform-provider-conjur/releases/tag/v0.2.0) - 2018-08-31
 ### Added
-- Homebrew installer, see [TODO LINK] for instructions.
+- Homebrew installer, see https://github.com/cyberark/terraform-provider-conjur#homebrew-macos for instructions.
 
 ## [v0.1.0](https://github.com/cyberark/terraform-provider-conjur/releases/tag/v0.1.0) - 2018-08-28
 ### Added
