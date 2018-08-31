@@ -1,41 +1,54 @@
-#!/bin/bash -ex
+#!/bin/bash
+set -eo pipefail
 
 TARGET="${1:-oss}"  # can also be set to 'enterprise'
 
-case "$TARGET" in
-"oss")
-  DOCKER_COMPOSE_ARGS="-f docker-compose.oss.yml -f docker-compose.yml"
-  CONJUR_WAIT_COMMAND="conjurctl wait"
-  ;;
-"enterprise")
-  DOCKER_COMPOSE_ARGS="-f docker-compose.enterprise.yml -f docker-compose.yml"
-  CONJUR_WAIT_COMMAND="/opt/conjur/evoke/bin/wait_for_conjur"
-  ;;
-*)
-  echo "> '$TARGET' is not a supported target"
-  exit 1
-  ;;
-esac
-
 CONJUR_ACCOUNT='cucumber'
-LOCAL_SECRET_FILE='secret1'
+LOCAL_SECRET_FILE='test/dbpass'
 
 function finish() {
-  echo "> Terminating local Conjur environment"
+  if [[ -z "$KEEP_CONTAINERS" ]]; then
+    echo "> Terminating local Conjur environment"
 
-  rm -f $LOCAL_SECRET_FILE
-  dockerCompose down -v
+    rm -f $LOCAL_SECRET_FILE
+    dockerCompose down -v
+  else
+    echo "> KEEP_CONTAINERS is set, not terminating local Conjur environment"
+  fi
 }
-
-if [[ -z "$KEEP_CONTAINERS" ]]; then
-  trap finish EXIT
-fi
+trap finish EXIT
 
 function main() {
+  checkTarget
+  loadUtils
+
   launchConjur
   configureConjur
   runTerraform
   validateResults
+}
+
+function checkTarget() {
+  case "$TARGET" in
+  "oss")
+    export DOCKER_COMPOSE_ARGS="-f docker-compose.oss.yml -f docker-compose.yml"
+    export CONJUR_WAIT_COMMAND="conjurctl wait"
+    ;;
+  "enterprise")
+    export DOCKER_COMPOSE_ARGS="-f docker-compose.enterprise.yml -f docker-compose.yml"
+    export CONJUR_WAIT_COMMAND="/opt/conjur/evoke/bin/wait_for_conjur"
+    ;;
+  *)
+    echo "> '$TARGET' is not a supported target"
+    exit 1
+    ;;
+  esac
+}
+
+function loadUtils() {
+  cwd="$(dirname "$0")"
+  # shellcheck source=_utils
+  . "$cwd/_utils"
 }
 
 function launchConjur() {
@@ -74,9 +87,12 @@ function configureConjur() {
   if [[ "$TARGET" == "enterprise" ]]; then
     clientExec conjur authn login -u admin -p secret
   fi
-  clientExec conjur policy load root /test/policy.yml  # policy file mounted in docker-compose
+
+  # policy files are mounted in docker-compose
+  clientExec conjur policy load --replace root /test/policy.root.yml
+  clientExec conjur policy load terraform-example /test/policy.example.yml
   clientExec conjur list
-  clientExec conjur variable values add my/shiny/dbpass testing
+  clientExec conjur variable values add terraform-example/dbpass SECRETXcLhn23MJcimV
 }
 
 function runTerraform() {
@@ -96,18 +112,18 @@ function runTerraform() {
     export CONJUR_SSL_CERTIFICATE="$(conjurExec cat /opt/conjur/etc/ssl/conjur.pem)"
     ;;
   esac
-         
+
   dockerCompose up -d terraform
-  
+
   terraformRun <<EOF
-terraform init
-terraform plan
-terraform apply -auto-approve
+terraform init test/
+terraform plan test/
+terraform apply -auto-approve test/
 EOF
 }
 
 function validateResults() {
-  local expectedValue="testing"
+  local expectedValue="SECRETXcLhn23MJcimV"
   local actualValue=$(cat $LOCAL_SECRET_FILE)
 
   if [[ "$expectedValue" == "$actualValue" ]]; then
@@ -117,33 +133,6 @@ function validateResults() {
     echo "Expected '$expectedValue', got '$actualValue'"
     exit 1
   fi
-}
-
-function dockerCompose() {
-  docker-compose $DOCKER_COMPOSE_ARGS "$@"
-}
-
-function conjurExec() {
-  dockerCompose exec -T conjur "$@"
-}
-
-function clientExec() {
-  dockerCompose exec -T client "$@"
-}
-
-function terraformRun() {
-  dockerCompose exec -T terraform sh -es "$@"
-}
-
-function fetchConjurAdminAPIKey() {
-  case "$TARGET" in
-  "oss")
-    conjurExec conjurctl role retrieve-key $CONJUR_ACCOUNT:user:admin | tr -d '\r'
-    ;;
-  "enterprise")
-    clientExec conjur user rotate_api_key
-    ;;
-  esac
 }
 
 main

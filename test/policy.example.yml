@@ -1,0 +1,25 @@
+- &secrets
+  - !variable dbpass
+
+- !layer authorized
+- !layer unauthorized
+
+- !group secrets-users
+- !group secrets-admins
+
+- !permit
+  resource: *secrets
+  privileges: [read, execute]
+  roles:
+  - !group secrets-users
+  - !group secrets-admins
+    
+- !permit
+  resource: *secrets
+  privileges: [update]
+  roles:
+  - !group secrets-admins
+
+- !grant
+  role: !group secrets-users
+  member: !layer authorized

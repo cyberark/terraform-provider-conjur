@@ -1,0 +1,15 @@
+version: '3'
+services:
+  conjur:
+    image: registry.tld/conjur-appliance-cuke-master:5.0-stable
+    security_opt:
+      - seccomp:unconfined # --security-opt seccomp=unconfined
+    hostname: conjur
+    ports:
+      - "4443:443"
+
+#  cli:
+#    image: cyberark/conjur-cli:5
+#    volumes:
+#      - .:/demo
+      
