@@ -1,0 +1,18 @@
+- &secrets
+  - !variable dbpass
+
+- !group secrets-users
+- !group secrets-admins
+
+- !permit
+  resource: *secrets
+  privileges: [read, execute]
+  roles:
+  - !group secrets-users
+  - !group secrets-admins
+    
+- !permit
+  resource: *secrets
+  privileges: [update]
+  roles:
+  - !group secrets-admins

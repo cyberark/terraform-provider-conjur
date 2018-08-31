@@ -3,6 +3,7 @@ vendor/
 .terraform/
 *.tfstate*
 dist/
+test/dbpass
 
 # Binaries for programs and plugins
 *.exe
