@@ -1,6 +1,6 @@
 # terraform-provider-conjur
 
-Terraform Conjur provider
+Terraform provider for [Conjur](https://www.conjur.org).
 
 [![GitHub release](https://img.shields.io/github/release/cyberark/terraform-provider-conjur.svg)](https://github.com/cyberark/terraform-provider-conjur/releases/latest)
 
