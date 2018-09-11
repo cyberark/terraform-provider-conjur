@@ -95,7 +95,7 @@ this provider will read the machine's configuration.
 To access the values of secrets, the user/machine needs `execute` privilege
 on the Conjur variables referenced in your Terraform manifests.
 
-For more details, eee the "Authentication" section
+For more details, see the "Authentication" section
 [on this page](https://docs.conjur.org/Latest/en/Content/terraform.htm).
 
 ### Provider configuration
