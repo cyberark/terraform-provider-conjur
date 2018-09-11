@@ -82,6 +82,10 @@ $ mv terraform-provider-conjur ~/.terraform.d/plugins/
 
 ## Usage
 
+### Workflow
+
+TODO, talk about Conjur authn/authnz and policy here
+
 ### Provider configuration
 
 #### Using environment variables
