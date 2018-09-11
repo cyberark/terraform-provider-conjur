@@ -82,6 +82,22 @@ $ mv terraform-provider-conjur ~/.terraform.d/plugins/
 
 ## Usage
 
+### Workflow
+
+Terraform can be run manually by users, but it is often run by machines.
+Conjur supports authentication and authorization for both.
+
+If you are logged into the [Conjur CLI](https://docs.conjur.org/Latest/en/Content/Tools/cli.html),
+this provider will read your configuration.
+If you have applied [Conjur machine identity](https://www.conjur.org/tutorials/policy/applications.html),
+this provider will read the machine's configuration.
+
+To access the values of secrets, the user/machine needs `execute` privilege
+on the Conjur variables referenced in your Terraform manifests.
+
+For more details, eee the "Authentication" section
+[on this page](https://docs.conjur.org/Latest/en/Content/terraform.htm).
+
 ### Provider configuration
 
 #### Using environment variables
