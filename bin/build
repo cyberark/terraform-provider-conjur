@@ -6,7 +6,6 @@ docker-compose pull goreleaser
 
 echo "> Building and packaging binaries"
 docker-compose run --rm -T --entrypoint sh goreleaser -es <<EOF
-dep ensure -v
 goreleaser release --rm-dist --skip-validate
 EOF
 

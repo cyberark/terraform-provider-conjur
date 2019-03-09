@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Changed
+- Converted to Go modules
+- Updated build to use official Goreleaser image
+
 ## [v0.2.0](https://github.com/cyberark/terraform-provider-conjur/releases/tag/v0.2.0) - 2018-08-31
 ### Added
 - Homebrew installer, see https://github.com/cyberark/terraform-provider-conjur#homebrew-macos for instructions.

@@ -56,7 +56,10 @@ func Provider() terraform.ResourceProvider {
 
 func providerConfig(d *schema.ResourceData) (interface{}, error) {
 
-	config := conjurapi.LoadConfig()
+	config, err := conjurapi.LoadConfig()
+	if err != nil {
+		return nil, err
+	}
 
 	// If creds have been specified in the schema, use them. Otherwise,
 	// assume the environment has everything needed.
