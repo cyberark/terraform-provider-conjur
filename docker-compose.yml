@@ -1,7 +1,7 @@
 version: '3'
 services:
   client:
-    image: conjurinc/cli5
+    image: cyberark/conjur-cli:5
     entrypoint: sleep
     command: infinity
     environment:
@@ -31,7 +31,7 @@ services:
       - $PWD:/src
 
   goreleaser:
-    image: cyberark/goreleaser
+    image: goreleaser/goreleaser:latest
     volumes:
-      - .:/go/src/github.com/cyberark/terraform-provider-conjur
-    working_dir: /go/src/github.com/cyberark/terraform-provider-conjur
+      - .:/terraform-provider-conjur
+    working_dir: /terraform-provider-conjur
