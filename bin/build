@@ -13,4 +13,4 @@ bin_name='terraform-provider-conjur'
 goos='linux'  # uname -s | tr '[:upper:]' '[:lower:]'
 goarch="amd64"
 
-cp "dist/${goos}_${goarch}/${bin_name}" .  # for following test stages
+cp "dist/${bin_name}_${goos}_${goarch}/${bin_name}" .  # for following test stages
