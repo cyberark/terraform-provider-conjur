@@ -16,13 +16,14 @@ builds:
   - amd64
   ldflags: []
 
-archive:
-  name_template: "{{.ProjectName}}-{{.Os}}-{{.Arch}}"
-  format_overrides:
-  - goos: windows
-    format: zip
-  files:
-    - none*  # only package the binary - not defaults: readme, license, changelog
+archives:
+  -
+    name_template: "{{.ProjectName}}-{{.Os}}-{{.Arch}}"
+    format_overrides:
+    - goos: windows
+      format: zip
+    files:
+      - none*  # only package the binary - not defaults: readme, license, changelog
 
 checksum:
   name_template: 'SHA256SUMS.txt'
