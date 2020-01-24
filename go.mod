@@ -6,3 +6,5 @@ require (
 	github.com/hashicorp/terraform v0.12.0
 	github.com/smartystreets/goconvey v0.0.0-20190306220146-200a235640ff // indirect
 )
+
+go 1.13
