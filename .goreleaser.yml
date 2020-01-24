@@ -17,41 +17,41 @@ builds:
   ldflags: []
 
 archives:
-  -
-    name_template: "{{.ProjectName}}-{{.Os}}-{{.Arch}}"
+  - id: conjur-terraform-release-archive
+    name_template: "{{.ProjectName}}-{{.Version}}-{{.Os}}-{{.Arch}}"
     format_overrides:
-    - goos: windows
-      format: zip
+      - goos: windows
+        format: zip
     files:
       - none*  # only package the binary - not defaults: readme, license, changelog
 
 checksum:
   name_template: 'SHA256SUMS.txt'
 
-brew:
-  description: Terraform provider for CyberArk Conjur
-  homepage: https://github.com/cyberark/terraform-provider-conjur
-  url_template: https://github.com/cyberark/terraform-provider-conjur/releases/download/v{{.Version}}/terraform-provider-conjur-darwin-amd64.tar.gz
-  caveats: |
-    After installation, you must symlink the provider into Terraform's plugins directory.
+brews:
+  - description: Terraform provider for CyberArk Conjur
+    homepage: https://github.com/cyberark/terraform-provider-conjur
+    url_template: https://github.com/cyberark/terraform-provider-conjur/releases/download/v{{.Version}}/terraform-provider-conjur-darwin-amd64.tar.gz
+    caveats: |
+      After installation, you must symlink the provider into Terraform's plugins directory.
 
-    mkdir -p ~/.terraform.d/plugins/
-    ln -sf /usr/local/Cellar/terraform-provider-conjur/$VERSION/bin/terraform-provider-conjur ~/.terraform.d/plugins/terraform-provider-conjur
+      mkdir -p ~/.terraform.d/plugins/
+      ln -sf /usr/local/Cellar/terraform-provider-conjur/$VERSION/bin/terraform-provider-conjur ~/.terraform.d/plugins/terraform-provider-conjur
 
-    Symlinking is necessary because Homebrew is sandboxed and cannot write to your home directory.
-    Replace $VERSION above.
-    If Homebrew is installing somewhere other than /usr/local/Cellar, update the path as well.
-  dependencies:
-    - terraform
-  install: |
-    bin.install "terraform-provider-conjur"
-  test: |
-    system "#{bin}/terraform-provider-conjur", "-h"  # running bin directly gives error, exit code 1
+      Symlinking is necessary because Homebrew is sandboxed and cannot write to your home directory.
+      Replace $VERSION above.
+      If Homebrew is installing somewhere other than /usr/local/Cellar, update the path as well.
+    dependencies:
+      - terraform
+    install: |
+      bin.install "terraform-provider-conjur"
+    test: |
+      system "#{bin}/terraform-provider-conjur", "-h"  # running bin directly gives error, exit code 1
 
-  github:
-    owner: cyberark
-    name: homebrew-tools
-  skip_upload: true
+    github:
+      owner: cyberark
+      name: homebrew-tools
+    skip_upload: true
 
 release:
   disable: true
