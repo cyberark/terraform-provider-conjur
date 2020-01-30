@@ -85,7 +85,7 @@ function configureConjur() {
   dockerCompose up -d client
 
   if [[ "$TARGET" == "enterprise" ]]; then
-    clientExec conjur authn login -u admin -p secret
+    clientExec conjur authn login -u admin -p SEcret12!!!!
   fi
 
   # policy files are mounted in docker-compose
