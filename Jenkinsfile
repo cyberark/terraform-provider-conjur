@@ -29,6 +29,14 @@ pipeline {
         sh './bin/test enterprise'
       }
     }
+    stage('Validate') {
+      parallel {
+        stage('Changelog') {
+          steps { sh './bin/parse-changelog.sh' }
+        }
+      }
+    }
+
   }
 
   post {
