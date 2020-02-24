@@ -13,6 +13,14 @@ pipeline {
   }
 
   stages {
+    stage('Validate') {
+      parallel {
+        stage('Changelog') {
+          steps { sh './bin/parse-changelog.sh' }
+        }
+      }
+    }
+
     stage('Build artifacts') {
       steps {
         sh './bin/build'
@@ -29,14 +37,6 @@ pipeline {
         sh './bin/test enterprise'
       }
     }
-    stage('Validate') {
-      parallel {
-        stage('Changelog') {
-          steps { sh './bin/parse-changelog.sh' }
-        }
-      }
-    }
-
   }
 
   post {
