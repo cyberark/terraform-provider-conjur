@@ -196,6 +196,13 @@ summon terraform apply
 
 ---
 
+## Contributing
+
+We welcome contributions of all kinds to this repository. For instructions on how to get started and descriptions of our development workflows, please see our [contributing
+guide][contrib].
+
+[contrib]: CONTRIBUTING.md
+
 ## License
 
 Copyright 2016-2018 CyberArk
