@@ -46,7 +46,8 @@ Install the provider and symlink it to Terraform's plugins directory.
 $ brew install terraform-provider-conjur
 
 $ mkdir -p ~/.terraform.d/plugins/
-$ ln -sf /usr/local/Cellar/terraform-provider-conjur/$VERSION/bin/terraform-provider-conjur
+$ ln -sf /usr/local/Cellar/terraform-provider-conjur/$VERSION/bin/terraform-provider-conjur \
+    ~/.terraform.d/plugins/terraform-provider-conjur
 ```
 
 Symlinking is necessary because
