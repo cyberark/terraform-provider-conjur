@@ -17,7 +17,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.terraform
-      
+
     entrypoint: sleep infinity
     environment:
       CONJUR_APPLIANCE_URL:
