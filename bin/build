@@ -12,8 +12,7 @@ docker-compose run --rm \
     goreleaser release --rm-dist --skip-validate
 EOF
 
-bin_name='terraform-provider-conjur'
+# Needed for testing stages
 goos='linux'  # uname -s | tr '[:upper:]' '[:lower:]'
 goarch="amd64"
-
-cp "dist/${bin_name}_${goos}_${goarch}/${bin_name}" .  # for following test stages
+cp dist/terraform-provider-conjur_${goos}_${goarch}/terraform-provider-conjur_v* .
