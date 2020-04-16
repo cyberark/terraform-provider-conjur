@@ -1,5 +1,3 @@
-#!/bin/bash
-
 declare DOCKER_COMPOSE_ARGS
 
 # shellcheck disable=SC2086
@@ -9,7 +7,7 @@ function dockerCompose() {
 }
 
 function conjurExec() {
-  dockerCompose exec -T conjur "$@"
+  dockerCompose exec -T conjur-server "$@"
 }
 
 function clientExec() {
@@ -18,15 +16,4 @@ function clientExec() {
 
 function terraformRun() {
   dockerCompose exec -T terraform sh -es "$@"
-}
-
-function fetchConjurAdminAPIKey() {  
-  case "$TARGET" in
-  "oss")
-    conjurExec conjurctl role retrieve-key "$CONJUR_ACCOUNT:user:admin" | tr -d '\r'
-    ;;
-  "enterprise")
-    clientExec conjur user rotate_api_key
-    ;;
-  esac
 }

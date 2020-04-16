@@ -1,7 +1,7 @@
 version: '3'
 services:
-  conjur:
-    image: registry.tld/conjur-appliance-cuke-master:5.0-stable
+  conjur-server:
+    image: registry.tld/conjur-appliance:5.0-stable
     security_opt:
       - seccomp:unconfined # --security-opt seccomp=unconfined
     hostname: conjur

@@ -1,10 +1,17 @@
 version: '3'
 services:
   database:
-    image: postgres:9.3
+    image: postgres:9.4
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 5s
+      retries: 5
 
-  conjur:
-    image: cyberark/conjur
+  conjur-server:
+    image: cyberark/conjur:latest
     command: server
     environment:
       DATABASE_URL: postgres://postgres@database/postgres
