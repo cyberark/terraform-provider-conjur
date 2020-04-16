@@ -25,7 +25,7 @@ build:
       - dist/*.zip
       - dist/*.txt
       - dist/*.rb
-      - terraform-provider-conjur  # for next stage
+      - terraform-provider-conjur_v*  # for next stage
 
 test:
   stage: test
