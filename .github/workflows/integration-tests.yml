@@ -1,0 +1,40 @@
+name: Integration Tests
+on:
+  # Only run this on pushes to master
+  push:
+    branches:
+    - master
+
+  # And when PRs operations are done
+  pull_request:
+    types:
+    - opened
+    - reopened
+    - synchronize
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Set up Go 1.13
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.13
+      id: go
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v2
+
+    - name: Set BRANCH_NAME
+      run: echo "::set-env name=GIT_BRANCH::${GITHUB_REF#refs/heads/}"
+
+    - name: Build plugin (statically)
+      run: |
+        CGO_ENABLED=0 go build -tags netgo -ldflags '-extldflags "-static"' \
+          -o terraform-provider-conjur .
+
+    - name: Run Tests
+      run: |
+        ./bin/test oss

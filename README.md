@@ -75,8 +75,10 @@ $ git clone https://github.com/cyberark/terraform-provider-conjur.git
 $ cd terraform-provider-conjur
 ```
 - Build the provider
+
 ```sh-session
 $ mkdir -p ~/.terraform.d/plugins/
+$ # Note: If a static binary is required, use ./bin/build to create the executable
 $ go build -o ~/.terraform.d/plugins/terraform-provider-conjur main.go
 ```
 

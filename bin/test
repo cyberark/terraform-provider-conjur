@@ -57,7 +57,7 @@ function loadUtils() {
 function launchConjur() {
   echo "> Launching local Conjur environment"
 
-  dockerCompose pull
+  dockerCompose pull -q
 
   dockerCompose up -d conjur-server
 
