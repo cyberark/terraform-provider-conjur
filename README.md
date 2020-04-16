@@ -142,6 +142,17 @@ provider "conjur" {
 
 ### Fetch secrets
 
+#### Preface
+
+An important thing to keep in mind is that by design Terraform state files can contain
+sensitive data (which may include credentials fetched by this plugin). Use Terraform's
+recommendations found [here](https://www.terraform.io/docs/state/sensitive-data.html) to
+protect these values where possible.
+
+#### Example
+
+_Note: If plan is being run manually, you will need to run `terraform init` first!_
+
 ```
 # main.tf
 # ... provider configuration above
