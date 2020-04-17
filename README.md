@@ -18,67 +18,66 @@ The packages are available for Linux, macOS and Windows.
 
 Download and uncompress the latest release for your OS. This example uses the linux binary.
 
+_Note: Replace `$VERSION` with the one you want to use. See [releases](https://github.com/cyberark/terraform-provider-conjur/releases)
+page for available versions._
+
 ```sh-session
-$ wget https://github.com/cyberark/terraform-provider-conjur/releases/download/$VERSION/terraform-provider-conjur-linux-amd64.tar.gz
+$ wget https://github.com/cyberark/terraform-provider-conjur/releases/download/v$VERSION/terraform-provider-conjur-$VERSION-linux-amd64.tar.gz
 $ tar -xvf terraform-provider-conjur*.tar.gz
 ```
 
-Replace `$VERSION` above.
 
-Now copy the binary to the Terraform's plugins folder. If this is your first plugin, you'll need to create the folder first.
+If you already have an unversioned plugin that was previously downloaded, we first need
+to remove it:
+```sh-session
+$ rm -f ~/.terraform.d/plugins/terraform-provider-conjur
+```
+
+Now copy the new binary to the Terraform's plugins folder. If this is your first plugin,
+you will need to create the folder first.
 
 ```sh-session
 $ mkdir -p ~/.terraform.d/plugins/
-$ mv terraform-provider-conjur*/terraform-provider-conjur ~/.terraform.d/plugins/
+$ mv terraform-provider-conjur*/terraform-provider-conjur* ~/.terraform.d/plugins/
 ```
 
 ### Homebrew (MacOS)
 
-Add and update the CyberArk Tools Homebrew tap.
+Add and update the [CyberArk Tools Homebrew tap](https://github.com/cyberark/homebrew-tools).
 
 ```sh-session
 $ brew tap cyberark/tools
 ```
 
-Install the provider and symlink it to Terraform's plugins directory.
+Install the provider and symlink it to Terraform's plugins directory. Symlinking is
+necessary because [Homebrew is sandboxed and cannot write to your home directory](https://github.com/Homebrew/brew/issues/2986).
+
+_Note: Replace `$VERSION` with the appropriate plugin version_
 
 ```sh-session
 $ brew install terraform-provider-conjur
 
 $ mkdir -p ~/.terraform.d/plugins/
-$ ln -sf /usr/local/Cellar/terraform-provider-conjur/$VERSION/bin/terraform-provider-conjur \
-    ~/.terraform.d/plugins/terraform-provider-conjur
-```
 
-Symlinking is necessary because
-[Homebrew is sandboxed and cannot write to your home directory](https://github.com/Homebrew/brew/issues/2986).
-Replace `$VERSION` above.
-If Homebrew is installing somewhere other than `/usr/local/Cellar`, update the path as well.
+$ # If Homebrew is installing somewhere other than `/usr/local/Cellar`, update the path as well.
+$ ln -sf /usr/local/Cellar/terraform-provider-conjur/$VERSION/bin/terraform-provider-conjur_* \
+    ~/.terraform.d/plugins/
+```
 
 ### Compile from Source
 
-If you wish to compile the provider from source code, you'll first need Go installed on your machine (version >=1.9 is required).
+If you wish to compile the provider from source code, you will first need Go installed
+on your machine (version >=1.12 is required).
 
-Clone repository to: `$GOPATH/src/github.com/cyberark/terraform-provider-conjur`
-
+- Clone repository and go into the cloned directory
 ```sh-session
-$ mkdir -p $GOPATH/src/github.com/cyberark
-
-$ git clone https://github.com/cyberark/terraform-provider-conjur.git $GOPATH/src/github.com/cyberark/terraform-provider-conjur
+$ git clone https://github.com/cyberark/terraform-provider-conjur.git
+$ cd terraform-provider-conjur
 ```
-
-Enter the provider directory and build the provider
-
-```sh-session
-$ cd $GOPATH/src/github.com/cyberark/terraform-provider-conjur
-$ make build
-```
-
-Now copy the binary to the Terraform's plugins folder. If this is your first plugin, you'll need to create the folder first.
-
+- Build the provider
 ```sh-session
 $ mkdir -p ~/.terraform.d/plugins/
-$ mv terraform-provider-conjur ~/.terraform.d/plugins/
+$ go build -o ~/.terraform.d/plugins/terraform-provider-conjur main.go
 ```
 
 ## Usage
@@ -106,7 +105,7 @@ For more details, see the "Authentication" section
 The provider uses [conjur-api-go](https://github.com/cyberark/conjur-api-go) to load its
 configuration. `conjur-api-go` can be configured using environment variables:
 
-```
+```sh-session
 export CONJUR_APPLIANCE_URL="https://localhost:8443"
 export CONJUR_ACCOUNT="quick-start"
 export CONJUR_AUTHN_LOGIN="admin"
@@ -191,8 +190,8 @@ TF_VAR_secret_key: !var aws/dev/sys_powerful/secret_access_key
 
 Run Terraform with Summon:
 
-```
-summon terraform apply
+```sh-session
+$ summon terraform apply
 ```
 
 ---

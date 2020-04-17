@@ -5,7 +5,7 @@ before:
   hooks: []
 
 builds:
-- binary: terraform-provider-conjur
+- binary: terraform-provider-conjur_v{{.Version}}
   env:
   - CGO_ENABLED=0
   goos:
@@ -23,7 +23,8 @@ archives:
       - goos: windows
         format: zip
     files:
-      - none*  # only package the binary - not defaults: readme, license, changelog
+      - README.md
+      - LICENSE
 
 checksum:
   name_template: 'SHA256SUMS.txt'
@@ -31,22 +32,26 @@ checksum:
 brews:
   - description: Terraform provider for CyberArk Conjur
     homepage: https://github.com/cyberark/terraform-provider-conjur
-    url_template: https://github.com/cyberark/terraform-provider-conjur/releases/download/v{{.Version}}/terraform-provider-conjur-darwin-amd64.tar.gz
+    url_template: https://github.com/cyberark/terraform-provider-conjur/releases/download/v{{.Version}}/{{.ProjectName}}-{{.Version}}-{{.Os}}-{{.Arch}}.gz
     caveats: |
       After installation, you must symlink the provider into Terraform's plugins directory.
-
-      mkdir -p ~/.terraform.d/plugins/
-      ln -sf /usr/local/Cellar/terraform-provider-conjur/$VERSION/bin/terraform-provider-conjur ~/.terraform.d/plugins/terraform-provider-conjur
-
       Symlinking is necessary because Homebrew is sandboxed and cannot write to your home directory.
-      Replace $VERSION above.
-      If Homebrew is installing somewhere other than /usr/local/Cellar, update the path as well.
+
+      # Make the plugins directory if not present
+      mkdir -p ~/.terraform.d/plugins/
+
+      # Remove any old unversioned plugins (if applicable)
+      rm -f  ~/.terraform.d/plugins/terraform-provider-conjur
+
+      # Symlink the provider to your home dir. If Homebrew is installing somewhere other than /usr/local/Cellar, update the path as well.
+      ln -sf /usr/local/Cellar/terraform-provider-conjur/{{.Version}}/bin/terraform-provider-conjur_v{{.Version}} ~/.terraform.d/plugins/terraform-provider-conjur_v{{.Version}}
     dependencies:
       - terraform
     install: |
-      bin.install "terraform-provider-conjur"
+      bin.install "terraform-provider-conjur_{{.Version}}"
     test: |
-      system "#{bin}/terraform-provider-conjur", "-h"  # running bin directly gives error, exit code 1
+      # Running bin directly gives error, exit code 1
+      system "#{bin}/terraform-provider-conjur_{{.Version}}", "-h"  
 
     github:
       owner: cyberark

@@ -1,5 +1,5 @@
 dist/
-terraform-provider-conjur
+terraform-provider-conjur_*
 vendor/
 .terraform/
 *.tfstate*
