@@ -48,10 +48,10 @@ brews:
     dependencies:
       - terraform
     install: |
-      bin.install "terraform-provider-conjur_{{.Version}}"
+      bin.install "terraform-provider-conjur_v{{.Version}}"
     test: |
       # Running bin directly gives error, exit code 1
-      system "#{bin}/terraform-provider-conjur_{{.Version}}", "-h"  
+      system "#{bin}/terraform-provider-conjur_v{{.Version}}", "-h"
 
     github:
       owner: cyberark
