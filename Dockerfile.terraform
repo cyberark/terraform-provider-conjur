@@ -1,3 +1,4 @@
-FROM hashicorp/terraform:0.12.24
+FROM hashicorp/terraform:latest
 
-RUN apk add coreutils
+RUN apk add --no-cache coreutils \
+                       file

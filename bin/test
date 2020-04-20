@@ -3,7 +3,10 @@ set -eo pipefail
 
 TARGET="${1:-oss}"  # can also be set to 'enterprise'
 
-CONJUR_ACCOUNT='cucumber'
+export CONJUR_ACCOUNT='myaccount'
+export CONJUR_DATA_KEY='iFra75qdvsLENSV+qXYFMkv7KJS3t+82Po4mmjZLxZc='
+
+CONJUR_AUTHN_PASSWORD='SEcret12!!!!'
 LOCAL_SECRET_FILE='test/dbpass'
 
 function finish() {
@@ -47,48 +50,62 @@ function checkTarget() {
 
 function loadUtils() {
   cwd="$(dirname "$0")"
-  # shellcheck source=_utils
-  . "$cwd/_utils"
+  # shellcheck source=utils.sh
+  . "$cwd/utils.sh"
 }
 
 function launchConjur() {
   echo "> Launching local Conjur environment"
 
-  dockerCompose pull
+  dockerCompose pull -q
 
-  if [[ "$TARGET" == "oss" ]]; then
-    export CONJUR_DATA_KEY="$(docker-compose $DOCKER_COMPOSE_ARGS run --rm --no-deps conjur data-key generate)"
+  dockerCompose up -d conjur-server
+
+  echo ">> Creating account '$CONJUR_ACCOUNT'"
+  if [[ "$TARGET" == "enterprise" ]]; then
+    conjurExec evoke configure master \
+      --accept-eula \
+      -h conjur-server \
+      -p "$CONJUR_AUTHN_PASSWORD" \
+      "$CONJUR_ACCOUNT"
+  else
+    # We need to wait for Conjur OSS to establish a DB connection before
+    # attempting to create the account
+    conjurExec $CONJUR_WAIT_COMMAND
+    conjurExec conjurctl account create "$CONJUR_ACCOUNT"
   fi
 
-  dockerCompose up -d conjur
+  echo ">> Waiting on conjur..."
   conjurExec $CONJUR_WAIT_COMMAND
 }
 
 function configureConjur() {
   echo "> Configuring local Conjur environment"
 
-  export CONJUR_ACCOUNT="$CONJUR_ACCOUNT"
   export CONJUR_AUTHN_LOGIN="admin"
 
-  case "$TARGET" in
-  "oss")
-    export CONJUR_APPLIANCE_URL=http://conjur
-    conjurExec conjurctl account create $CONJUR_ACCOUNT
-    export CONJUR_AUTHN_API_KEY="$(fetchConjurAdminAPIKey)"
-    ;;
-  "enterprise")
-    export CONJUR_APPLIANCE_URL=https://conjur
+  export CONJUR_APPLIANCE_URL=http://conjur-server
+  if [[ "$TARGET" == "enterprise" ]]; then
+    export CONJUR_APPLIANCE_URL=https://conjur-server
     export CONJUR_SSL_CERTIFICATE="$(conjurExec cat /opt/conjur/etc/ssl/conjur.pem)"
-    ;;
-  esac
+  fi
 
+  if [[ "$TARGET" == "oss" ]]; then
+    export CONJUR_AUTHN_API_KEY=$(conjurExec conjurctl role retrieve-key \
+      "$CONJUR_ACCOUNT:user:admin" | tr -d '\r')
+  fi
+
+  echo ">> Applying policies"
   dockerCompose up -d client
 
   if [[ "$TARGET" == "enterprise" ]]; then
-    clientExec conjur authn login -u admin -p SEcret12!!!!
+    echo ">> Logging in CLI to the server"
+    clientExec conjur authn login -u admin -p "$CONJUR_AUTHN_PASSWORD"
+    export CONJUR_AUTHN_API_KEY=$(clientExec conjur user rotate_api_key)
   fi
 
-  # policy files are mounted in docker-compose
+  echo ">> Applying policies"
+  # Policy files are mounted in docker-compose
   clientExec conjur policy load --replace root /test/policy.root.yml
   clientExec conjur policy load terraform-example /test/policy.example.yml
   clientExec conjur list
@@ -98,27 +115,22 @@ function configureConjur() {
 function runTerraform() {
   echo "> Planning and applying main.tf Terraform manifest"
 
+  export CONJUR_APPLIANCE_URL=http://conjur-server
   export CONJUR_ACCOUNT="$CONJUR_ACCOUNT"
   export CONJUR_AUTHN_LOGIN="admin"
-  export CONJUR_AUTHN_API_KEY="$(fetchConjurAdminAPIKey)"
   export TF_LOG=INFO
 
-  case "$TARGET" in
-  "oss")
-    export CONJUR_APPLIANCE_URL=http://conjur
-    ;;
-  "enterprise")
-    export CONJUR_APPLIANCE_URL=https://conjur
+  if [[ "$TARGET" == "enterprise" ]]; then
+    export CONJUR_APPLIANCE_URL=https://conjur-server
     export CONJUR_SSL_CERTIFICATE="$(conjurExec cat /opt/conjur/etc/ssl/conjur.pem)"
-    ;;
-  esac
+  fi
 
   dockerCompose up -d terraform
 
   terraformRun <<EOF
-terraform init test/
-terraform plan test/
-terraform apply -auto-approve test/
+    terraform init test/
+    terraform plan test/
+    terraform apply -auto-approve test/
 EOF
 }
 

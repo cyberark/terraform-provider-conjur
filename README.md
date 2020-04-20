@@ -75,8 +75,10 @@ $ git clone https://github.com/cyberark/terraform-provider-conjur.git
 $ cd terraform-provider-conjur
 ```
 - Build the provider
+
 ```sh-session
 $ mkdir -p ~/.terraform.d/plugins/
+$ # Note: If a static binary is required, use ./bin/build to create the executable
 $ go build -o ~/.terraform.d/plugins/terraform-provider-conjur main.go
 ```
 
@@ -139,6 +141,17 @@ provider "conjur" {
 
 
 ### Fetch secrets
+
+#### Preface
+
+An important thing to keep in mind is that by design Terraform state files can contain
+sensitive data (which may include credentials fetched by this plugin). Use Terraform's
+recommendations found [here](https://www.terraform.io/docs/state/sensitive-data.html) to
+protect these values where possible.
+
+#### Example
+
+_Note: If plan is being run manually, you will need to run `terraform init` first!_
 
 ```
 # main.tf
