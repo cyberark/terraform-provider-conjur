@@ -129,23 +129,27 @@ In addition, the provider can be configured using attributes in the
 configuration. Attributes specified in `main.tf` override the configuration loaded by
 `conjur-api-go`.
 
-For example, if the environment is initialized as above, this configuration would
-authenticate as `terraform-user` instead of `admin`:
+For example, with `conjur_api_key` and `conjur_ssl_cert`defined as
+[input variables](https://www.terraform.io/docs/configuration/variables.html), this
+type of configuration could be used:
 
 ```
 # main.tf
 variable "conjur_api_key" {}
+variable "conjur_ssl_cert" {}
 
 provider "conjur" {
-  account = "myorg"
   appliance_url = "http://conjur-server"
+  ssl_cert = var.conjur_ssl_cert
+  # If you have the certificate as a file, use this line instead
+  # ssl_cert_path = var.conjur_ssl_cert_path
+
+  account = "myorg"
+
   login = "terraform-user"
   api_key = var.conjur_api_key
 }
 ```
-
-_Note that currently there is no way to set the SSL certificate over the attributes
-so you need to use environment variables for that_
 
 _Note as well that `login`/`api_key` settings are only used when both are present in
 the attributes otherwise the provider will fall back to using environment variables

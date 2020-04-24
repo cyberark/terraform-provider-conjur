@@ -6,8 +6,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 ### Added
-- You can now specify account and appliance URL in the provider config
-  in the `.tf` file [#29](https://github.com/cyberark/terraform-provider-conjur/issues/29)
+- You can now specify `account`, `appliance_url`, `ssl_cert`, and `ssl_cert_path` values
+  directly in the `.tf` provider config [#29](https://github.com/cyberark/terraform-provider-conjur/issues/29)
 
 ## [0.3.1] - 2020-04-20
 ### Fixed

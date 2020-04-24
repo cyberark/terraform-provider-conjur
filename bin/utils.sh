@@ -7,7 +7,11 @@ function dockerCompose() {
 }
 
 function conjurExec() {
-  dockerCompose exec -T conjur-server "$@"
+  if [[ "$TARGET" == "oss" ]]; then
+    dockerCompose exec -T conjur "$@"
+  else
+    dockerCompose exec -T conjur-server "$@"
+  fi
 }
 
 function clientExec() {

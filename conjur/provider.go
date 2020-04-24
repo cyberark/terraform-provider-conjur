@@ -73,7 +73,15 @@ func providerConfig(d *schema.ResourceData) (interface{}, error) {
 		config.Account = account
 	}
 
-	// TODO: Support "ssl_cert" and "ssl_cert_path" resources too
+	ssl_cert := d.Get("ssl_cert").(string)
+	if ssl_cert != "" {
+		config.SSLCert = ssl_cert
+	}
+
+	ssl_cert_path := d.Get("ssl_cert_path").(string)
+	if ssl_cert_path != "" {
+		config.SSLCertPath = ssl_cert_path
+	}
 
 	// If creds have been specified in the schema, use them. Otherwise,
 	// assume the environment has everything needed.
