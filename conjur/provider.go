@@ -61,6 +61,20 @@ func providerConfig(d *schema.ResourceData) (interface{}, error) {
 		return nil, err
 	}
 
+	// If server info has been specified in the schema, use it. Otherwise,
+	// assume the environment has everything needed.
+	appliance_url := d.Get("appliance_url").(string)
+	if appliance_url != "" {
+		config.ApplianceURL = appliance_url
+	}
+
+	account := d.Get("account").(string)
+	if account != "" {
+		config.Account = account
+	}
+
+	// TODO: Support "ssl_cert" and "ssl_cert_path" resources too
+
 	// If creds have been specified in the schema, use them. Otherwise,
 	// assume the environment has everything needed.
 	login := d.Get("login").(string)

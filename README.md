@@ -102,10 +102,11 @@ For more details, see the "Authentication" section
 
 ### Provider configuration
 
-#### Using environment variables
-
 The provider uses [conjur-api-go](https://github.com/cyberark/conjur-api-go) to load its
-configuration. `conjur-api-go` can be configured using environment variables:
+configuration. `conjur-api-go` can be configured using environment variables or using the
+provider configuration in the `.tf` file.
+
+#### Using environment variables
 
 ```sh-session
 export CONJUR_APPLIANCE_URL="https://localhost:8443"
@@ -133,12 +134,22 @@ authenticate as `terraform-user` instead of `admin`:
 
 ```
 # main.tf
+variable "conjur_api_key" {}
+
 provider "conjur" {
+  account = "myorg"
+  appliance_url = "http://conjur-server"
   login = "terraform-user"
-  api_key = "x0dwqc3jrqkye3xhn7k62rw31c6216ewfe1wv71291jrqm4j15b3dg9"
+  api_key = var.conjur_api_key
 }
 ```
 
+_Note that currently there is no way to set the SSL certificate over the attributes
+so you need to use environment variables for that_
+
+_Note as well that `login`/`api_key` settings are only used when both are present in
+the attributes otherwise the provider will fall back to using environment variables
+for those two values_
 
 ### Fetch secrets
 

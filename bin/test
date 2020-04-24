@@ -3,11 +3,15 @@ set -eo pipefail
 
 TARGET="${1:-oss}"  # can also be set to 'enterprise'
 
-export CONJUR_ACCOUNT='myaccount'
 export CONJUR_DATA_KEY='iFra75qdvsLENSV+qXYFMkv7KJS3t+82Po4mmjZLxZc='
 
+CONJUR_ACCOUNT='myaccount'
 CONJUR_AUTHN_PASSWORD='SEcret12!!!!'
+
 LOCAL_SECRET_FILE='test/dbpass'
+
+# This variable is set after configuring conjur
+api_key=""
 
 function finish() {
   if [[ -z "$KEEP_CONTAINERS" ]]; then
@@ -27,7 +31,14 @@ function main() {
 
   launchConjur
   configureConjur
-  runTerraform
+
+  # TODO: Make this test work with DAP too
+  if [[ "$TARGET" != "enterprise" ]]; then
+    runTerraformWithProviderVars
+    validateResults
+  fi
+
+  runTerraformWithEnvVars
   validateResults
 }
 
@@ -57,8 +68,10 @@ function loadUtils() {
 function launchConjur() {
   echo "> Launching local Conjur environment"
 
+  echo ">> Pulling images (this may take a long time)"
   dockerCompose pull -q
 
+  echo ">> Starting Conjur/DAP server"
   dockerCompose up -d conjur-server
 
   echo ">> Creating account '$CONJUR_ACCOUNT'"
@@ -79,9 +92,18 @@ function launchConjur() {
   conjurExec $CONJUR_WAIT_COMMAND
 }
 
+function unexportConjurVars() {
+  export -n CONJUR_APPLIANCE_URL
+  export -n CONJUR_SSL_CERTIFICATE
+  export -n CONJUR_ACCOUNT
+  export -n CONJUR_AUTHN_LOGIN
+  export -n CONJUR_AUTHN_API_KEY
+}
+
 function configureConjur() {
   echo "> Configuring local Conjur environment"
 
+  export CONJUR_ACCOUNT="$CONJUR_ACCOUNT"
   export CONJUR_AUTHN_LOGIN="admin"
 
   export CONJUR_APPLIANCE_URL=http://conjur-server
@@ -91,52 +113,93 @@ function configureConjur() {
   fi
 
   if [[ "$TARGET" == "oss" ]]; then
-    export CONJUR_AUTHN_API_KEY=$(conjurExec conjurctl role retrieve-key \
+    api_key=$(conjurExec conjurctl role retrieve-key \
       "$CONJUR_ACCOUNT:user:admin" | tr -d '\r')
+    export CONJUR_AUTHN_API_KEY="$api_key"
   fi
 
-  echo ">> Applying policies"
+  echo ">> Starting CLI"
   dockerCompose up -d client
 
   if [[ "$TARGET" == "enterprise" ]]; then
     echo ">> Logging in CLI to the server"
     clientExec conjur authn login -u admin -p "$CONJUR_AUTHN_PASSWORD"
-    export CONJUR_AUTHN_API_KEY=$(clientExec conjur user rotate_api_key)
+    api_key=$(clientExec conjur user rotate_api_key)
+    export CONJUR_AUTHN_API_KEY="$api_key"
   fi
 
   echo ">> Applying policies"
+
   # Policy files are mounted in docker-compose
   clientExec conjur policy load --replace root /test/policy.root.yml
   clientExec conjur policy load terraform-example /test/policy.example.yml
   clientExec conjur list
   clientExec conjur variable values add terraform-example/dbpass SECRETXcLhn23MJcimV
+
+  unexportConjurVars
 }
 
 function runTerraform() {
-  echo "> Planning and applying main.tf Terraform manifest"
+  target_dir=$1
+
+  echo ">> Planning and applying '$target_dir/main.tf' Terraform manifest"
+
+  export TF_LOG=INFO
+
+  rm -f "$LOCAL_SECRET_FILE"
+
+  dockerCompose up -d terraform
+
+  terraformRun <<EOF
+    terraform init $target_dir/
+    terraform plan $target_dir/
+    terraform apply -auto-approve $target_dir/
+EOF
+
+  docker-compose rm --force \
+    --stop \
+    -v \
+    terraform
+}
+
+function runTerraformWithProviderVars() {
+  echo "> Testing provider with tf-included vars"
+
+  unexportConjurVars
+
+  export TF_VAR_conjur_api_key="$api_key"
+
+  # TODO: Add support for CONJUR_SSL_CERTIFICATE in .tf file
+
+  runTerraform "test/provider_vars"
+
+  export -n TF_VAR_conjur_api_key
+}
+
+function runTerraformWithEnvVars() {
+  echo "> Planning and applying env_vars/main.tf Terraform manifest"
+
+  unexportConjurVars
 
   export CONJUR_APPLIANCE_URL=http://conjur-server
   export CONJUR_ACCOUNT="$CONJUR_ACCOUNT"
   export CONJUR_AUTHN_LOGIN="admin"
-  export TF_LOG=INFO
 
   if [[ "$TARGET" == "enterprise" ]]; then
     export CONJUR_APPLIANCE_URL=https://conjur-server
     export CONJUR_SSL_CERTIFICATE="$(conjurExec cat /opt/conjur/etc/ssl/conjur.pem)"
   fi
 
-  dockerCompose up -d terraform
+  export CONJUR_AUTHN_API_KEY="$api_key"
 
-  terraformRun <<EOF
-    terraform init test/
-    terraform plan test/
-    terraform apply -auto-approve test/
-EOF
+  runTerraform "test/env_vars"
 }
 
 function validateResults() {
   local expectedValue="SECRETXcLhn23MJcimV"
   local actualValue=$(cat $LOCAL_SECRET_FILE)
+
+  rm -f "$LOCAL_SECRET_FILE"
 
   if [[ "$expectedValue" == "$actualValue" ]]; then
     echo "Secret succesfully retrieved!"
