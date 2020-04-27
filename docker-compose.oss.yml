@@ -10,7 +10,7 @@ services:
       timeout: 5s
       retries: 5
 
-  conjur-server:
+  conjur:
     image: cyberark/conjur:latest
     command: server
     environment:
@@ -20,3 +20,15 @@ services:
     ports:
       - "80"
 
+  conjur-server:
+    image: nginx:alpine
+    ports:
+      - 443
+    volumes:
+      - ./test/https_config/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./test/https_config/conjur.conf:/etc/nginx/sites-enabled/conjur.conf:ro
+      - ./test/https_config/dhparams.pem:/etc/nginx/dhparams.pem:ro
+      - ./test/https_config/conjur.crt:/cert/tls.crt:ro
+      - ./test/https_config/conjur.key:/cert/tls.key:ro
+      - ./test/https_config/ca.crt:/ca/tls.crt:ro
+    depends_on: [ conjur ]

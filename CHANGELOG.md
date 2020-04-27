@@ -5,10 +5,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-### Fixed
-- Each brew recipe binary now includes the provider version [#47](https://github.com/cyberark/terraform-provider-conjur/issues/47)
-- Updated output binary file names to include version suffix so that the
-  version command returns the correct version [#30](https://github.com/cyberark/terraform-provider-conjur/issues/30)
+### Added
+- You can now specify `account`, `appliance_url`, `ssl_cert`, and `ssl_cert_path` values
+  directly in the `.tf` provider config [#29](https://github.com/cyberark/terraform-provider-conjur/issues/29)
 
 ## [0.3.1] - 2020-04-20
 ### Fixed

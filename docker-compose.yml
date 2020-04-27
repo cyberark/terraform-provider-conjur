@@ -26,6 +26,8 @@ services:
       CONJUR_AUTHN_API_KEY:
       CONJUR_SSL_CERTIFICATE:
       TF_LOG: "${TF_LOG:-INFO}"
+      TF_VAR_conjur_api_key:
+      TF_VAR_conjur_ssl_cert:
     working_dir: /src
     volumes:
       - $PWD:/src

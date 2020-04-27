@@ -102,14 +102,15 @@ For more details, see the "Authentication" section
 
 ### Provider configuration
 
+The provider uses [conjur-api-go](https://github.com/cyberark/conjur-api-go) to load its
+configuration. `conjur-api-go` can be configured using environment variables or using the
+provider configuration in the `.tf` file.
+
 #### Using environment variables
 
-The provider uses [conjur-api-go](https://github.com/cyberark/conjur-api-go) to load its
-configuration. `conjur-api-go` can be configured using environment variables:
-
 ```sh-session
-export CONJUR_APPLIANCE_URL="https://localhost:8443"
-export CONJUR_ACCOUNT="quick-start"
+export CONJUR_APPLIANCE_URL="https://conjur-server"
+export CONJUR_ACCOUNT="myorg"
 export CONJUR_AUTHN_LOGIN="admin"
 export CONJUR_AUTHN_API_KEY="3ahcddy39rcxzh3ggac4cwk3j2r8pqwdg33059y835ys2rh2kzs2a"
 export CONJUR_CERT_FILE="/etc/conjur.pem"
@@ -128,17 +129,37 @@ In addition, the provider can be configured using attributes in the
 configuration. Attributes specified in `main.tf` override the configuration loaded by
 `conjur-api-go`.
 
-For example, if the environment is initialized as above, this configuration would
-authenticate as `terraform-user` instead of `admin`:
+For example, with `conjur_api_key` and `conjur_ssl_cert`defined as
+[input variables](https://www.terraform.io/docs/configuration/variables.html), this
+type of configuration could be used:
 
 ```
 # main.tf
+variable "conjur_api_key" {}
+variable "conjur_ssl_cert" {}
+# If you have the certificate as a file, use this line instead
+# variable "conjur_ssl_cert_path" {}
+
 provider "conjur" {
-  login = "terraform-user"
-  api_key = "x0dwqc3jrqkye3xhn7k62rw31c6216ewfe1wv71291jrqm4j15b3dg9"
+  appliance_url = "http://conjur-server"
+  ssl_cert = var.conjur_ssl_cert
+  # If you have the certificate as a file, use this line instead
+  # ssl_cert_path = var.conjur_ssl_cert_path
+
+  account = "myorg"
+
+  login = "admin"
+  api_key = var.conjur_api_key
 }
 ```
 
+**Notes on precedence of configuration variable setting:**
+
+- If both the environment variable **and** `.tf` configuration are present for a
+  configuration setting, the `.tf` configuration takes precedence and the environment
+  variable will be ignored.
+- If the `.tf` configuration does not include **both** `login` and `api_key`, then
+  environment variables will be used for these values instead.
 
 ### Fetch secrets
 
