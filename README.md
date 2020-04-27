@@ -109,8 +109,8 @@ provider configuration in the `.tf` file.
 #### Using environment variables
 
 ```sh-session
-export CONJUR_APPLIANCE_URL="https://localhost:8443"
-export CONJUR_ACCOUNT="quick-start"
+export CONJUR_APPLIANCE_URL="https://conjur-server"
+export CONJUR_ACCOUNT="myorg"
 export CONJUR_AUTHN_LOGIN="admin"
 export CONJUR_AUTHN_API_KEY="3ahcddy39rcxzh3ggac4cwk3j2r8pqwdg33059y835ys2rh2kzs2a"
 export CONJUR_CERT_FILE="/etc/conjur.pem"
@@ -137,6 +137,8 @@ type of configuration could be used:
 # main.tf
 variable "conjur_api_key" {}
 variable "conjur_ssl_cert" {}
+# If you have the certificate as a file, use this line instead
+# variable "conjur_ssl_cert_path" {}
 
 provider "conjur" {
   appliance_url = "http://conjur-server"
@@ -146,14 +148,18 @@ provider "conjur" {
 
   account = "myorg"
 
-  login = "terraform-user"
+  login = "admin"
   api_key = var.conjur_api_key
 }
 ```
 
-_Note as well that `login`/`api_key` settings are only used when both are present in
-the attributes otherwise the provider will fall back to using environment variables
-for those two values_
+**Notes on precedence of configuration variable setting:**
+
+- If both the environment variable **and** `.tf` configuration are present for a
+  configuration setting, the `.tf` configuration takes precedence and the environment
+  variable will be ignored.
+- If the `.tf` configuration does not include **both** `login` and `api_key`, then
+  environment variables will be used for these values instead.
 
 ### Fetch secrets
 
