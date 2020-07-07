@@ -109,7 +109,7 @@ To access the values of secrets, the user/machine needs `execute` privilege
 on the Conjur variables referenced in your Terraform manifests.
 
 For more details, see the "Authentication" section
-[on this page](https://docs.conjur.org/Latest/en/Content/terraform.htm).
+[on this page](https://docs.conjur.org/Latest/en/Content/Integrations/terraform.htm).
 
 ### Provider configuration
 
