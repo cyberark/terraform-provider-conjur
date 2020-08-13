@@ -3,6 +3,8 @@ set -eo pipefail
 
 TARGET="${1:-oss}"  # can also be set to 'enterprise'
 
+export CONJUR_PLUGIN_VERSION=$(cat VERSION)
+
 export CONJUR_DATA_KEY='iFra75qdvsLENSV+qXYFMkv7KJS3t+82Po4mmjZLxZc='
 
 CONJUR_ACCOUNT='myaccount'

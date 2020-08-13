@@ -27,13 +27,13 @@ jobs:
     - name: Check out code into the Go module directory
       uses: actions/checkout@v2
 
-    - name: Set BRANCH_NAME
-      run: echo "::set-env name=GIT_BRANCH::${GITHUB_REF#refs/heads/}"
+    - name: Set VERSION
+      run: echo "::set-env name=VERSION::$(cat VERSION)"
 
     - name: Build plugin (statically)
       run: |
         CGO_ENABLED=0 go build -tags netgo -ldflags '-extldflags "-static"' \
-          -o terraform-provider-conjur .
+        -o $PWD/dist/terraform-provider-conjur_linux_amd64/terraform-provider-conjur_v${VERSION} .
 
     - name: Run Tests
       run: |

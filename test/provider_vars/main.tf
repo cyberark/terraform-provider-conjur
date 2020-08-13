@@ -5,7 +5,7 @@ terraform {
   required_providers {
     conjur = {
       source  = "terraform.example.com/cyberark/conjur"
-      version = "~> 0.4.0"
+      version = "~> 0"
     }
   }
 }
