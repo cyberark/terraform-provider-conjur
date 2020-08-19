@@ -1,3 +1,12 @@
+terraform {
+  required_providers {
+    conjur = {
+      source  = "terraform.example.com/cyberark/conjur"
+      version = "~> 0"
+    }
+  }
+}
+
 provider "conjur" {
   # All variables for this tests are passed in through env vars
 }
