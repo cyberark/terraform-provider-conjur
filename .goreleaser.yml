@@ -53,7 +53,7 @@ brews:
       # Running bin directly gives error, exit code 1
       system "#{bin}/terraform-provider-conjur_v{{.Version}}", "-h"
 
-    github:
+    tap:
       owner: cyberark
       name: homebrew-tools
     skip_upload: true
