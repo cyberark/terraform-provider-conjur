@@ -19,5 +19,5 @@ function clientExec() {
 }
 
 function terraformRun() {
-  dockerCompose exec -T terraform sh -es "$@"
+  dockerCompose exec -T terraform sh -ec "$@"
 }

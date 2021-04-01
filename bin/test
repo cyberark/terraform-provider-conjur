@@ -1,5 +1,5 @@
 #!/bin/bash
-set -eo pipefail
+set -exo pipefail
 
 TARGET="${1:-oss}"  # can also be set to 'enterprise'
 
@@ -73,7 +73,6 @@ function launchConjur() {
 
   echo ">> Starting Conjur/DAP server"
   dockerCompose up -d conjur-server
-
   echo ">> Creating account '$CONJUR_ACCOUNT'"
   if [[ "$TARGET" == "enterprise" ]]; then
     conjurExec evoke configure master \
@@ -152,11 +151,10 @@ function runTerraform() {
 
   dockerCompose up -d terraform
 
-  terraformRun <<EOF
-    terraform init $target_dir/
-    terraform plan $target_dir/
-    terraform apply -auto-approve $target_dir/
-EOF
+  terraformRun \
+    "terraform init $target_dir/ &&
+     terraform plan $target_dir/ &&
+     terraform apply -auto-approve $target_dir/"
 
   docker-compose rm --force \
     --stop \
