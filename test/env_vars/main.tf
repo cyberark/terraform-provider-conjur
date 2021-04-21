@@ -17,7 +17,7 @@ data "conjur_secret" "dbpass" {
 
 output "dbpass-to-output" {
   value = data.conjur_secret.dbpass.value
-  sensitive = false
+  sensitive = true
 }
 
 resource "local_file" "dbpass-to-file" {

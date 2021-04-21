@@ -6,6 +6,19 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Added
+- Validated support with Terraform v0.15. Please note that in v0.15, behavior
+  around [sensitive output values](https://www.terraform.io/upgrade-guides/0-15.html#sensitive-output-values)
+  changed; with Terraform v0.15, you **must** mark output values with
+  "sensitive: true" if its definition includes any Conjur-provided secret values.
+  [cyberark/terraform-provider-conjur#76](https://github.com/cyberark/terraform-provider-conjur/issues/76)
+
+### Changed
+- Plugin now uses the [Terraform Plugin SDK](https://github.com/hashicorp/terraform-plugin-sdk)
+  instead of Terraform core as its plugin library. With this change, the Go
+  version was also incremented to 1.15.
+  [cyberark/terraform-provider-conjur#76](https://github.com/cyberark/terraform-provider-conjur/issues/76)
+
 ## [0.4.0] - 2020-04-29
 ### Added
 - You can now specify `account`, `appliance_url`, `ssl_cert`, and `ssl_cert_path` values

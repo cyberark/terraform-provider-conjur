@@ -152,9 +152,10 @@ function runTerraform() {
   dockerCompose up -d terraform
 
   terraformRun \
-    "terraform init $target_dir/ &&
-     terraform plan $target_dir/ &&
-     terraform apply -auto-approve $target_dir/"
+    "cd $target_dir/ &&
+     terraform init &&
+     terraform plan &&
+     terraform apply -auto-approve"
 
   docker-compose rm --force \
     --stop \

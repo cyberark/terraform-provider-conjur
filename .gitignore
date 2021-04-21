@@ -1,6 +1,7 @@
 terraform-provider-conjur_*
 vendor/
 .terraform/
+.terraform.lock.hcl
 *.tfstate*
 dist/
 test/dbpass
