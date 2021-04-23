@@ -1,7 +1,7 @@
 version: '3'
 services:
   database:
-    image: postgres:9.4
+    image: postgres:10
     environment:
       POSTGRES_HOST_AUTH_METHOD: trust
     healthcheck:
@@ -11,7 +11,7 @@ services:
       retries: 5
 
   conjur:
-    image: cyberark/conjur:latest
+    image: cyberark/conjur:edge
     command: server
     environment:
       DATABASE_URL: postgres://postgres@database/postgres
