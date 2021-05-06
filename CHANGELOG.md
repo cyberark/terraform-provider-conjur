@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [0.5.0] - 2021-05-06
 ### Added
 - Validated support with Terraform v0.15. Please note that in v0.15, behavior
   around [sensitive output values](https://www.terraform.io/upgrade-guides/0-15.html#sensitive-output-values)
@@ -45,8 +46,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Initial release
 - Use https://github.com/cyberark/conjur-api-go to read configuration.
 
-[Unreleased]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.4.0...HEAD
-[0.4.0]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.3.0...v0.4.0
+[Unreleased]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.1.0...v0.2.0
