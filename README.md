@@ -194,7 +194,11 @@ data "conjur_secret" "dbpass" {
 
 output "dbpass_output" {
   value = "${data.conjur_secret.dbpass.value}"
-  sensitive = true  # toggle this off to view value
+  
+  # Must mark this output value as sensitive for Terraform v0.15+,
+  # because it's derived from a Conjur variable value that is declared
+  # as sensitive.
+  sensitive = true
 }
 ```
 
