@@ -42,3 +42,13 @@ From here your pull request will be reviewed and once you've responded to all
 feedback it will be merged into the project. Congratulations, you're a
 contributor!
 
+## Releasing
+
+The following checklist should be followed when creating a release:
+
+- [ ] Follow the [Conjur release proceedure](https://github.com/cyberark/community/blob/master/Conjur/CONTRIBUTING.md#release-process)
+
+- [ ] Update homebrew tools
+  - [ ] In [`cyberark/homebrew-tools`](https://github.com/cyberark/homebrew-tools) repo, update
+        the [`terraform-provider-conjur.rb` formula](https://github.com/cyberark/homebrew-tools/blob/master/terraform-provider-conjur.rb)
+        using the file `dist/terraform-provider-conjur.rb` from the artifacts Jenkins built.
