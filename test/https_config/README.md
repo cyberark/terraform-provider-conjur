@@ -1,4 +1,4 @@
-To regenerate certificates, use [this](https://github.com/conjurdemos/dap-intro/tree/master/tools/simple-certificates)
+To regenerate certificates, use [this](https://github.com/conjurdemos/dap-intro/tree/main/tools/simple-certificates)
 tool:
 ```sh-session
 $ ./generate_certificates 1 conjur-server
