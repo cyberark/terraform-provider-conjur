@@ -1,9 +1,9 @@
 name: Integration Tests
 on:
-  # Run this on pushes to master
+  # Run this on pushes to main
   push:
     branches:
-    - master
+    - main
 
   # And when PRs operations are done
   pull_request:
