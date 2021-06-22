@@ -10,9 +10,9 @@ Terraform provider for [Conjur](https://www.conjur.org).
 
 ## Installation
 
-### Using terraform-provider-conjur with Conjur OSS 
+### Using terraform-provider-conjur with Conjur Open Source 
 
-Are you using this project with [Conjur OSS](https://github.com/cyberark/conjur)? Then we 
+Are you using this project with [Conjur Open Source](https://github.com/cyberark/conjur)? Then we 
 **strongly** recommend choosing the version of this project to use from the latest [Conjur OSS 
 suite release](https://docs.conjur.org/Latest/en/Content/Overview/Conjur-OSS-Suite-Overview.html). 
 Conjur maintainers perform additional testing on the suite release versions to ensure 
