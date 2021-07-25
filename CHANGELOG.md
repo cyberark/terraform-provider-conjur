@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Added
+- Build for Apple M1 silicon.
+  [cyberark/terraform-provider-conjur#84](https://github.com/cyberark/terraform-provider-conjur/issues/84)
+
 ## [0.5.0] - 2021-05-06
 ### Added
 - Validated support with Terraform v0.15. Please note that in v0.15, behavior
