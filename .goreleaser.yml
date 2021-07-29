@@ -16,6 +16,17 @@ builds:
   - amd64
   ldflags: []
 
+# Apple silicon support
+- id: summon-conjur-arm
+  binary: summon-conjur
+  env:
+  - CGO_ENABLED=0
+  goos:
+  - darwin  # MacOS
+  goarch:
+  - arm64
+  ldflags: []
+
 archives:
   - id: conjur-terraform-release-archive
     name_template: "{{.ProjectName}}-{{.Version}}-{{.Os}}-{{.Arch}}"
