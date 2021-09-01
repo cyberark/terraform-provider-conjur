@@ -77,6 +77,87 @@ provider "conjur" {
 }
 ```
 
+**Notes on precedence of configuration variable setting:**
+
+- If both the environment variable **and** `.tf` configuration are present for a
+  configuration setting, the `.tf` configuration takes precedence and the environment
+  variable will be ignored.
+- If the `.tf` configuration does not include **both** `login` and `api_key`, then
+  environment variables will be used for these values instead.
+
+### Fetch secrets
+
+#### Preface
+
+An important thing to keep in mind is that by design Terraform state files can contain
+sensitive data (which may include credentials fetched by this plugin). Use Terraform's
+recommendations found [here](https://www.terraform.io/docs/state/sensitive-data.html) to
+protect these values where possible.
+
+#### Example
+
+_Note: If plan is being run manually, you will need to run `terraform init` first!_
+
+```
+# main.tf
+# ... provider configuration above
+
+data "conjur_secret" "dbpass" {
+  name = "my/shiny/dbpass"
+}
+
+output "dbpass_output" {
+  value = "${data.conjur_secret.dbpass.value}"
+  
+  # Must mark this output value as sensitive for Terraform v0.15+,
+  # because it's derived from a Conjur variable value that is declared
+  # as sensitive.
+  sensitive = true
+}
+```
+
+Secrets like `data.conjur_secret.dbpass.value` can be used in any Terraform resources.
+
+View an example Terraform manifest and Conjur policies in the
+[test/](test/) directory in this project.
+
+---
+
+## Alternate Workflow with Summon
+
+If this Terraform provider does not fit your needs, you can also use
+[summon](https://github.com/cyberark/summon) with the
+[summon-conjur](https://github.com/cyberark/summon-conjur) provider
+to provide secrets to Terraform via environment variables.
+The user running `terraform` must already be authenticated with Conjur.
+
+Terraform's [`TF_VAR_name` syntax](https://www.terraform.io/docs/configuration/environment-variables.html#tf_var_name)
+allows a user to set Terraform variables via environment variables.
+To use Terraform with Summon, prefix the environment variable names in secrets.yml with `TF_VAR_`.
+
+### Example
+
+```
+# variables.tf
+variable "access_key" {}
+variable "secret_key" {}
+```
+
+
+```
+# secrets.yml
+TF_VAR_access_key: !var aws/dev/sys_powerful/access_key_id
+TF_VAR_secret_key: !var aws/dev/sys_powerful/secret_access_key
+```
+
+Run Terraform with Summon:
+
+```sh-session
+$ summon terraform apply
+```
+
+---
+
 ## Argument Reference
 
 * List any arguments for the provider block.
