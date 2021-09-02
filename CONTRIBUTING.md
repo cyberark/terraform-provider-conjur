@@ -52,3 +52,6 @@ The following checklist should be followed when creating a release:
   - [ ] In [`cyberark/homebrew-tools`](https://github.com/cyberark/homebrew-tools) repo, update
         the [`terraform-provider-conjur.rb` formula](https://github.com/cyberark/homebrew-tools/blob/main/terraform-provider-conjur.rb)
         using the file `dist/terraform-provider-conjur.rb` from the artifacts Jenkins built.
+
+- [ ] Public to Terraform Registry
+  - [ ] Request infra sign the SHA256SUMS file for the release and attach the resulting .sig file to the github release
