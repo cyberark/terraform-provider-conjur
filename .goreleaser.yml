@@ -29,21 +29,18 @@ builds:
 
 archives:
   - id: conjur-terraform-release-archive
-    name_template: "{{.ProjectName}}-{{.Version}}-{{.Os}}-{{.Arch}}"
-    format_overrides:
-      - goos: windows
-        format: zip
+    format: zip
     files:
       - README.md
       - LICENSE
 
 checksum:
-  name_template: 'SHA256SUMS.txt'
+  name_template: "{{.ProjectName}}_{{.Version}}_SHA256SUMS"
 
 brews:
   - description: Terraform provider for CyberArk Conjur
     homepage: https://github.com/cyberark/terraform-provider-conjur
-    url_template: https://github.com/cyberark/terraform-provider-conjur/releases/download/v{{.Version}}/{{.ProjectName}}-{{.Version}}-{{.Os}}-{{.Arch}}.tar.gz
+    url_template: https://github.com/cyberark/terraform-provider-conjur/releases/download/v{{.Version}}/{{.ProjectName}}_{{.Version}}_{{.Os}}_{{.Arch}}.zip
     caveats: |
       After installation, you must symlink the provider into Terraform's plugins directory.
       Symlinking is necessary because Homebrew is sandboxed and cannot write to your home directory.

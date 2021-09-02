@@ -24,7 +24,7 @@ pipeline {
     stage('Build artifacts') {
       steps {
         sh './bin/build'
-        archiveArtifacts artifacts: "dist/*.tar.gz,dist/*.zip,dist/*.txt,dist/*.rb", fingerprint: true
+        archiveArtifacts artifacts: "dist/*.tar.gz,dist/*.zip,dist/*.txt,dist/*.rb,dist/*_SHA256SUMS", fingerprint: true
       }
     }
     stage('Run integration tests (OSS)') {
