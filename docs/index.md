@@ -1,4 +1,4 @@
-# <provider> Provider
+# Conjur Provider
 
 Terraform provider for [Conjur](https://www.conjur.org).
 
