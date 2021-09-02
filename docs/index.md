@@ -6,23 +6,22 @@ Terraform provider for [Conjur](https://www.conjur.org).
 
 [![Maintainability](https://api.codeclimate.com/v1/badges/e9fc0a2de573aa189a3c/maintainability)](https://codeclimate.com/github/cyberark/terraform-provider-conjur/maintainability)
 
-## Example Usage
+The provider manages authentication with Conjur, allowing Terraform to fetch and use secrets stored in Conjur. The provider includes the following features and benefits:
 
-### Workflow
+- Simple setup in the Terraform manifest.
 
-Terraform can be run manually by users, but it is often run by machines.
-Conjur supports authentication and authorization for both.
+- The provider authenticates to Conjur.
 
-If you are logged into the [Conjur CLI](https://docs.conjur.org/Latest/en/Content/Tools/cli.html),
-this provider will read your configuration.
-If you have applied [Conjur machine identity](https://www.conjur.org/tutorials/policy/applications.html),
-this provider will read the machine's configuration.
+- Conjur policy controls access to requested Conjur variables.
 
-To access the values of secrets, the user/machine needs `execute` privilege
-on the Conjur variables referenced in your Terraform manifests.
+- A provider method fetches variable values and makes them available for use elsewhere in the manifest.
+
+- The Terraform sensitive flag may be used against any fetched secret value to keep the value from appearing in logs and on-screen.
 
 For more details, see the "Authentication" section
 [on this page](https://docs.conjur.org/Latest/en/Content/Integrations/terraform.htm).
+
+## Example Usage
 
 ### Provider configuration
 
