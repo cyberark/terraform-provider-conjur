@@ -6,6 +6,9 @@ vendor/
 dist/
 test/dbpass
 
+# Temporary directory to store the CyberArk proxy CA certificate.
+build_ca_certificate/
+
 # Binaries for programs and plugins
 *.exe
 *.exe~
