@@ -1,0 +1,12 @@
+FROM goreleaser/goreleaser
+
+# On CyberArk dev laptops, golang dependencies are downloaded
+# with a corporate proxy in the middle. For these connections to
+# succeed we need to configure the proxy CA certificate in the
+# build container.
+#
+# To also allow this script to work on non-CyberArk laptops
+# we copy the certificate into the Docker image as a (potentially
+# empty) directory, rather than rely on the CA file itself.
+ADD build_ca_certificate /usr/local/share/ca-certificates/
+RUN update-ca-certificates

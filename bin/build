@@ -1,15 +1,52 @@
 #!/bin/bash -e
 
-git fetch --tags  # jenkins does not do this automatically yet
+main() {
+  retrieve_cyberark_ca_cert
+  build_and_package_binaries
+}
 
-docker-compose pull goreleaser
+retrieve_cyberark_ca_cert() {
+  # On CyberArk dev laptops, golang dependencies are downloaded
+  # with a corporate proxy in the middle. For these connections
+  # succeed we need to configure the proxy CA certificate in the
+  # build container.
+  #
+  # To also allow this script to work on non-CyberArk laptops
+  # we copy the certificate into the Docker image as a (potentially
+  # empty) directory, rather than rely on the CA file itself.
+  mkdir -p "$(repo_root)/build_ca_certificate"
 
-echo "> Building and packaging binaries"
-docker-compose run --rm \
-  --entrypoint goreleaser \
-  goreleaser release --rm-dist --skip-validate
+  # Only attempt to extract the certificate if the security
+  # command is available.
+  #
+  # The certificate file must have the .crt extension to be imported
+  # by `update-ca-certificates`.
+  if command -v security &> /dev/null
+  then
+    security find-certificate \
+      -a -c "CyberArk Enterprise Root CA" \
+      -p > build_ca_certificate/cyberark_root.crt
+  fi
+}
 
-# Needed for testing stages
-goos='linux'  # uname -s | tr '[:upper:]' '[:lower:]'
-goarch="amd64"
-cp dist/terraform-provider-conjur_${goos}_${goarch}/terraform-provider-conjur_v* .
+build_and_package_binaries() {
+  git fetch --tags  # jenkins does not do this automatically yet
+
+  docker-compose build goreleaser
+
+  echo "> Building and packaging binaries"
+  docker-compose run --rm \
+    --entrypoint goreleaser \
+    goreleaser release --rm-dist --skip-validate
+
+  # Needed for testing stages
+  goos='linux'  # uname -s | tr '[:upper:]' '[:lower:]'
+  goarch="amd64"
+  cp dist/terraform-provider-conjur_${goos}_${goarch}/terraform-provider-conjur_v* .
+}
+
+repo_root() {
+  git rev-parse --show-toplevel
+}
+
+main
