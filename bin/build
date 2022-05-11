@@ -42,7 +42,7 @@ build_and_package_binaries() {
   # Needed for testing stages
   goos='linux'  # uname -s | tr '[:upper:]' '[:lower:]'
   goarch="amd64"
-  cp dist/terraform-provider-conjur_${goos}_${goarch}/terraform-provider-conjur_v* .
+  cp dist/terraform-provider-conjur_${goos}_${goarch}_v1/terraform-provider-conjur_v* .
 }
 
 repo_root() {
