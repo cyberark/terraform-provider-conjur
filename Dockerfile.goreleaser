@@ -10,3 +10,6 @@ FROM goreleaser/goreleaser
 # empty) directory, rather than rely on the CA file itself.
 ADD build_ca_certificate /usr/local/share/ca-certificates/
 RUN update-ca-certificates
+
+# Workaround for CVE-2022-24765 when running git inside a docker container
+RUN git config --global --add safe.directory /terraform-provider-conjur

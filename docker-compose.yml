@@ -31,7 +31,7 @@ services:
     working_dir: /src
     volumes:
       - $PWD:/src
-      - $PWD/dist/terraform-provider-conjur_linux_amd64/:/usr/share/terraform/plugins/terraform.example.com/cyberark/conjur/${CONJUR_PLUGIN_VERSION}/linux_amd64/
+      - $PWD/dist/terraform-provider-conjur_linux_amd64_v1/:/usr/share/terraform/plugins/terraform.example.com/cyberark/conjur/${CONJUR_PLUGIN_VERSION}/linux_amd64/
 
   goreleaser:
     build:
