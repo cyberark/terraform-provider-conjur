@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- Updated direct dependencies (conjur-api-go -> 0.10.1 and github.com/hashicorp/terraform-plugin-sdk -> 1.17.2)
+  [conjurinc/terraform-provider-conjur#102](https://github.com/conjurinc/terraform-provider-conjur/pull/102)
 
 ## [0.6.2] - 2021-09-02
 ### Added
