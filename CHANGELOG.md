@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 ### Changed
 - Updated direct dependencies (conjur-api-go -> 0.10.1 and github.com/hashicorp/terraform-plugin-sdk -> 1.17.2)
-  [conjurinc/terraform-provider-conjur#102](https://github.com/conjurinc/terraform-provider-conjur/pull/102)
+  [cyberark/terraform-provider-conjur#102](https://github.com/cyberark/terraform-provider-conjur/pull/102)
+
+### Security
+- Add replace statements to go.mod to remove 3rd party dependencies with known vulnerabilities from our 
+  dependency tree. [cyberark/terraform-provider-conjur#103](https://github.com/cyberark/terraform-provider-conjur/pull/103)
 
 ## [0.6.2] - 2021-09-02
 ### Added
