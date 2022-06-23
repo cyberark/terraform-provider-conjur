@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Security
 - Add replace statements to go.mod to remove 3rd party dependencies with known vulnerabilities from our 
   dependency tree. [cyberark/terraform-provider-conjur#103](https://github.com/cyberark/terraform-provider-conjur/pull/103)
+  [cyberark/terraform-provider-conjur#104](https://github.com/cyberark/terraform-provider-conjur/pull/104)
 
 ## [0.6.2] - 2021-09-02
 ### Added
