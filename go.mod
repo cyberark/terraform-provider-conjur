@@ -196,3 +196,5 @@ replace golang.org/x/text v0.3.6 => golang.org/x/text v0.3.7
 replace gopkg.in/yaml.v2 v2.2.2 => gopkg.in/yaml.v2 v2.2.8
 
 replace gopkg.in/yaml.v2 v2.2.4 => gopkg.in/yaml.v2 v2.2.8
+
+replace gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c => gopkg.in/yaml.v3 v3.0.1
