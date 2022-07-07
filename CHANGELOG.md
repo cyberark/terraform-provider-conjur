@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 ### Changed
+- Updated Terraform Plugin SDK to v2. This removes support for Terraform 0.11.
+  [cyberark/terraform-provider-conjur#106](https://github.com/cyberark/terraform-provider-conjur/pull/106)
 - Updated direct dependencies (conjur-api-go -> 0.10.1 and github.com/hashicorp/terraform-plugin-sdk -> 1.17.2)
   [cyberark/terraform-provider-conjur#102](https://github.com/cyberark/terraform-provider-conjur/pull/102)
 

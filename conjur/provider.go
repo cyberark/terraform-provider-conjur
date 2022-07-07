@@ -5,15 +5,14 @@ import (
 	"encoding/hex"
 	"log"
 
-	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
-	"github.com/hashicorp/terraform-plugin-sdk/terraform"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 
 	"github.com/cyberark/conjur-api-go/conjurapi"
 	"github.com/cyberark/conjur-api-go/conjurapi/authn"
 )
 
-// Provider implements Conjur as a terraform.ResourceProvider
-func Provider() terraform.ResourceProvider {
+// Provider implements Conjur as a schema.Provider
+func Provider() *schema.Provider {
 	return &schema.Provider{
 		DataSourcesMap: map[string]*schema.Resource{
 			"conjur_secret": dataSourceSecret(),
