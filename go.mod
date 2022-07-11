@@ -56,9 +56,17 @@ go 1.17
 
 replace github.com/aws/aws-sdk-go v1.15.78 => github.com/aws/aws-sdk-go v1.34.2
 
+replace github.com/aws/aws-sdk-go v1.25.3 => github.com/aws/aws-sdk-go v1.34.2
+
+replace github.com/hashicorp/go-getter v1.4.0 => github.com/hashicorp/go-getter v1.6.1
+
+replace github.com/hashicorp/go-getter v1.5.0 => github.com/hashicorp/go-getter v1.6.1
+
 replace github.com/hashicorp/go-getter v1.5.3 => github.com/hashicorp/go-getter v1.6.1
 
 replace github.com/Masterminds/goutils v1.1.0 => github.com/Masterminds/goutils v1.1.1
+
+replace github.com/ulikunitz/xz v0.5.5 => github.com/ulikunitz/xz v0.5.8
 
 replace golang.org/x/crypto v0.0.0-20190219172222-a4c6cb3142f2 => golang.org/x/crypto v0.0.0-20220314234659-1baeb1ce4c0b
 
@@ -71,6 +79,8 @@ replace golang.org/x/crypto v0.0.0-20190510104115-cbcb75029529 => golang.org/x/c
 replace golang.org/x/crypto v0.0.0-20190605123033-f99c8df09eb5 => golang.org/x/crypto v0.0.0-20220314234659-1baeb1ce4c0b
 
 replace golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550 => golang.org/x/crypto v0.0.0-20220314234659-1baeb1ce4c0b
+
+replace golang.org/x/crypto v0.0.0-20200302210943-78000ba7a073 => golang.org/x/crypto v0.0.0-20220314234659-1baeb1ce4c0b
 
 replace golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9 => golang.org/x/crypto v0.0.0-20220314234659-1baeb1ce4c0b
 

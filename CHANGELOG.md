@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   dependency tree. [cyberark/terraform-provider-conjur#103](https://github.com/cyberark/terraform-provider-conjur/pull/103)
   [cyberark/terraform-provider-conjur#104](https://github.com/cyberark/terraform-provider-conjur/pull/104)
   [cyberark/terraform-provider-conjur#105](https://github.com/cyberark/terraform-provider-conjur/pull/105)
+  [cyberark/terraform-provider-conjur#107](https://github.com/cyberark/terraform-provider-conjur/pull/107)
 
 ## [0.6.2] - 2021-09-02
 ### Added
