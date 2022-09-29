@@ -49,7 +49,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
-go 1.17
+go 1.19
 
 // Security fixes to ensure we don't have old vulnerable packages in our
 // dependency tree. We're often not vulnerable, but removing them to ensure
