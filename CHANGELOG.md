@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 ### Security
+- Added replaces for 2 versions of golang.org/x/crypto brought in by the terraform sdk to resolve CVE-2021-43565
+  [cyberark/terraform-provider-conjur#111](https://github.com/cyberark/terraform-provider-conjur/pull/111)
 - Upgraded to Go 1.19 [cyberark/terraform-provider-conjur#110](https://github.com/cyberark/terraform-provider-conjur/pull/110)
 - Forced golang.org/x/net to use v0.0.0-20220923203811-8be639271d50 to resolve CVE-2022-27664
   [cyberark/terraform-provider-conjur#109](https://github.com/cyberark/terraform-provider-conjur/pull/109)
