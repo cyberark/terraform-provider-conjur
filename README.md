@@ -91,6 +91,40 @@ $ mkdir -p ~/.terraform.d/plugins/
 $ # Note: If a static binary is required, use ./bin/build to create the executable
 $ go build -o ~/.terraform.d/plugins/terraform-provider-conjur main.go
 ```
+### Access from Terraform Registry
+If you wish to use the Terraform Provider Conjur from Terraform Registry
+
+In main.tf use registry.terraform.io/cyberark/conjur in source and replace version with the latest 
+
+```sh-session
+  terraform {
+    required_providers {
+      conjur = {
+        source  = “registry.terraform.io/cyberark/conjur"
+        version = "~> 0"
+      }
+    }
+  }
+
+  provider "conjur" {
+    # All variables required variable for API Key/JWT/Access token authorization for Conjur Server. Please refer Usage section
+  }
+
+  data "conjur_secret" "dbpass" {
+    name = "App/secretVar"
+  }
+
+  output "dbpass-to-output" {
+    value = data.conjur_secret.dbpass.value
+    sensitive = true
+  }
+
+  resource "local_file" "dbpass-to-file" {
+    content = data.conjur_secret.dbpass.value
+    filename = "${path.module}/../dbpass"
+    file_permission = "0664"
+  }
+```
 
 ## Usage
 
@@ -116,7 +150,7 @@ The provider uses [conjur-api-go](https://github.com/cyberark/conjur-api-go) to 
 configuration. `conjur-api-go` can be configured using environment variables or using the
 provider configuration in the `.tf` file.
 
-#### Using environment variables
+#### Using environment variables for API Key Authorization
 
 ```sh-session
 export CONJUR_APPLIANCE_URL="https://conjur-server"
@@ -124,6 +158,13 @@ export CONJUR_ACCOUNT="myorg"
 export CONJUR_AUTHN_LOGIN="admin"
 export CONJUR_AUTHN_API_KEY="3ahcddy39rcxzh3ggac4cwk3j2r8pqwdg33059y835ys2rh2kzs2a"
 export CONJUR_CERT_FILE="/etc/conjur.pem"
+```
+
+#### Using environment variables for Access Token
+```sh-session
+export CONJUR_APPLIANCE_URL="https://conjur-server"
+export CONJUR_ACCOUNT="myorg"
+export CONJUR_AUTHN_TOKEN="1hj78787hghgjh232425424+@="
 ```
 
 No other configuration is necessary in `main.tf`:
