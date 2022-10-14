@@ -160,13 +160,6 @@ export CONJUR_AUTHN_API_KEY="3ahcddy39rcxzh3ggac4cwk3j2r8pqwdg33059y835ys2rh2kzs
 export CONJUR_CERT_FILE="/etc/conjur.pem"
 ```
 
-#### Using environment variables for Access Token
-```sh-session
-export CONJUR_APPLIANCE_URL="https://conjur-server"
-export CONJUR_ACCOUNT="myorg"
-export CONJUR_AUTHN_TOKEN="1hj78787hghgjh232425424+@="
-```
-
 No other configuration is necessary in `main.tf`:
 
 ```
