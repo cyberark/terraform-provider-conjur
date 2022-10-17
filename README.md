@@ -150,7 +150,7 @@ The provider uses [conjur-api-go](https://github.com/cyberark/conjur-api-go) to 
 configuration. `conjur-api-go` can be configured using environment variables or using the
 provider configuration in the `.tf` file.
 
-#### Using environment variablesß
+#### Using environment variables
 
 ```sh-session
 export CONJUR_APPLIANCE_URL="https://conjur-server"
