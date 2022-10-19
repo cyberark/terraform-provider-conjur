@@ -150,7 +150,7 @@ The provider uses [conjur-api-go](https://github.com/cyberark/conjur-api-go) to 
 configuration. `conjur-api-go` can be configured using environment variables or using the
 provider configuration in the `.tf` file.
 
-#### Using environment variables
+#### Using environment variables for API Key Authentication 
 
 ```sh-session
 export CONJUR_APPLIANCE_URL="https://conjur-server"
@@ -158,6 +158,18 @@ export CONJUR_ACCOUNT="myorg"
 export CONJUR_AUTHN_LOGIN="admin"
 export CONJUR_AUTHN_API_KEY="3ahcddy39rcxzh3ggac4cwk3j2r8pqwdg33059y835ys2rh2kzs2a"
 export CONJUR_CERT_FILE="/etc/conjur.pem"
+```
+
+#### Using environment variables for Access Token
+
+```sh-session
+export CONJUR_APPLIANCE_URL="https://conjur-server"
+export CONJUR_ACCOUNT="myorg"
+export CONJUR_AUTHN_TOKEN='{                       
+  "protected": "eyJhbGciOiJjb25qdXIub3JnL3Nsb3NpbG8vdjIiLCJraWQiOiJhMjA1NmEwYTk4OWU5ZmEyMTVmMTQwNDlmZmIyMTc3N2QxN2QyMjlmNjc2MGI3YjJkNmZhY2UwMjQ2NmNkMDg0In0=",
+  "payload": "eyJzdWIiOiJhZG1pbiIsImV4cCI6MTY2NjIwODQ4NiwiaWF0IjoxNjY2MjA4MDA2fQ==",
+  "signature": "RiwpMqGfWKgN5fTWv9JY6XUmNGLrsrx6mIjLllt0NN8n2VoZCMqXOaoicSyan0w3aJ2Z-eAqi46-nko24qOYw6iybg7AIi9ws7G-d68IIgY0GMYbT4LGDb8GaHeN_y6eOpBMJHHyiHnaOeP5d8h47wLSzdPsaVzPpzd_lczJJSiUg11Qzh6_OxLAsF9Us80Ta-O320HSHg3IXzw-792eKUubAHPOUAY04xYhgoZ-vQbjQkOBmH8vAwnUQ10l_7w1A9upRDnulCK4KDl8VPAvBI1XhyiqIbxrcCZWfreVt0S6rvl3aTkeYbBPRh4vXpRP5KDKp6lznUi6dl75ZHfSbX_OHUNpiCZiY2wCRm69s2C4Ww5mvNq20fUvsf8tclVV"
+}'
 ```
 
 No other configuration is necessary in `main.tf`:
