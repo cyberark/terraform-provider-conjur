@@ -92,7 +92,9 @@ $ # Note: If a static binary is required, use ./bin/build to create the executab
 $ go build -o ~/.terraform.d/plugins/terraform-provider-conjur main.go
 ```
 ### Access from Terraform Registry
-If you wish to use the Terraform Provider Conjur from Terraform Registry
+To use the Conjur Terraform Provider from the Terraform Registry:
+
+I would at least change Terraform Provider Conjur to Conjur Terraform Provider to match the product name.
 
 In main.tf use registry.terraform.io/cyberark/conjur in source and replace version with the latest 
 
@@ -107,7 +109,7 @@ In main.tf use registry.terraform.io/cyberark/conjur in source and replace versi
   }
 
   provider "conjur" {
-    # All variables required variable for API Key/JWT/Access token authorization for Conjur Server. Please refer Usage section
+    # All variables required for API Key, JWT, or Access Token authentication for Conjur Server. Refer to the Usage section for details.
   }
 
   data "conjur_secret" "dbpass" {
