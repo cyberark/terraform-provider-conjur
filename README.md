@@ -94,8 +94,6 @@ $ go build -o ~/.terraform.d/plugins/terraform-provider-conjur main.go
 ### Access from Terraform Registry
 To use the Conjur Terraform Provider from the Terraform Registry:
 
-I would at least change Terraform Provider Conjur to Conjur Terraform Provider to match the product name.
-
 In main.tf use registry.terraform.io/cyberark/conjur in source and replace version with the latest 
 
 ```sh-session
