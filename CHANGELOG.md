@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.6.4] - 2022-11-14
 ### Security
 - Added replaces for 2 versions of golang.org/x/crypto brought in by the terraform sdk to resolve CVE-2021-43565
   [cyberark/terraform-provider-conjur#111](https://github.com/cyberark/terraform-provider-conjur/pull/111)
@@ -79,7 +81,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Initial release
 - Use https://github.com/cyberark/conjur-api-go to read configuration.
 
-[Unreleased]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.6.3...HEAD
+[Unreleased]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.6.4...HEAD
+[0.6.4]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.6.0...v0.6.1
