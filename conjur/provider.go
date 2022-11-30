@@ -66,6 +66,9 @@ func providerConfig(d *schema.ResourceData) (interface{}, error) {
 	if appliance_url != "" {
 		config.ApplianceURL = appliance_url
 	}
+	
+	// Add `/api` to appliance url for Conjur Cloud support
+	appliance_url += "/api"
 
 	account := d.Get("account").(string)
 	if account != "" {
