@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [0.6.5] - 2022-11-30
+### Changed
+- Added support for Conjur Cloud by appending `appliance_url` with `/api` [cyberark/terraform-provider-conjur#115](https://github.com/cyberark/terraform-provider-conjur/pull/115)
+
 ## [0.6.4] - 2022-11-14
 ### Security
 - Added replaces for 2 versions of golang.org/x/crypto brought in by the terraform sdk to resolve CVE-2021-43565
