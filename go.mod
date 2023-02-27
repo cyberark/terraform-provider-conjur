@@ -39,9 +39,9 @@ require (
 	github.com/vmihailenco/msgpack/v4 v4.3.12 // indirect
 	github.com/vmihailenco/tagparser v0.1.1 // indirect
 	github.com/zclconf/go-cty v1.11.0 // indirect
-	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2 // indirect
-	golang.org/x/sys v0.0.0-20220728004956-3c1f35247d10 // indirect
-	golang.org/x/text v0.3.7 // indirect
+	golang.org/x/net v0.7.0 // indirect
+	golang.org/x/sys v0.5.0 // indirect
+	golang.org/x/text v0.7.0 // indirect
 	google.golang.org/appengine v1.6.6 // indirect
 	google.golang.org/genproto v0.0.0-20200904004341-0bd0a958aa1d // indirect
 	google.golang.org/grpc v1.48.0 // indirect
@@ -96,75 +96,77 @@ replace golang.org/x/crypto v0.0.0-20210421170649-83a5a9bb288b => golang.org/x/c
 
 replace golang.org/x/crypto v0.0.0-20210616213533-5ff15b29337e => golang.org/x/crypto v0.0.0-20220314234659-1baeb1ce4c0b
 
-replace golang.org/x/net v0.0.0-20180530234432-1e491301e022 => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20180530234432-1e491301e022 => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20180724234803-3673e40ba225 => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20180724234803-3673e40ba225 => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20180811021610-c39426892332 => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20180811021610-c39426892332 => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20180826012351-8a410e7b638d => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20180826012351-8a410e7b638d => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20190108225652-1e06a53dbb7e => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20190108225652-1e06a53dbb7e => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20190213061140-3a22650c66bd => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20190213061140-3a22650c66bd => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20190311183353-d8887717615a => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20190311183353-d8887717615a => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3 => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3 => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20190501004415-9ce7a6920f09 => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20190501004415-9ce7a6920f09 => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20190503192946-f4e77d36d62c => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20190503192946-f4e77d36d62c => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20190603091049-60506f45cf65 => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20190603091049-60506f45cf65 => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20190620200207-3b0461eec859 => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20190620200207-3b0461eec859 => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20190628185345-da137c7871d7 => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20190628185345-da137c7871d7 => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20190724013045-ca1201d0de80 => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20190724013045-ca1201d0de80 => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20191009170851-d66e71096ffb => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20191009170851-d66e71096ffb => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553 => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553 => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20200114155413-6afb5195e5aa => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20200114155413-6afb5195e5aa => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20200202094626-16171245cfb2 => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20200202094626-16171245cfb2 => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20200222125558-5a598a2470a0 => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20200222125558-5a598a2470a0 => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20200226121028-0de0cce0169b => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20200226121028-0de0cce0169b => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20200301022130-244492dfa37a => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20200301022130-244492dfa37a => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20200501053045-e0ff5e5a1de5 => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20200501053045-e0ff5e5a1de5 => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20200506145744-7e3656a0809f => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20200506145744-7e3656a0809f => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20200513185701-a91f0712d120 => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20200513185701-a91f0712d120 => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20200520182314-0ba52f642ac2 => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20200520182314-0ba52f642ac2 => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20200625001655-4c5254603344 => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20200625001655-4c5254603344 => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20200707034311-ab3426394381 => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20200707034311-ab3426394381 => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20200822124328-c89045814202 => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20200822124328-c89045814202 => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20201021035429-f5854403a974 => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20201021035429-f5854403a974 => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20201110031124-69a78807bb2b => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20201110031124-69a78807bb2b => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20210119194325-5f4716e94777 => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20210119194325-5f4716e94777 => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20210226172049-e18ecbb05110 => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20210226172049-e18ecbb05110 => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20210326060303-6b1517762897 => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20210326060303-6b1517762897 => golang.org/x/net v0.7.0
 
-replace golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2 => golang.org/x/net v0.0.0-20220923203811-8be639271d50
+replace golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2 => golang.org/x/net v0.7.0
+
+replace golang.org/x/net v0.0.0-20220722155237-a158d28d115b => golang.org/x/net v0.7.0
 
 replace golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c => golang.org/x/text v0.3.7
 
