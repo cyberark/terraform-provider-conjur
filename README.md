@@ -1,16 +1,31 @@
-# terraform-provider-conjur
+# Terraform Provider Conjur
+With the Help of Conjur Terraform Provider Plugin you can retrive secretes from Conjur.
 
-Terraform provider for [Conjur](https://www.conjur.org).
+## Certification level
+[![](https://img.shields.io/badge/Certification%20Level-Certified-28A745?)](https://github.com/cyberark/community/blob/master/Conjur/conventions/certification-levels.md)
 
-[![GitHub release](https://img.shields.io/github/release/cyberark/terraform-provider-conjur.svg)](https://github.com/cyberark/terraform-provider-conjur/releases/latest)
+This repository is a **Certified** level project. It's a community contributed project **reviewed and tested by CyberArk
+and trusted to use with Conjur Open Source**. For more detailed information on our certification levels, see [our community guidelines](https://github.com/cyberark/community/blob/master/Conjur/conventions/certification-levels.md#certified).
 
-[![Maintainability](https://api.codeclimate.com/v1/badges/e9fc0a2de573aa189a3c/maintainability)](https://codeclimate.com/github/cyberark/terraform-provider-conjur/maintainability)
+## Features
+The following features are available with the Terraform Provider Plugin:
+* Retrieve a single secret from the CyberArk Vault by specifying the path to the secret in the main.tf file or environment variable.
 
----
+## Limitations
 
-## Installation
+The Terraform Provider Plugin does not support creating, deleting, or updating secrets.
 
-### Using terraform-provider-conjur with Conjur Open Source 
+## Technical Requirements
+
+|  Technology    |  Version |
+|----------------|----------|
+| GO             |   1.19   |
+| Conjur OSS     |  1.9+    |
+| Conjur Enterprise | 12.5  |
+|ConjurSDK(GO)   |  0.10.1  |
+|Conjur API      |  5.1     |
+
+## Using terraform-provider-conjur with Conjur Open Source 
 
 Are you using this project with [Conjur Open Source](https://github.com/cyberark/conjur)? Then we 
 **strongly** recommend choosing the version of this project to use from the latest [Conjur OSS 
@@ -21,7 +36,15 @@ compatibility. When possible, upgrade your Conjur version to match the
 when using integrations, choose the latest suite release that matches your Conjur version. For any 
 questions, please contact us on [Discourse](https://discuss.cyberarkcommons.org/c/conjur/5).
 
-### Binaries (Recommended)
+## Prerequisites
+
+The following are prerequisites to using the Terraform Provider Plugin.
+
+### 1.Conjur setup
+
+You need to Setup Conjur OSS locally. To setup Conjur OSS follow Conjur quickstart [Cyberark-Conjur-OSS](https://github.com/cyberark/conjur-quickstart)
+
+### 2.Binaries 
 The recommended way to install `terraform-provider-conjur` is to use the binary distributions from this project's
 [GitHub Releases page](https://github.com/cyberark/terraform-provider-conjur/releases).
 The packages are available for Linux, macOS and Windows.
@@ -32,26 +55,11 @@ _Note: Replace `$VERSION` with the one you want to use. See [releases](https://g
 page for available versions._
 
 ```sh-session
-$ wget https://github.com/cyberark/terraform-provider-conjur/releases/download/v$VERSION/terraform-provider-conjur-$VERSION-linux-amd64.tar.gz
-$ tar -xvf terraform-provider-conjur*.tar.gz
+$ wget https://github.com/cyberark/terraform-provider-conjur/releases/download/v$VERSION/terraform-provider-conjur-$VERSION.tar.gz
+$ tar -xvf terraform-provider-conjur-$VERSION.tar.gz
 ```
 
-
-If you already have an unversioned plugin that was previously downloaded, we first need
-to remove it:
-```sh-session
-$ rm -f ~/.terraform.d/plugins/terraform-provider-conjur
-```
-
-Now copy the new binary to the Terraform's plugins folder. If this is your first plugin,
-you will need to create the folder first.
-
-```sh-session
-$ mkdir -p ~/.terraform.d/plugins/
-$ mv terraform-provider-conjur*/terraform-provider-conjur* ~/.terraform.d/plugins/
-```
-
-### Homebrew (MacOS)
+### 3.Homebrew (MacOS)
 
 Add and update the [CyberArk Tools Homebrew tap](https://github.com/cyberark/homebrew-tools).
 
@@ -74,7 +82,22 @@ $ ln -sf /usr/local/Cellar/terraform-provider-conjur/$VERSION/bin/terraform-prov
     ~/.terraform.d/plugins/
 ```
 
-### Compile from Source
+
+If you already have an unversioned plugin that was previously downloaded, we first need
+to remove it:
+```sh-session
+$ rm -f ~/.terraform.d/plugins/terraform-provider-conjur
+```
+
+Now copy the new binary to the Terraform's plugins folder. If this is your first plugin,
+you will need to create the folder first.
+
+```sh-session
+$ mkdir -p ~/.terraform.d/plugins/
+$ mv terraform-provider-conjur*/terraform-provider-conjur* ~/.terraform.d/plugins/
+```
+
+### 4.Compile from Source
 
 If you wish to compile the provider from source code, you will first need Go installed
 on your machine (version >=1.12 is required).
@@ -87,14 +110,45 @@ $ cd terraform-provider-conjur
 - Build the provider
 
 ```sh-session
-$ mkdir -p ~/.terraform.d/plugins/
+$ mkdir -p ~/.terraform.d/plugins/terraform.example.com/cyberark/conjur/$VERSION/$platform_reference_in_go
+$ # Example: platform_reference_in_go= darwin_amd64
 $ # Note: If a static binary is required, use ./bin/build to create the executable
-$ go build -o ~/.terraform.d/plugins/terraform-provider-conjur main.go
+$ go build -o ~/.terraform.d/plugins/terraform.example.com/cyberark/conjur/$VERSION/$platform_reference_in_go/terraform-provider-conjur main.go
+```
+### Access from Terraform Registry
+To use the Conjur Terraform Provider from the Terraform Registry:
+
+In main.tf use registry.terraform.io/cyberark/conjur in source and replace version with the latest 
+
+```sh-session
+  terraform {
+    required_providers {
+      conjur = {
+        source  = “registry.terraform.io/cyberark/conjur"
+        version = "~> 0"
+      }
+    }
+  }
+  provider "conjur" {
+    # All variables required for API Key, or Access Token authentication for Conjur Server. Refer to the Usage section for details.
+  }
+  data "conjur_secret" "dbpass" {
+    name = "App/secretVar"
+  }
+  output "dbpass-to-output" {
+    value = data.conjur_secret.dbpass.value
+    sensitive = true
+  }
+  resource "local_file" "dbpass-to-file" {
+    content = data.conjur_secret.dbpass.value
+    filename = "${path.module}/../dbpass"
+    file_permission = "0664"
+  }
 ```
 
-## Usage
+## Terrafrom Provider Usage
 
-### Workflow
+### Terraform Provider Workflow
 
 Terraform can be run manually by users, but it is often run by machines.
 Conjur supports authentication and authorization for both.
@@ -110,13 +164,13 @@ on the Conjur variables referenced in your Terraform manifests.
 For more details, see the "Authentication" section
 [on this page](https://docs.conjur.org/Latest/en/Content/Integrations/terraform.htm).
 
-### Provider configuration
+## Provider configuration
 
 The provider uses [conjur-api-go](https://github.com/cyberark/conjur-api-go) to load its
 configuration. `conjur-api-go` can be configured using environment variables or using the
 provider configuration in the `.tf` file.
 
-#### Using environment variables
+### Option 1: Using environment variables for API Key Authentication 
 
 ```sh-session
 export CONJUR_APPLIANCE_URL="https://conjur-server"
@@ -132,8 +186,19 @@ No other configuration is necessary in `main.tf`:
 # main.tf
 provider "conjur" {}
 ```
+### Option 2: Using environment variables for Access Token
 
-#### Using attributes
+```sh-session
+export CONJUR_APPLIANCE_URL="https://conjur-server"
+export CONJUR_ACCOUNT="myorg"
+export CONJUR_AUTHN_TOKEN='{                       
+  "protected": "eyJhbGciOiJjb25qdXIub3JnL3Nsb3NpbG8vdjIiLCJraWQiOiJhMjA1NmEwYTk4OWU5ZmEyMTVmMTQwNDlmZmIyMTc3N2QxN2QyMjlmNjc2MGI3YjJkNmZhY2UwMjQ2NmNkMDg0In0=",
+  "payload": "eyJzdWIiOiJhZG1pbiIsImV4cCI6MTY2NjIwODQ4NiwiaWF0IjoxNjY2MjA4MDA2fQ==",
+  "signature": "RiwpMqGfWKgN5fTWv9JY6XUmNGLrsrx6mIjLllt0NN8n2VoZCMqXOaoicSyan0w3aJ2Z-eAqi46-nko24qOYw6iybg7AIi9ws7G-d68IIgY0GMYbT4LGDb8GaHeN_y6eOpBMJHHyiHnaOeP5d8h47wLSzdPsaVzPpzd_lczJJSiUg11Qzh6_OxLAsF9Us80Ta-O320HSHg3IXzw-792eKUubAHPOUAY04xYhgoZ-vQbjQkOBmH8vAwnUQ10l_7w1A9upRDnulCK4KDl8VPAvBI1XhyiqIbxrcCZWfreVt0S6rvl3aTkeYbBPRh4vXpRP5KDKp6lznUi6dl75ZHfSbX_OHUNpiCZiY2wCRm69s2C4Ww5mvNq20fUvsf8tclVV"
+}'
+```
+
+### Option 3: Using attributes
 
 In addition, the provider can be configured using attributes in the
 configuration. Attributes specified in `main.tf` override the configuration loaded by
@@ -170,17 +235,17 @@ provider "conjur" {
   variable will be ignored.
 - If the `.tf` configuration does not include **both** `login` and `api_key`, then
   environment variables will be used for these values instead.
-
-### Fetch secrets
-
-#### Preface
+  
+## Fetch secrets from Conjur
+  
+### Preface
 
 An important thing to keep in mind is that by design Terraform state files can contain
 sensitive data (which may include credentials fetched by this plugin). Use Terraform's
 recommendations found [here](https://www.terraform.io/docs/state/sensitive-data.html) to
 protect these values where possible.
 
-#### Example
+### Example
 
 _Note: If plan is being run manually, you will need to run `terraform init` first!_
 
@@ -243,7 +308,7 @@ $ summon terraform apply
 ```
 
 ---
-
+ 
 ## Contributing
 
 We welcome contributions of all kinds to this repository. For instructions on how to get started and descriptions of our development workflows, please see our [contributing
