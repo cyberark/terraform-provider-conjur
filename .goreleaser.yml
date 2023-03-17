@@ -17,8 +17,8 @@ builds:
   ldflags: []
 
 # Apple silicon support
-- id: summon-conjur-arm
-  binary: summon-conjur
+- id: terraform-provider-conjur-arm
+  binary: terraform-provider-conjur_v{{.Version}}
   env:
   - CGO_ENABLED=0
   goos:
