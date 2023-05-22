@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 
 ### Security
+- Updated golang.org/x/sys to v0.8.0 and golang.org/x/text to v0.9.0
+  [cyberark/terraform-provider-conjur#123](https://github.com/cyberark/terraform-provider-conjur/pull/123)
 - Updated golang.org/x/net to v0.7.0 for CVE-2022-41721 and CVE-2022-41723, and
   golang.org/x/text to v0.3.8 for CVE_2022-32149
   [cyberark/terraform-provider-conjur#117](https://github.com/cyberark/terraform-provider-conjur/pull/117)

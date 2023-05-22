@@ -40,8 +40,8 @@ require (
 	github.com/vmihailenco/tagparser v0.1.1 // indirect
 	github.com/zclconf/go-cty v1.11.0 // indirect
 	golang.org/x/net v0.7.0 // indirect
-	golang.org/x/sys v0.5.0 // indirect
-	golang.org/x/text v0.7.0 // indirect
+	golang.org/x/sys v0.8.0 // indirect
+	golang.org/x/text v0.9.0 // indirect
 	google.golang.org/appengine v1.6.6 // indirect
 	google.golang.org/genproto v0.0.0-20200904004341-0bd0a958aa1d // indirect
 	google.golang.org/grpc v1.48.0 // indirect
@@ -71,6 +71,8 @@ replace github.com/hashicorp/go-getter v1.5.3 => github.com/hashicorp/go-getter 
 replace github.com/Masterminds/goutils v1.1.0 => github.com/Masterminds/goutils v1.1.1
 
 replace github.com/ulikunitz/xz v0.5.5 => github.com/ulikunitz/xz v0.5.8
+
+replace golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 => golang.org/x/crypto v0.0.0-20220314234659-1baeb1ce4c0b
 
 replace golang.org/x/crypto v0.0.0-20190219172222-a4c6cb3142f2 => golang.org/x/crypto v0.0.0-20220314234659-1baeb1ce4c0b
 
@@ -168,19 +170,49 @@ replace golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2 => golang.org/x/net 
 
 replace golang.org/x/net v0.0.0-20220722155237-a158d28d115b => golang.org/x/net v0.7.0
 
-replace golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c => golang.org/x/text v0.3.7
+replace golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c => golang.org/x/text v0.9.0
 
-replace golang.org/x/text v0.3.0 => golang.org/x/text v0.3.7
+replace golang.org/x/text v0.3.0 => golang.org/x/text v0.9.0
 
-replace golang.org/x/text v0.3.1-0.20180807135948-17ff2d5776d2 => golang.org/x/text v0.3.7
+replace golang.org/x/text v0.3.1-0.20180807135948-17ff2d5776d2 => golang.org/x/text v0.9.0
 
-replace golang.org/x/text v0.3.2 => golang.org/x/text v0.3.7
+replace golang.org/x/text v0.3.2 => golang.org/x/text v0.9.0
 
-replace golang.org/x/text v0.3.3 => golang.org/x/text v0.3.7
+replace golang.org/x/text v0.3.3 => golang.org/x/text v0.9.0
 
-replace golang.org/x/text v0.3.5 => golang.org/x/text v0.3.7
+replace golang.org/x/text v0.3.5 => golang.org/x/text v0.9.0
 
-replace golang.org/x/text v0.3.6 => golang.org/x/text v0.3.7
+replace golang.org/x/text v0.3.6 => golang.org/x/text v0.9.0
+
+replace golang.org/x/text v0.3.7 => golang.org/x/text v0.9.0
+
+replace golang.org/x/text v0.7.0 => golang.org/x/text v0.9.0
+
+replace golang.org/x/sys v0.0.0-20180830151530-49385e6e1522 => golang.org/x/sys v0.8.0
+
+replace golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a => golang.org/x/sys v0.8.0
+
+replace golang.org/x/sys v0.0.0-20191026070338-33540a1f6037 => golang.org/x/sys v0.8.0
+
+replace golang.org/x/sys v0.0.0-20200116001909-b77594299b42 => golang.org/x/sys v0.8.0
+
+replace golang.org/x/sys v0.0.0-20200223170610-d5e6a3e2c0ae => golang.org/x/sys v0.8.0
+
+replace golang.org/x/sys v0.0.0-20201119102817-f84b799fce68 => golang.org/x/sys v0.8.0
+
+replace golang.org/x/sys v0.0.0-20210119212857-b64e53b001e4 => golang.org/x/sys v0.8.0
+
+replace golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1 => golang.org/x/sys v0.8.0
+
+replace golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c => golang.org/x/sys v0.8.0
+
+replace golang.org/x/sys v0.0.0-20210927094055-39ccf1dd6fa6 => golang.org/x/sys v0.8.0
+
+replace golang.org/x/sys v0.0.0-20220503163025-988cb79eb6c6 => golang.org/x/sys v0.8.0
+
+replace golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f => golang.org/x/sys v0.8.0
+
+replace golang.org/x/sys v0.5.0 => golang.org/x/sys v0.8.0
 
 replace gopkg.in/yaml.v2 v2.2.2 => gopkg.in/yaml.v2 v2.2.8
 
