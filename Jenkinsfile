@@ -1,7 +1,7 @@
 #!/usr/bin/env groovy
 
 pipeline {
-  agent { label 'executor-v2' }
+  agent { label 'conjur-enterprise-common-agent' }
 
   options {
     timestamps()
@@ -13,35 +13,65 @@ pipeline {
   }
 
   stages {
+    stage('Get InfraPool ExecutorV2 Agent') {
+      steps {
+        script {
+          // Request InfraPool
+          INFRAPOOL_EXECUTORV2_AGENT_0 = getInfraPoolAgent.connected(type: "ExecutorV2", quantity: 1, duration: 1)[0]
+        }
+      }
+    }
+
+    stage('Get latest upstream dependencies') {
+      steps {
+        script {
+          withCredentials([usernamePassword(credentialsId: 'jenkins_ci_token', usernameVariable: 'GITHUB_USER', passwordVariable: 'TOKEN')]) {
+            sh './bin/updateGoDependencies.sh -g "${WORKSPACE}/go.mod"'
+          }
+          // Copy the vendor directory onto infrapool
+          INFRAPOOL_EXECUTORV2_AGENT_0.agentPut from: "vendor", to: "${WORKSPACE}"
+          INFRAPOOL_EXECUTORV2_AGENT_0.agentPut from: "go.*", to: "${WORKSPACE}"
+        }
+      }
+    }
+
     stage('Validate') {
       parallel {
         stage('Changelog') {
-          steps { parseChangelog() }
+          steps { parseChangelog(INFRAPOOL_EXECUTORV2_AGENT_0) }
         }
       }
     }
 
     stage('Build artifacts') {
       steps {
-        sh './bin/build'
-        archiveArtifacts artifacts: "dist/*.tar.gz,dist/*.zip,dist/*.txt,dist/*.rb,dist/*_SHA256SUMS", fingerprint: true
+        script {
+          INFRAPOOL_EXECUTORV2_AGENT_0.agentSh './bin/build'
+          INFRAPOOL_EXECUTORV2_AGENT_0.agentArchiveArtifacts artifacts: "dist/*.tar.gz,dist/*.zip,dist/*.txt,dist/*.rb,dist/*_SHA256SUMS", fingerprint: true
+        }
       }
     }
     stage('Run integration tests (OSS)') {
       steps {
-        sh './bin/test oss'
+        script {
+          INFRAPOOL_EXECUTORV2_AGENT_0.agentSh './bin/test oss'
+        }
       }
     }
     stage('Run integration tests (Conjur 5 Enterprise)') {
       steps {
-        sh './bin/test enterprise'
+        script {
+          INFRAPOOL_EXECUTORV2_AGENT_0.agentSh './bin/test enterprise'
+        }
       }
     }
   }
 
   post {
     always {
-      cleanupAndNotify(currentBuild.currentResult)
+      script {
+        releaseInfraPoolAgent(".infrapool/release_agents")
+      }
     }
   }
 }
