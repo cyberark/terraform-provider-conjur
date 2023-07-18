@@ -22,6 +22,8 @@ github.com/cncf/xds/go v0.0.0-20211001041855-01bcc9b48dfe/go.mod h1:eXthEFrGJvWH
 github.com/cncf/xds/go v0.0.0-20211011173535-cb28da3451f1/go.mod h1:eXthEFrGJvWHgFFCl3hGmgk+/aYT6PnTQLykKQRLhEs=
 github.com/cyberark/conjur-api-go v0.10.1 h1:3gaKBINNyz9KGaY8SWatODVziINHYVmz+uAXKYujwIA=
 github.com/cyberark/conjur-api-go v0.10.1/go.mod h1:8+qYC7L6wPY1e56hoZmHSdGa2fHALck8PtS+cUky75Y=
+github.com/cyberark/conjur-api-go v0.10.2 h1:V2zip069ybE1ubAi2xsay4WGdXG4vIQZ1z7GXPRt7IY=
+github.com/cyberark/conjur-api-go v0.10.2/go.mod h1:8+qYC7L6wPY1e56hoZmHSdGa2fHALck8PtS+cUky75Y=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
