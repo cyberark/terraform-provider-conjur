@@ -1,0 +1,26 @@
+FROM golang:1.19-alpine
+
+ADD build_ca_certificate /usr/local/share/ca-certificates/
+RUN update-ca-certificates
+
+CMD /bin/bash
+
+RUN apk add -u curl \
+               gcc \
+               git \
+               bash \
+               mercurial \
+               musl-dev
+
+RUN apk add --no-cache ca-certificates && \
+    update-ca-certificates
+
+RUN apk add terraform --repository=https://dl-cdn.alpinelinux.org/alpine/edge/community
+
+WORKDIR /terraform-provider-conjur
+
+COPY go.mod go.sum /terraform-provider-conjur/
+
+RUN go mod download
+
+COPY . .
