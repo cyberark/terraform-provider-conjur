@@ -1,0 +1,8 @@
+version: '2.1'
+services:
+  conjur_test:
+    build:
+      context: .
+      dockerfile: Dockerfile.testfile
+    volumes:
+      - ./output:/terraform-provider-conjur/output
