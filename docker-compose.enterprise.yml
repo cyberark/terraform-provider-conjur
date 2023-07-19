@@ -1,7 +1,7 @@
 version: '3'
 services:
   conjur-server:
-    image: registry.tld/conjur-appliance:5.0-stable
+    image: registry.tld/conjur-appliance:transition.to.openssl3
     security_opt:
       - seccomp:unconfined # --security-opt seccomp=unconfined
     hostname: conjur
