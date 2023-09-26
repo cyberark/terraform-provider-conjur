@@ -16,6 +16,7 @@ func Provider() *schema.Provider {
 	return &schema.Provider{
 		DataSourcesMap: map[string]*schema.Resource{
 			"conjur_secret": dataSourceSecret(),
+			"conjur_secret_update": dataSourceSecretUpdate(),
 		},
 		Schema: map[string]*schema.Schema{
 			"appliance_url": {
@@ -66,7 +67,7 @@ func providerConfig(d *schema.ResourceData) (interface{}, error) {
 	if appliance_url != "" {
 		config.ApplianceURL = appliance_url
 	}
-	
+
 	// Add `/api` to appliance url for Conjur Cloud support
 	appliance_url += "/api"
 
@@ -124,6 +125,37 @@ func dataSourceSecret() *schema.Resource {
 	}
 }
 
+func dataSourceSecretUpdate() *schema.Resource {
+	return &schema.Resource{
+		Read: dataSourceSecretUpdateRead,
+
+		Schema: map[string]*schema.Schema{
+			"name": {
+				Type:        schema.TypeString,
+				Required:    true,
+				Description: "name (path) of the secret",
+			},
+			"update_value": {
+				Type:        schema.TypeString,
+				Required:    true,
+				Description: "value of the secret",
+			},
+			"version": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "version of the secret",
+				Default:     "latest",
+			},
+			"value": {
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "value of the secret",
+				Sensitive:   true,
+			},
+		},
+	}
+}
+
 func dataSourceSecretRead(d *schema.ResourceData, meta interface{}) error {
 	client := meta.(*conjurapi.Client)
 
@@ -140,6 +172,26 @@ func dataSourceSecretRead(d *schema.ResourceData, meta interface{}) error {
 
 	d.Set("value", string(secretValue))
 	d.SetId(hash(string(secretValue)))
+
+	return nil
+}
+
+func dataSourceSecretUpdateRead(d *schema.ResourceData, meta interface{}) error {
+	client := meta.(*conjurapi.Client)
+
+	name := d.Get("name").(string)
+	version := d.Get("version").(string)
+	update_value := d.Get("update_value").(string)
+	
+	log.Printf("[DEBUG] Setting secret for name=%q version=%q", name, version)
+	errAdd := client.AddSecret(name, update_value)
+
+	if errAdd != nil {
+		return errAdd
+	}
+	
+	d.Set("value", string(update_value))
+	d.SetId(hash(string(update_value)))
 
 	return nil
 }
