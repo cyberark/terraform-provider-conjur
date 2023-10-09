@@ -28,6 +28,9 @@ services:
       TF_LOG: "${TF_LOG:-INFO}"
       TF_VAR_conjur_api_key:
       TF_VAR_conjur_ssl_cert:
+      TF_VAR_conjur_appliance_url:
+      TF_VAR_conjur_account:
+      TF_VAR_conjur_authn_login:
     working_dir: /src
     volumes:
       - $PWD:/src

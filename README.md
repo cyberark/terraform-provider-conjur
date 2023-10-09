@@ -1,4 +1,4 @@
-# terraform-provider-conjur
+# terraform-provider-conjur 
 
 Terraform provider for [Conjur](https://www.conjur.org).
 
@@ -31,7 +31,7 @@ Download and uncompress the latest release for your OS. This example uses the li
 _Note: Replace `$VERSION` with the one you want to use. See [releases](https://github.com/cyberark/terraform-provider-conjur/releases)
 page for available versions._
 
-```sh-session
+```sh
 $ wget https://github.com/cyberark/terraform-provider-conjur/releases/download/v$VERSION/terraform-provider-conjur-$VERSION-linux-amd64.tar.gz
 $ tar -xvf terraform-provider-conjur*.tar.gz
 ```
@@ -39,14 +39,14 @@ $ tar -xvf terraform-provider-conjur*.tar.gz
 
 If you already have an unversioned plugin that was previously downloaded, we first need
 to remove it:
-```sh-session
+```sh
 $ rm -f ~/.terraform.d/plugins/terraform-provider-conjur
 ```
 
 Now copy the new binary to the Terraform's plugins folder. If this is your first plugin,
 you will need to create the folder first.
 
-```sh-session
+```sh
 $ mkdir -p ~/.terraform.d/plugins/
 $ mv terraform-provider-conjur*/terraform-provider-conjur* ~/.terraform.d/plugins/
 ```
@@ -55,7 +55,7 @@ $ mv terraform-provider-conjur*/terraform-provider-conjur* ~/.terraform.d/plugin
 
 Add and update the [CyberArk Tools Homebrew tap](https://github.com/cyberark/homebrew-tools).
 
-```sh-session
+```sh
 $ brew tap cyberark/tools
 ```
 
@@ -64,7 +64,7 @@ necessary because [Homebrew is sandboxed and cannot write to your home directory
 
 _Note: Replace `$VERSION` with the appropriate plugin version_
 
-```sh-session
+```sh
 $ brew install terraform-provider-conjur
 
 $ mkdir -p ~/.terraform.d/plugins/
@@ -80,13 +80,13 @@ If you wish to compile the provider from source code, you will first need Go ins
 on your machine (version >=1.12 is required).
 
 - Clone repository and go into the cloned directory
-```sh-session
+```sh
 $ git clone https://github.com/cyberark/terraform-provider-conjur.git
 $ cd terraform-provider-conjur
 ```
 - Build the provider
 
-```sh-session
+```sh
 $ mkdir -p ~/.terraform.d/plugins/
 $ # Note: If a static binary is required, use ./bin/build to create the executable
 $ go build -o ~/.terraform.d/plugins/terraform-provider-conjur main.go
@@ -118,7 +118,7 @@ provider configuration in the `.tf` file.
 
 #### Using environment variables
 
-```sh-session
+```sh
 export CONJUR_APPLIANCE_URL="https://conjur-server"
 export CONJUR_ACCOUNT="myorg"
 export CONJUR_AUTHN_LOGIN="admin"
@@ -128,8 +128,20 @@ export CONJUR_CERT_FILE="/etc/conjur.pem"
 
 No other configuration is necessary in `main.tf`:
 
-```
+```terraform
 # main.tf
+
+# Configure the Conjur provider using the required_providers stanza
+# required with Terraform 0.13 and beyond. You may optionally use version
+# directive to prevent breaking changes occurring unannounced.
+terraform {
+  required_providers {
+    conjur = {
+      source  = "cyberark/conjur"
+    }
+  }
+}
+
 provider "conjur" {}
 ```
 
@@ -143,7 +155,7 @@ For example, with `conjur_api_key` and `conjur_ssl_cert`defined as
 [input variables](https://www.terraform.io/docs/configuration/variables.html), this
 type of configuration could be used:
 
-```
+```terraform
 # main.tf
 variable "conjur_api_key" {}
 variable "conjur_ssl_cert" {}
@@ -184,7 +196,7 @@ protect these values where possible.
 
 _Note: If plan is being run manually, you will need to run `terraform init` first!_
 
-```
+```terraform
 # main.tf
 # ... provider configuration above
 
@@ -223,14 +235,14 @@ To use Terraform with Summon, prefix the environment variable names in secrets.y
 
 ### Example
 
-```
+```terraform
 # variables.tf
 variable "access_key" {}
 variable "secret_key" {}
 ```
 
 
-```
+```yaml
 # secrets.yml
 TF_VAR_access_key: !var aws/dev/sys_powerful/access_key_id
 TF_VAR_secret_key: !var aws/dev/sys_powerful/secret_access_key
@@ -238,7 +250,7 @@ TF_VAR_secret_key: !var aws/dev/sys_powerful/secret_access_key
 
 Run Terraform with Summon:
 
-```sh-session
+```sh
 $ summon terraform apply
 ```
 

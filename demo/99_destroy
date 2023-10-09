@@ -1,4 +1,4 @@
 #!/bin/bash -ex
 
 terraform destroy
-docker-compose down
+docker compose down

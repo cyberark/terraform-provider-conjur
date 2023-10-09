@@ -1,9 +1,10 @@
+#!/bin/bash
 declare DOCKER_COMPOSE_ARGS
 
 # shellcheck disable=SC2086
 # DOCKER_COMPOSE_ARGS needs to stay unquoted to work 
 function dockerCompose() {
-  docker-compose $DOCKER_COMPOSE_ARGS "$@"
+  docker compose $DOCKER_COMPOSE_ARGS "$@"
 }
 
 function conjurExec() {
