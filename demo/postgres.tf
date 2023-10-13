@@ -6,5 +6,5 @@ resource "docker_container" "postgres" {
 }
 
 resource "docker_image" "postgres" {
-  name = "postgres:10"
+  name = "postgres:15"
 }
