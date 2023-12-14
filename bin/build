@@ -33,7 +33,7 @@ build_and_package_binaries() {
   #git fetch --tags  # jenkins does not do this automatically yet
 
   echo "> Building goreleaser"
-  docker-compose build goreleaser
+  docker compose build goreleaser
 
   echo "> Building and packaging binaries"
   docker compose run --rm \
