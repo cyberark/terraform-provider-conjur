@@ -3,8 +3,8 @@
 make
 terraform init
 
-docker-compose up -d
-docker-compose exec conjur /opt/conjur/evoke/bin/wait_for_conjur
+docker compose up -d
+docker compose exec conjur /opt/conjur/evoke/bin/wait_for_conjur
 
 appliance_url=https://localhost:4443
 account=cucumber

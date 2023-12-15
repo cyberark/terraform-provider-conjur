@@ -157,7 +157,7 @@ function runTerraform() {
      terraform plan &&
      terraform apply -auto-approve"
 
-  docker-compose rm --force \
+  docker compose rm --force \
     --stop \
     -v \
     terraform
