@@ -1,3 +1,4 @@
+#!/bin/bash
 declare DOCKER_COMPOSE_ARGS
 
 # shellcheck disable=SC2086

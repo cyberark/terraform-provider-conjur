@@ -1,4 +1,18 @@
 #!/usr/bin/env groovy
+  // Automated release, promotion and dependencies
+properties([
+  // Include the automated release parameters for the build
+  release.addParams(),
+  // Dependencies of the project that should trigger builds
+  dependencies([])
+])
+
+// Performs release promotion.  No other stages will be run
+if (params.MODE == "PROMOTE") {
+  release.promote(params.VERSION_TO_PROMOTE) { infrapool
+  }
+  return
+}
 
 pipeline {
   agent { label 'conjur-enterprise-common-agent' }
@@ -12,6 +26,7 @@ pipeline {
     cron(getDailyCronString())
   }
 
+  
   stages {
     stage('Get InfraPool ExecutorV2 Agent') {
       steps {
@@ -62,6 +77,13 @@ pipeline {
       steps {
         script {
           INFRAPOOL_EXECUTORV2_AGENT_0.agentSh './bin/test enterprise'
+        }
+      }
+    }
+    stage('Run integration tests (cloud)'){
+      steps {
+        script {
+          INFRAPOOL_EXECUTORV2_AGENT_0.agentSh 'summon ./bin/test cloud'
         }
       }
     }

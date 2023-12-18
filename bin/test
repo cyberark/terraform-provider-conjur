@@ -17,6 +17,8 @@ api_key=""
 ssl_cert=""
 
 function finish() {
+  case "$TARGET" in
+  "oss"|"enterprise" )
   if [[ -z "$KEEP_CONTAINERS" ]]; then
     echo "> Terminating local Conjur environment"
 
@@ -25,16 +27,20 @@ function finish() {
   else
     echo "> KEEP_CONTAINERS is set, not terminating local Conjur environment"
   fi
+  ;;
+  esac
 }
 trap finish EXIT
 
 function main() {
   checkTarget
   loadUtils
-
-  launchConjur
-  configureConjur
-
+  case "$TARGET" in
+  "oss" | "enterprise")
+    launchConjur
+    configureConjur
+    ;;
+  esac
   runTerraformWithProviderVars
   validateResults
 
@@ -52,6 +58,9 @@ function checkTarget() {
     export DOCKER_COMPOSE_ARGS="-f docker-compose.enterprise.yml -f docker-compose.yml"
     export CONJUR_WAIT_COMMAND="/opt/conjur/evoke/bin/wait_for_conjur"
     ;;
+  "cloud")
+
+    ;;
   *)
     echo "> '$TARGET' is not a supported target"
     exit 1
@@ -66,6 +75,7 @@ function loadUtils() {
 }
 
 function launchConjur() {
+  
   echo "> Launching local Conjur environment"
 
   echo ">> Pulling images (this may take a long time)"
@@ -101,7 +111,6 @@ function unexportConjurVars() {
 
 function configureConjur() {
   echo "> Configuring local Conjur environment"
-
   export CONJUR_APPLIANCE_URL=https://conjur-server
   export CONJUR_ACCOUNT="$CONJUR_ACCOUNT"
   export CONJUR_AUTHN_LOGIN="admin"
@@ -118,7 +127,6 @@ function configureConjur() {
       "$CONJUR_ACCOUNT:user:admin" | tr -d '\r')
     export CONJUR_AUTHN_API_KEY="$api_key"
   fi
-
   echo ">> Starting CLI"
   dockerCompose up -d client
 
@@ -126,12 +134,13 @@ function configureConjur() {
     echo ">> Logging in CLI to the server"
     clientExec conjur authn login -u admin -p "$CONJUR_AUTHN_PASSWORD"
     api_key=$(clientExec conjur user rotate_api_key)
+    echo ">> '$api_key' enterprise apikey "   
     export CONJUR_AUTHN_API_KEY="$api_key"
   fi
 
   echo ">> Applying policies"
 
-  # Policy files are mounted in docker-compose
+    # Policy files are mounted in docker-compose
   clientExec conjur policy load --replace root /test/policy.root.yml
   clientExec conjur policy load terraform-example /test/policy.example.yml
   clientExec conjur list
@@ -165,20 +174,29 @@ function runTerraform() {
 
 function runTerraformWithProviderVars() {
   echo "> Testing provider with tf-included vars"
+  case "$TARGET" in
+    "oss" | "enterprise")
+    unexportConjurVars
 
-  unexportConjurVars
+    export TF_VAR_conjur_api_key="$api_key"
+    export TF_VAR_conjur_ssl_cert="$ssl_cert"
+    runTerraform "test/provider_vars"
+  ;;
+  *)
+    export TF_VAR_conjur_appliance_url="$CONJUR_APPLIANCE_URL"
+    export TF_VAR_conjur_account="$CONJUR_CLOUD_ACCOUNT"
+    export TF_VAR_conjur_authn_login="host/$HOST_ID"
+    export TF_VAR_conjur_api_key="$CONJUR_API_KEY"
 
-  export TF_VAR_conjur_api_key="$api_key"
-  export TF_VAR_conjur_ssl_cert="$ssl_cert"
-
-  runTerraform "test/provider_vars"
-
+    runTerraform "test/cloudprovider_vars"
+  esac
   export -n TF_VAR_conjur_api_key
 }
 
 function runTerraformWithEnvVars() {
   echo "> Planning and applying env_vars/main.tf Terraform manifest"
-
+case "$TARGET" in
+  "oss" | "enterprise")
   unexportConjurVars
 
   export CONJUR_APPLIANCE_URL=https://conjur-server
@@ -186,12 +204,25 @@ function runTerraformWithEnvVars() {
   export CONJUR_ACCOUNT="$CONJUR_ACCOUNT"
   export CONJUR_AUTHN_LOGIN="admin"
   export CONJUR_AUTHN_API_KEY="$api_key"
-
   runTerraform "test/env_vars"
+;;
+*)
+  export CONJUR_APPLIANCE_URL="$CONJUR_APPLIANCE_URL"
+  export CONJUR_ACCOUNT="$CONJUR_CLOUD_ACCOUNT"
+  export CONJUR_AUTHN_API_KEY="$CONJUR_API_KEY"
+  export CONJUR_AUTHN_LOGIN="host/$HOST_ID"
+  runTerraform "test/cloudenv_vars"
+esac
 }
 
 function validateResults() {
-  local expectedValue="SECRETXcLhn23MJcimV"
+  case "$TARGET" in
+  "oss" | "enterprise")
+    local expectedValue="SECRETXcLhn23MJcimV"
+  ;;
+  *)
+    local expectedValue="nirupma"
+  esac
   local actualValue=$(cat $LOCAL_SECRET_FILE)
 
   rm -f "$LOCAL_SECRET_FILE"
