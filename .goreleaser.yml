@@ -38,9 +38,9 @@ checksum:
   name_template: "{{.ProjectName}}_{{.Version}}_SHA256SUMS"
 
 brews:
-  - description: Terraform provider for CyberArk Conjur
-    homepage: https://github.com/cyberark/terraform-provider-conjur
-    url_template: https://github.com/cyberark/terraform-provider-conjur/releases/download/v{{.Version}}/{{.ProjectName}}_{{.Version}}_{{.Os}}_{{.Arch}}.zip
+  - description: Terraform provider for HybridCloudIT Conjur
+    homepage: https://github.com/HybridCloudIT/terraform-provider-conjur
+    url_template: https://github.com/HybridCloudIT/terraform-provider-conjur/releases/download/v{{.Version}}/{{.ProjectName}}_{{.Version}}_{{.Os}}_{{.Arch}}.zip
     caveats: |
       After installation, you must symlink the provider into Terraform's plugins directory.
       Symlinking is necessary because Homebrew is sandboxed and cannot write to your home directory.
@@ -62,8 +62,8 @@ brews:
       system "#{bin}/terraform-provider-conjur_v{{.Version}}", "-h"
 
     tap:
-      owner: cyberark
-      name: homebrew-tools
+      owner: HybridCloudIT 
+      name: terraform-conjur-provider
     skip_upload: true
 
 release:
