@@ -1,70 +1,60 @@
-# all available options: https://goreleaser.com/customization/
-project_name: terraform-provider-conjur
-
+# Visit https://goreleaser.com for documentation on how to customize this
+# behavior.
 before:
-  hooks: []
-
+  hooks:
+    # this is just an example and not a requirement for provider building/publishing
+    - go mod tidy
 builds:
-- binary: terraform-provider-conjur_v{{.Version}}
-  env:
-  - CGO_ENABLED=0
+- env:
+    # goreleaser does not work with CGO, it could also complicate
+    # usage by users in CI/CD systems like Terraform Cloud where
+    # they are unable to install libraries.
+    - CGO_ENABLED=0
+  mod_timestamp: '{{ .CommitTimestamp }}'
+  flags:
+    - -trimpath
+  ldflags:
+    - '-s -w -X main.version={{.Version}} -X main.commit={{.Commit}}'
   goos:
-  - darwin  # MacOS
-  - windows
-  - linux
+    - freebsd
+    - windows
+    - linux
+    - darwin
   goarch:
-  - amd64
-  ldflags: []
-
-# Apple silicon support
-- id: terraform-provider-conjur-arm
-  binary: terraform-provider-conjur_v{{.Version}}
-  env:
-  - CGO_ENABLED=0
-  goos:
-  - darwin  # MacOS
-  goarch:
-  - arm64
-  ldflags: []
-
+    - amd64
+    - '386'
+    - arm
+    - arm64
+  ignore:
+    - goos: darwin
+      goarch: '386'
+  binary: '{{ .ProjectName }}_v{{ .Version }}'
 archives:
-  - id: conjur-terraform-release-archive
-    format: zip
-    files:
-      - README.md
-      - LICENSE
-
+- format: zip
+  name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
 checksum:
-  name_template: "{{.ProjectName}}_{{.Version}}_SHA256SUMS"
-
-brews:
-  - description: Terraform provider for HybridCloudIT Conjur
-    homepage: https://github.com/HybridCloudIT/terraform-provider-conjur
-    url_template: https://github.com/HybridCloudIT/terraform-provider-conjur/releases/download/v{{.Version}}/{{.ProjectName}}_{{.Version}}_{{.Os}}_{{.Arch}}.zip
-    caveats: |
-      After installation, you must symlink the provider into Terraform's plugins directory.
-      Symlinking is necessary because Homebrew is sandboxed and cannot write to your home directory.
-
-      # Make the plugins directory if not present
-      mkdir -p ~/.terraform.d/plugins/
-
-      # Remove any old unversioned plugins (if applicable)
-      rm -f  ~/.terraform.d/plugins/terraform-provider-conjur
-
-      # Symlink the provider to your home dir. If Homebrew is installing somewhere other than /usr/local/Cellar, update the path as well.
-      ln -sf /usr/local/Cellar/terraform-provider-conjur/{{.Version}}/bin/terraform-provider-conjur_v{{.Version}} ~/.terraform.d/plugins/terraform-provider-conjur_v{{.Version}}
-    dependencies:
-      - terraform
-    install: |
-      bin.install "terraform-provider-conjur_v{{.Version}}"
-    test: |
-      # Running bin directly gives error, exit code 1
-      system "#{bin}/terraform-provider-conjur_v{{.Version}}", "-h"
-
-    tap:
-      owner: HybridCloudIT 
-      name: terraform-conjur-provider
-    skip_upload: true
-
+  extra_files:
+    - glob: 'terraform-registry-manifest.json'
+      name_template: '{{ .ProjectName }}_{{ .Version }}_manifest.json'
+  name_template: '{{ .ProjectName }}_{{ .Version }}_SHA256SUMS'
+  algorithm: sha256
+signs:
+  - artifacts: checksum
+    args:
+      # if you are using this in a GitHub action or some other automated pipeline, you 
+      # need to pass the batch flag to indicate its not interactive.
+      - "--batch"
+      - "--local-user"
+      - "{{ .Env.GPG_FINGERPRINT }}" # set this environment variable for your signing key
+      - "--output"
+      - "${signature}"
+      - "--detach-sign"
+      - "${artifact}"
 release:
-  disable: true
+  extra_files:
+    - glob: 'terraform-registry-manifest.json'
+      name_template: '{{ .ProjectName }}_{{ .Version }}_manifest.json'
+  # If you want to manually examine the release before its live, uncomment this line:
+  # draft: true
+changelog:
+  skip: true
