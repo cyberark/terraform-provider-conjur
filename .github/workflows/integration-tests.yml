@@ -22,10 +22,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Set up Go 1.15
+    - name: Set up Go 1.19
       uses: actions/setup-go@v1
       with:
-        go-version: 1.15
+        go-version: 1.19
       id: go
 
     - name: Check out code into the Go module directory
@@ -37,7 +37,7 @@ jobs:
     - name: Build plugin (statically)
       run: |
         CGO_ENABLED=0 go build -tags netgo -ldflags '-extldflags "-static"' \
-        -o $PWD/dist/terraform-provider-conjur_linux_amd64/terraform-provider-conjur_v${VERSION} .
+        -o $PWD/dist/terraform-provider-conjur_linux_amd64_v1/terraform-provider-conjur_v${VERSION} .
 
     - name: Run Tests
       run: |
