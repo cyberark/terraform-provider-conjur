@@ -145,6 +145,8 @@ function runTerraform() {
 
   echo ">> Planning and applying '$target_dir/main.tf' Terraform manifest"
 
+  export TF_LOG=INFO
+
   rm -f "$LOCAL_SECRET_FILE"
 
   dockerCompose up -d terraform
