@@ -219,6 +219,50 @@ Secrets like `data.conjur_secret.dbpass.value` can be used in any Terraform reso
 View an example Terraform manifest and Conjur policies in the
 [test/](test/) directory in this project.
 
+### Update secrets
+
+#### Preface
+
+An important thing to keep in mind is that by design Terraform state files can contain
+sensitive data (which may include credentials fetched by this plugin). Use Terraform's
+recommendations found [here](https://www.terraform.io/docs/state/sensitive-data.html) to
+protect these values where possible.
+
+#### Example
+
+_Note: If plan is being run manually, you will need to run `terraform init` first!_
+
+```terraform
+# main.tf
+provider "conjur" {
+  alias         = "read"
+  appliance_url = "http://conjur-read-server"
+}
+
+provider "conjur" {
+  alias         = "write"
+  appliance_url = "http://conjur-write-server"
+}
+
+data "conjur_secret_update" "passwordupdate" {
+  provider     = conjur.write
+  name         = "my/shiny/dbpass"
+  update_value = "shinynewdbvalue"
+}
+
+data "conjur_secret" "password" {
+  depends_on   = [data.conjur_secret_update.passwordupdate]
+  provider     = conjur.read
+  name         = "my/shiny/dbpass"
+}
+
+```
+
+Secrets like `data.conjur_secret.password.value` can be used in any Terraform resources.
+
+View an example Terraform manifest and Conjur policies in the
+[test/](test/) directory in this project.
+
 ---
 
 ## Alternate Workflow with Summon
