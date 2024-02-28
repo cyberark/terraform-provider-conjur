@@ -40,6 +40,9 @@ function main() {
 
   runTerraformWithEnvVars
   validateResults
+
+  runTerraformUpdateSecretTest
+  validateUpdatedSecret
 }
 
 function checkTarget() {
@@ -204,5 +207,35 @@ function validateResults() {
     exit 1
   fi
 }
+
+function runTerraformUpdateSecretTest() {
+  echo "> Testing secret update with tf-included vars"
+
+  unexportConjurVars
+
+  export CONJUR_APPLIANCE_URL=https://conjur-server
+  export CONJUR_SSL_CERTIFICATE="$ssl_cert"
+  export CONJUR_ACCOUNT="$CONJUR_ACCOUNT"
+  export CONJUR_AUTHN_LOGIN="admin"
+  export CONJUR_AUTHN_API_KEY="$api_key"
+
+  runTerraform "test/update_secret"  # Assuming 'test_update.tf' is in this directory
+}
+
+function validateUpdatedSecret() {
+  local expectedValue="NewSecretValue123"
+  local actualValue=$(cat $LOCAL_SECRET_FILE)
+
+  rm -f "$LOCAL_SECRET_FILE"
+
+  if [[ "$expectedValue" == "$actualValue" ]]; then
+    echo "Secret succesfully retrieved!"
+  else
+    echo "Secret not successfully retrieved."
+    echo "Expected '$expectedValue', got '$actualValue'"
+    exit 1
+  fi
+}
+
 
 main
