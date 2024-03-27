@@ -38,7 +38,7 @@ build_and_package_binaries() {
   echo "> Building and packaging binaries"
   docker compose run --rm \
     --entrypoint goreleaser \
-    goreleaser release --rm-dist --skip-validate
+    goreleaser release --clean --skip=validate
 
   # Needed for testing stages
   goos='linux'  # uname -s | tr '[:upper:]' '[:lower:]'
