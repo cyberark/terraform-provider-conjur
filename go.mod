@@ -1,5 +1,7 @@
 module github.com/cyberark/terraform-provider-conjur
 
+go 1.22.1
+
 require (
 	github.com/cyberark/conjur-api-go v0.10.1
 	github.com/hashicorp/terraform-plugin-sdk/v2 v2.23.0
@@ -48,8 +50,6 @@ require (
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
-
-go 1.19
 
 // Security fixes to ensure we don't have old vulnerable packages in our
 // dependency tree. We're often not vulnerable, but removing them to ensure

@@ -1,4 +1,3 @@
-version: '3'
 services:
   conjur-server:
     image: registry.tld/conjur-appliance:5.0-stable
