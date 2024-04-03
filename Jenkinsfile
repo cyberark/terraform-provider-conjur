@@ -1,4 +1,7 @@
 #!/usr/bin/env groovy
+
+@Library("product-pipelines-shared-library") _
+
   // Automated release, promotion and dependencies
 properties([
   // Include the automated release parameters for the build
@@ -9,8 +12,11 @@ properties([
 
 // Performs release promotion.  No other stages will be run
 if (params.MODE == "PROMOTE") {
-  release.promote(params.VERSION_TO_PROMOTE) { infrapool
+  release.promote(params.VERSION_TO_PROMOTE) { sourceVersion, targetVersion, assetDirectory ->
+
   }
+  // Copy Github Enterprise release to Github
+  release.copyEnterpriseRelease(params.VERSION_TO_PROMOTE)
   return
 }
 
@@ -26,7 +32,10 @@ pipeline {
     cron(getDailyCronString())
   }
 
-  
+  environment {
+    MODE = release.canonicalizeMode()
+  }
+
   stages {
     stage('Scan for internal URLs') {
       steps {
@@ -56,11 +65,10 @@ pipeline {
       }
     }
 
-    stage('Validate') {
-      parallel {
-        stage('Changelog') {
-          steps { parseChangelog(INFRAPOOL_EXECUTORV2_AGENT_0) }
-        }
+    // Generates a VERSION file based on the current build number and latest version in CHANGELOG.md
+    stage('Validate changelog and set version') {
+      steps {
+        updateVersion(INFRAPOOL_EXECUTORV2_AGENT_0, "CHANGELOG.md", "${BUILD_NUMBER}")
       }
     }
 
