@@ -1,5 +1,7 @@
 #!/bin/bash -e
 
+export CONJUR_PLUGIN_VERSION="$(cat VERSION | cut -d'-' -f1)"
+
 main() {
   retrieve_cyberark_ca_cert
   build_and_package_binaries
