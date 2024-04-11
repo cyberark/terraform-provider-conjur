@@ -39,6 +39,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.goreleaser
+    environment:
+      CONJUR_PLUGIN_VERSION:
     volumes:
       - .:/terraform-provider-conjur
     working_dir: /terraform-provider-conjur

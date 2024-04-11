@@ -3,7 +3,8 @@ set -exo pipefail
 
 TARGET="${1:-oss}"  # can also be set to 'enterprise'
 
-export CONJUR_PLUGIN_VERSION=$(cat VERSION)
+# Trim the build number from the VERSION file to be compatible with tf version contraints
+export CONJUR_PLUGIN_VERSION="$(cat VERSION | cut -d'-' -f1)"
 
 export CONJUR_DATA_KEY='iFra75qdvsLENSV+qXYFMkv7KJS3t+82Po4mmjZLxZc='
 
