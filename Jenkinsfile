@@ -101,8 +101,27 @@ pipeline {
         }
       }
     }
+    stage('Release') {
+      when {
+        expression {
+          MODE == "RELEASE"
+        }
+      }
+      steps {
+        script {
+          release(INFRAPOOL_EXECUTORV2_AGENT_0) { billOfMaterialsDirectory, assetDirectory, toolsDirectory ->
+            // Publish release artifacts to all the appropriate locations
+            // Copy any artifacts to assetDirectory to attach them to the Github release
+            INFRAPOOL_EXECUTORV2_AGENT_0.agentSh "cp -r dist/*.zip dist/*_SHA256SUMS ${assetDirectory}"
+            // Create Go module SBOM
+            INFRAPOOL_EXECUTORV2_AGENT_0.agentSh """export PATH="${toolsDirectory}/bin:${PATH}" && go-bom --tools "${toolsDirectory}" --go-mod ./go.mod --image "golang" --output "${billOfMaterialsDirectory}/go-mod-bom.json" """
+          }
+        }
+      }  
+    }
   }
-
+  
+  
   post {
     always {
       script {
