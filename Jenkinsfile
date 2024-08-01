@@ -12,9 +12,10 @@ properties([
 
 // Performs release promotion.  No other stages will be run
 if (params.MODE == "PROMOTE") {
-  release.promote(params.VERSION_TO_PROMOTE) { sourceVersion, targetVersion, assetDirectory ->
-
+  release.promote(params.VERSION_TO_PROMOTE) { infrapool, sourceVersion, targetVersion, assetDirectory ->
+    // No actions needed, artifacts labeled correctly
   }
+
   // Copy Github Enterprise release to Github
   release.copyEnterpriseRelease(params.VERSION_TO_PROMOTE)
   return
@@ -54,6 +55,13 @@ pipeline {
       }
     }
 
+    // Generates a VERSION file based on the current build number and latest version in CHANGELOG.md
+    stage('Validate changelog and set version') {
+      steps {
+        updateVersion(INFRAPOOL_EXECUTORV2_AGENT_0, "CHANGELOG.md", "${BUILD_NUMBER}")
+      }
+    }
+
     stage('Get latest upstream dependencies') {
       steps {
         script {
@@ -62,13 +70,6 @@ pipeline {
           INFRAPOOL_EXECUTORV2_AGENT_0.agentPut from: "vendor", to: "${WORKSPACE}"
           INFRAPOOL_EXECUTORV2_AGENT_0.agentPut from: "go.*", to: "${WORKSPACE}"
         }
-      }
-    }
-
-    // Generates a VERSION file based on the current build number and latest version in CHANGELOG.md
-    stage('Validate changelog and set version') {
-      steps {
-        updateVersion(INFRAPOOL_EXECUTORV2_AGENT_0, "CHANGELOG.md", "${BUILD_NUMBER}")
       }
     }
 
