@@ -1,6 +1,5 @@
-version: 2
-
 # all available options: https://goreleaser.com/customization/
+version: 2
 project_name: terraform-provider-conjur
 
 before:
@@ -31,6 +30,7 @@ builds:
 
 archives:
   - id: conjur-terraform-release-archive
+    name_template: "{{ .ProjectName }}_{{ .Env.CONJUR_PLUGIN_VERSION }}_{{ .Os }}_{{ .Arch }}"
     format: zip
     files:
       - README.md
