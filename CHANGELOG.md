@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Changed
 - Upgrade Go to 1.22 (CONJSE-1842)
 
+## [0.6.7] - 2024-02-27
+### Changed
+- Added support for updating Conjur secret [cyberark/terraform-provider-conjur#131](https://github.com/cyberark/terraform-provider-conjur/pull/133)
+
 ## [0.6.6] - 2023-06-21
 ### Security
 - Updated golang.org/x/sys to v0.8.0 and golang.org/x/text to v0.9.0
