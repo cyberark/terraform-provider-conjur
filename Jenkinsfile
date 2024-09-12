@@ -81,6 +81,9 @@ pipeline {
       }
     }
     stage('Run integration tests (OSS)') {
+      environment {
+        INFRAPOOL_REGISTRY_URL = "registry.tld"
+      }
       steps {
         script {
           INFRAPOOL_EXECUTORV2_AGENT_0.agentSh './bin/test oss'

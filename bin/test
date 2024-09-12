@@ -8,6 +8,8 @@ export CONJUR_PLUGIN_VERSION="$(cat VERSION | cut -d'-' -f1)"
 
 export CONJUR_DATA_KEY='iFra75qdvsLENSV+qXYFMkv7KJS3t+82Po4mmjZLxZc='
 
+export REGISTRY_URL=${INFRAPOOL_REGISTRY_URL:-"docker.io"}
+
 CONJUR_ACCOUNT='myaccount'
 CONJUR_AUTHN_PASSWORD='SEcret12!!!!'
 
