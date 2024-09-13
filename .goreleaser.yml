@@ -1,3 +1,5 @@
+version: 2
+
 # all available options: https://goreleaser.com/customization/
 project_name: terraform-provider-conjur
 
@@ -61,7 +63,7 @@ brews:
       # Running bin directly gives error, exit code 1
       system "#{bin}/terraform-provider-conjur_v{{.Env.CONJUR_PLUGIN_VERSION}}", "-h"
 
-    tap:
+    repository:
       owner: cyberark
       name: homebrew-tools
     skip_upload: true
