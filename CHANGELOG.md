@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [0.6.9] - 2024-10-22
 ### Changed
   - Update conjur-api-go to v0.12.4
+    [cyberark/terraform-provider-conjur#137](https://github.com/cyberark/terraform-provider-conjur/pull/137)
 
 ## [0.6.8] - 2024-08-01
 ### Changed
@@ -106,7 +107,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Initial release
 - Use https://github.com/cyberark/conjur-api-go to read configuration.
 
-[Unreleased]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.6.6...HEAD
+[Unreleased]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.6.9...HEAD
+[0.6.9]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.6.8...v0.6.9
+[0.6.8]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.6.7...v0.6.8
+[0.6.7]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.6.6...v0.6.7
 [0.6.6]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.6.5...v0.6.6
 [0.6.5]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.6.4...v0.6.5
 [0.6.4]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.6.3...v0.6.4
