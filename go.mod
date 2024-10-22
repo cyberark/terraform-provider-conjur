@@ -3,15 +3,18 @@ module github.com/cyberark/terraform-provider-conjur
 go 1.22.1
 
 require (
-	github.com/cyberark/conjur-api-go v0.10.1
+	github.com/cyberark/conjur-api-go v0.12.4
 	github.com/hashicorp/terraform-plugin-sdk/v2 v2.23.0
 )
 
 require (
 	github.com/agext/levenshtein v1.2.2 // indirect
+	github.com/alessio/shellescape v1.4.1 // indirect
 	github.com/apparentlymart/go-textseg/v13 v13.0.0 // indirect
 	github.com/bgentry/go-netrc v0.0.0-20140422174119-9fd32a8b3d3d // indirect
+	github.com/danieljoos/wincred v1.1.2 // indirect
 	github.com/fatih/color v1.13.0 // indirect
+	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
@@ -40,6 +43,7 @@ require (
 	github.com/vmihailenco/msgpack v4.0.4+incompatible // indirect
 	github.com/vmihailenco/msgpack/v4 v4.3.12 // indirect
 	github.com/vmihailenco/tagparser v0.1.1 // indirect
+	github.com/zalando/go-keyring v0.2.3-0.20230503081219-17db2e5354bd // indirect
 	github.com/zclconf/go-cty v1.11.0 // indirect
 	golang.org/x/net v0.7.0 // indirect
 	golang.org/x/sys v0.8.0 // indirect
