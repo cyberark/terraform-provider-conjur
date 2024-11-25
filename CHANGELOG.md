@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-## [0.6.9] - 2024-10-22
+## [0.7.1] - 2024-10-22
 ### Changed
   - Update conjur-api-go to v0.12.4
     [cyberark/terraform-provider-conjur#137](https://github.com/cyberark/terraform-provider-conjur/pull/137)
