@@ -13,7 +13,18 @@ properties([
 // Performs release promotion.  No other stages will be run
 if (params.MODE == "PROMOTE") {
   release.promote(params.VERSION_TO_PROMOTE) { infrapool, sourceVersion, targetVersion, assetDirectory ->
-    // No actions needed, artifacts labeled correctly
+    // Gather the SUMS file to sign
+    sums = "*SHA256SUMS"
+    infrapool.agentGet from: "${assetDirectory}/${sums}", to: "./"
+    sumFile = sh(script: "ls ${sums}", returnStdout: true).trim()
+    // Create .tar for signing
+    sh "mv ${sumFile} ${sumFile}.tar"
+    signArtifacts patterns: ["${sumFile}.tar"]
+    // Rename the sig file
+    sh "mv ${sumFile}.tar.sig ${sumFile}.sig"
+    // Copy back to assetDirectory
+    sigLocation = pwd() + "/${sumFile}.sig"
+    infrapool.agentPut from: "${sigLocation}", to: "${assetDirectory}"
   }
 
   // Copy Github Enterprise release to Github
