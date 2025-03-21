@@ -44,9 +44,32 @@ contributor!
 
 ## Releasing
 
+### Verify and update dependencies
+
+1.  Review the changes to `go.mod` since the last release and make any needed
+    updates to [NOTICES.txt](./NOTICES.txt):
+    *   Verify that dependencies fit into supported licenses types:
+        ```shell
+         go-licenses check ./... --allowed_licenses="MIT,ISC,Apache-2.0,BSD-3-Clause,MPL-2.0,BSD-2-Clause" \
+            --ignore github.com/cyberark/terraform-provider-conjur \
+            --ignore $(go list std | awk 'NR > 1 { printf(",") } { printf("%s",$0) } END { print "" }')
+        ```
+        If there is new dependency having unsupported license, such license should be included to [notices.tpl](./notices.tpl)
+        file in order to get generated in NOTICES.txt.  
+
+        NOTE: The second ignore flag tells the command to ignore standard library packages, which
+        may or may not be necessary depending on your local Go installation and toolchain.
+
+    *   If no errors occur, proceed to generate updated NOTICES.txt:
+        ```shell
+         go-licenses report ./... --template notices.tpl > NOTICES.txt \
+            --ignore github.com/cyberark/terraform-provider-conjur \
+            --ignore $(go list std | awk 'NR > 1 { printf(",") } { printf("%s",$0) } END { print "" }')
+         ```
+
 The following checklist should be followed when creating a release:
 
-- [ ] Follow the [Conjur release proceedure](https://github.com/cyberark/community/blob/main/Conjur/CONTRIBUTING.md#release-process)
+- [ ] Follow the [Conjur release procedure](https://github.com/cyberark/community/blob/main/Conjur/CONTRIBUTING.md#release-process)
 
 - [ ] Update homebrew tools
   - [ ] In [`cyberark/homebrew-tools`](https://github.com/cyberark/homebrew-tools) repo, update
