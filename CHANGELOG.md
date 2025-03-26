@@ -5,15 +5,19 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.6.10] - 2025-03-21
+### Changed
+- Upgrade Go to 1.24.x
+
 ## [0.6.9] - 2024-10-22
 ### Changed
-  - Update conjur-api-go to v0.12.4
-    [cyberark/terraform-provider-conjur#137](https://github.com/cyberark/terraform-provider-conjur/pull/137)
+- Update conjur-api-go to v0.12.4
+  [cyberark/terraform-provider-conjur#137](https://github.com/cyberark/terraform-provider-conjur/pull/137)
 
 ## [0.6.8] - 2024-08-01
 ### Changed
-  - Update to support new automated release process and correct terraform registry
-    publication.
+- Update to support new automated release process and correct terraform registry
+  publication.
 
 ## [0.6.7] - 2024-04-08
 

@@ -44,14 +44,36 @@ contributor!
 
 ## Releasing
 
-The following checklist should be followed when creating a release:
+### Verify and update dependencies
 
-- [ ] Follow the [Conjur release proceedure](https://github.com/cyberark/community/blob/main/Conjur/CONTRIBUTING.md#release-process)
+1.  Review the changes to `go.mod` since the last release and make any needed
+    updates to [NOTICES.txt](./NOTICES.txt):
+    *   Verify that dependencies fit into supported licenses types:
+        ```shell
+         go-licenses check ./... --allowed_licenses="MIT,ISC,Apache-2.0,BSD-3-Clause,MPL-2.0,BSD-2-Clause" \
+            --ignore github.com/cyberark/terraform-provider-conjur \
+            --ignore $(go list std | awk 'NR > 1 { printf(",") } { printf("%s",$0) } END { print "" }')
+        ```
+        If there is new dependency having unsupported license, such license should be included to [notices.tpl](./notices.tpl)
+        file in order to get generated in NOTICES.txt.  
 
-- [ ] Update homebrew tools
-  - [ ] In [`cyberark/homebrew-tools`](https://github.com/cyberark/homebrew-tools) repo, update
-        the [`terraform-provider-conjur.rb` formula](https://github.com/cyberark/homebrew-tools/blob/main/terraform-provider-conjur.rb)
-        using the file `dist/terraform-provider-conjur.rb` from the artifacts Jenkins built.
+        NOTE: The second ignore flag tells the command to ignore standard library packages, which
+        may or may not be necessary depending on your local Go installation and toolchain.
 
-- [ ] Public to Terraform Registry
-  - [ ] Request infra sign the SHA256SUMS file for the release and attach the resulting .sig file to the github release
+    *   If no errors occur, proceed to generate updated NOTICES.txt:
+        ```shell
+         go-licenses report ./... --template notices.tpl > NOTICES.txt \
+            --ignore github.com/cyberark/terraform-provider-conjur \
+            --ignore $(go list std | awk 'NR > 1 { printf(",") } { printf("%s",$0) } END { print "" }')
+         ```
+
+### Release and Promote
+
+1. Merging into the master branch will automatically trigger a release.
+   If successful, this release can be promoted at a later time.
+1. Jenkins build parameters can be utilized to promote a successful release
+   or manually trigger aditional releases as needed.
+1. Reference the [internal automated release doc](https://github.com/conjurinc/docs/blob/master/reference/infrastructure/automated_releases.md#release-and-promotion-process) for releasing and promoting.
+1. **After promotion:**
+    - **Publish to the Terraform Registry**
+    - **Request infra sign the SHA256SUMS file for the release and attach the resulting .sig file to the github release**

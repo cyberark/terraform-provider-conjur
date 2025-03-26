@@ -1,6 +1,6 @@
 module github.com/cyberark/terraform-provider-conjur
 
-go 1.22.1
+go 1.24.1
 
 require (
 	github.com/cyberark/conjur-api-go v0.12.4
