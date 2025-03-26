@@ -67,14 +67,13 @@ contributor!
             --ignore $(go list std | awk 'NR > 1 { printf(",") } { printf("%s",$0) } END { print "" }')
          ```
 
-The following checklist should be followed when creating a release:
+### Release and Promote
 
-- [ ] Follow the [Conjur release procedure](https://github.com/cyberark/community/blob/main/Conjur/CONTRIBUTING.md#release-process)
-
-- [ ] Update homebrew tools
-  - [ ] In [`cyberark/homebrew-tools`](https://github.com/cyberark/homebrew-tools) repo, update
-        the [`terraform-provider-conjur.rb` formula](https://github.com/cyberark/homebrew-tools/blob/main/terraform-provider-conjur.rb)
-        using the file `dist/terraform-provider-conjur.rb` from the artifacts Jenkins built.
-
-- [ ] Public to Terraform Registry
-  - [ ] Request infra sign the SHA256SUMS file for the release and attach the resulting .sig file to the github release
+1. Merging into the master branch will automatically trigger a release.
+   If successful, this release can be promoted at a later time.
+1. Jenkins build parameters can be utilized to promote a successful release
+   or manually trigger aditional releases as needed.
+1. Reference the [internal automated release doc](https://github.com/conjurinc/docs/blob/master/reference/infrastructure/automated_releases.md#release-and-promotion-process) for releasing and promoting.
+1. **After promotion:**
+    - **Publish to the Terraform Registry**
+    - **Request infra sign the SHA256SUMS file for the release and attach the resulting .sig file to the github release**
