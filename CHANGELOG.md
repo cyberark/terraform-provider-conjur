@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.6.11] - 2025-04-04
+### Added
+- Add the test cases and integrate Codacy
+
 ## [0.6.10] - 2025-03-21
 ### Changed
 - Upgrade Go to 1.24.x
