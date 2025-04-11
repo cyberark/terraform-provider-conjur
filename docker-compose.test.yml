@@ -1,0 +1,15 @@
+version: '2.1'
+services:
+  conjur_test:
+    build:
+      context: .
+      dockerfile: Dockerfile.testfile
+    environment:
+      CONJUR_APPLIANCE_URL: ${CONJUR_APPLIANCE_URL}
+      CONJUR_ACCOUNT: ${CONJUR_CLOUD_ACCOUNT}
+      CONJUR_AUTHN_LOGIN: "host/${HOST_ID}"
+      CONJUR_AUTHN_API_KEY: ${CONJUR_API_KEY}
+      CONJUR_CERT_FILE: "/terraform-provider-conjur/ssl_cert/cloud_ca.pem"
+    volumes:
+      - ./ssl_cert:/terraform-provider-conjur/ssl_cert
+      - ./output:/terraform-provider-conjur/output

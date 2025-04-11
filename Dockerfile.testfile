@@ -1,0 +1,25 @@
+FROM golang:1.24-alpine
+
+COPY ssl_cert/*  /usr/local/share/ca-certificates/
+
+RUN update-ca-certificates
+
+RUN apk add --no-cache curl \
+               gcc \
+               git \
+               bash \
+               mercurial \
+               musl-dev \
+               jq \
+               libc-dev \
+               openssl && \
+    go install github.com/jstemmer/go-junit-report@latest && \
+    go install github.com/axw/gocov/gocov@latest && \
+    go install github.com/AlekSi/gocov-xml@latest && \
+    go install github.com/wadey/gocovmerge@latest
+
+WORKDIR /terraform-provider-conjur
+
+COPY . .
+
+CMD ["/bin/bash"]

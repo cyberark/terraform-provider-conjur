@@ -89,7 +89,6 @@ pipeline {
       steps {
         script {
           INFRAPOOL_EXECUTORV2_AGENT_0.agentSh './bin/build'
-          INFRAPOOL_EXECUTORV2_AGENT_0.agentArchiveArtifacts artifacts: "dist/*.tar.gz,dist/*.zip,dist/*.txt,dist/*.rb,dist/*_SHA256SUMS", fingerprint: true
         }
       }
     }
@@ -117,6 +116,14 @@ pipeline {
         }
       }
     }
+    stage('Run Code Coverage'){
+      steps {
+        script {
+          INFRAPOOL_EXECUTORV2_AGENT_0.agentSh 'summon ./bin/codecoverage.sh'
+          INFRAPOOL_EXECUTORV2_AGENT_0.agentStash name: 'xml-out', includes: 'output/*.xml'
+        } 
+      }
+    }
     stage('Release') {
       when {
         expression {
@@ -140,9 +147,11 @@ pipeline {
   
   post {
     always {
-      script {
-        releaseInfraPoolAgent(".infrapool/release_agents")
-      }
+      unstash 'xml-out'
+      junit 'output/junit.xml'
+      cobertura autoUpdateHealth: false, autoUpdateStability: false, coberturaReportFile: 'output/coverage.xml', conditionalCoverageTargets: '30, 0, 0', failUnhealthy: false, failUnstable: false, lineCoverageTargets: '30, 0, 0', maxNumberOfBuilds: 0, methodCoverageTargets: '30, 0, 0', onlyStable: false, sourceEncoding: 'ASCII', zoomCoverageChart: false
+      codacy action: 'reportCoverage', filePath: "output/coverage.xml"
+      releaseInfraPoolAgent(".infrapool/release_agents") 
     }
   }
 }
