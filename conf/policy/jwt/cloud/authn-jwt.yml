@@ -1,0 +1,48 @@
+#conjur policy load -f authn-jwt.yml -b root
+#conjur authenticator enable --id authn-jwt/github_token
+#conjur variable set -i conjur/authn-jwt/github/token-app-property -v 'workflow'
+#conjur variable set -i conjur/authn-jwt/github/identity-path -v "github-apps"
+#conjur variable set -i conjur/authn-jwt/github/issuer -v "https://token.actions.githubusercontent.com"
+#conjur variable set -i conjur/authn-jwt/github/jwks-uri -v "https://token.actions.githubusercontent.com/.well-known/jwks"
+
+- !policy
+  id: github
+  body:
+      - !webservice
+
+      # jwks-uri for GitHub Actions: https://token.actions.githubusercontent.com/.well-known/jwks
+      - !variable public-keys
+
+      #In this example, "token-app-property" is set to "workflow"
+      #Please refer to README.md for detailed policy and commands
+      - !variable
+        id: token-app-property
+
+      #In this example, "identity-path" is set to "github-apps"
+      #Please refer to README.md for detailed policy and commands
+      - !variable
+        id: identity-path
+
+      #"issuer" for GitHub Actions: https://token.actions.githubusercontent.com
+      - !variable
+        id: issuer        
+
+      #Group of applications that can authenticate using this JWT Authenticator
+      - !group apps
+
+      - !permit
+        role: !group apps
+        privilege: [read, authenticate]
+        resource: !webservice
+
+      - !webservice
+        id: status
+
+      #Group of users who can check the status of the JWT Authenticator
+      - !group
+        id: operators
+
+      - !permit
+        role: !group operators
+        privilege: [read]
+        resource: !webservice status

@@ -1,0 +1,24 @@
+---
+- !policy
+  id: terraform
+  annotations:
+    description: Policy for terraform
+  body:
+
+  - !host
+    id: testapp
+    annotations:
+      description: Host for running Terraform on remote targets
+      authn/api-key: true
+
+  - &variables
+    - !variable target-password
+    - !variable test-secret
+    - !variable test-secret-in-file
+    - !variable var with spaces
+
+  - !permit
+    role: !host testapp
+    privileges: [ read, execute ]
+    resource: *variables
+

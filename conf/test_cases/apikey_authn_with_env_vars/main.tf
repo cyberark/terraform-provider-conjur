@@ -1,8 +1,8 @@
 variable "conjur_appliance_url" {}
 variable "conjur_account" {}
-variable "conjur_authn_login" {}
-variable "conjur_api_key" {}
-
+variable "conjur_secret_variable" {}
+variable "conjur_authn_type" {}
+variable "conjur_ssl_cert" {}
 
 terraform {
   required_providers {
@@ -14,14 +14,15 @@ terraform {
 }
 
 provider "conjur" {
+  # Login and api_key are passed thorugh environmental variables
   appliance_url = var.conjur_appliance_url
   account       = var.conjur_account
-  login         = var.conjur_authn_login
-  api_key       = var.conjur_api_key
+  authn_type    = var.conjur_authn_type
+  ssl_cert      = var.conjur_ssl_cert
 }
 
 data "conjur_secret" "cloud_dbpass" {
-  name = "data/vault/ADO_Secret/ado_secret_apikey/username"
+  name = var.conjur_secret_variable
 }
 
 output "dbpass-to-output" {

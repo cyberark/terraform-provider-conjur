@@ -31,7 +31,7 @@ builds:
 archives:
   - id: conjur-terraform-release-archive
     name_template: "{{ .ProjectName }}_{{ .Env.CONJUR_PLUGIN_VERSION }}_{{ .Os }}_{{ .Arch }}"
-    format: zip
+    formats: ['zip']
     files:
       - README.md
       - LICENSE

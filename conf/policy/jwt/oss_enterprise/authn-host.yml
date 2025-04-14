@@ -1,0 +1,19 @@
+#conjur policy load -f authn-host.yml -b root
+- !policy
+  id: github-apps
+  body:
+      - !group
+
+      - &hosts
+        - !host
+          id: example_user
+          annotations:
+              authn-jwt/github/user_id: 12345
+  
+      - !grant
+        role: !group
+        members: *hosts
+
+- !grant
+  role: !group conjur/authn-jwt/github/apps
+  member: !group github-apps

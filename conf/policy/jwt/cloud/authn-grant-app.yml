@@ -1,0 +1,6 @@
+#conjur policy load -f authn-grantapp.yaml -b conjur/authn-jwt/github_token
+- !grant
+  roles:
+     - !group apps
+  members:
+     - !group /data/github-apps

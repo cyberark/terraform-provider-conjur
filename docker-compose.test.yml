@@ -1,4 +1,3 @@
-version: '2.1'
 services:
   conjur_test:
     build:
@@ -9,7 +8,24 @@ services:
       CONJUR_ACCOUNT: ${CONJUR_CLOUD_ACCOUNT}
       CONJUR_AUTHN_LOGIN: "host/${HOST_ID}"
       CONJUR_AUTHN_API_KEY: ${CONJUR_API_KEY}
-      CONJUR_CERT_FILE: "/terraform-provider-conjur/ssl_cert/cloud_ca.pem"
+      CONJUR_CERT_FILE: ""
+      TF_IAM_SERVICE_ID: "prod"
+      TF_IAM_HOST_ID: "host/data/myspace/601277729239/InstanceReadJenkinsExecutorHostFactoryToken"
+      TF_AZ_SERVICE_ID: "AzureTerraform"
+      TF_CONJUR_APPLIANCE_URL: "https://conjur-server"
+      TF_CONJUR_ACCOUNT: "myaccount"
+      TF_JWT_SERVICE_ID: "github"
+      TF_JWT_HOST_ID: ""
+      TF_CONJUR_CERT_FILE: ${CONJUR_CERT_CONTENT}
+      GCP_TOKEN: ${GCP_TOKEN}
+      TF_AZ_HOST_ID: "host/data/azure-app/azureVM"
+      TF_CLIENT_ID: ${USER_ASSIGNED_IDENTITY_CLIENT_ID}
+      TF_CONJUR_SECRET_VARIABLE: "data/vault/ADO_Secret/ado_secret_apikey/username"
+      TF_SECRET_VALUE: "nirupma"
+      TF_JWT_SECRET_VALUE: "SECRETXcLhn23MJcimV"
+      TF_JWT_CONJUR_SECRET_VARIABLE: "Dev-Team-credential1"
+      JWT_TOKEN: ${JWT_TOKEN}
     volumes:
       - ./ssl_cert:/terraform-provider-conjur/ssl_cert
+      - $PWD/conf/https_config:/conf/https_config
       - ./output:/terraform-provider-conjur/output

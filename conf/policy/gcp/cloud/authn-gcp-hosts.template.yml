@@ -1,0 +1,14 @@
+- !policy
+  id: gcp-apps
+  body:
+    - !group
+  
+    - &hosts
+      - !host
+        id: test-app
+        annotations:
+          authn-gcp/project-id: {{ PROJECT_ID }} 
+
+    - !grant
+      role: !group
+      members: *hosts

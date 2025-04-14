@@ -1,25 +1,106 @@
 #!/bin/bash
-set -exo pipefail
+set -eo pipefail
 
-TARGET="${1:-oss}"  # can also be set to 'enterprise'
+# Default values
+TARGET=""
+TEST_CASE=""
+JWT_SETUP="false"
+SHOW_HELP="false"
 
-# Trim the build number from the VERSION file to be compatible with tf version contraints
-export CONJUR_PLUGIN_VERSION="$(cat VERSION | cut -d'-' -f1)"
-
+export CONJUR_PLUGIN_VERSION="$(cut -d'-' -f1 < VERSION)"
 export CONJUR_DATA_KEY='iFra75qdvsLENSV+qXYFMkv7KJS3t+82Po4mmjZLxZc='
-
-export REGISTRY_URL=${INFRAPOOL_REGISTRY_URL:-"docker.io"}
-
+export REGISTRY_URL="${INFRAPOOL_REGISTRY_URL:-docker.io}"
 CONJUR_ACCOUNT='myaccount'
 CONJUR_AUTHN_PASSWORD='SEcret12!!!!'
-
-LOCAL_SECRET_FILE='test/dbpass'
-
-# These variables are set after configuring conjur
+LOCAL_SECRET_FILE='tests/dbpass'
 api_key=""
 ssl_cert=""
+JWT_TOKEN=""
+GCP_TOKEN=""
 
-function finish() {
+source "$(git rev-parse --show-toplevel)/bin/utils.sh"
+
+# Function to display help
+function show_help() {
+  echo "Usage: $0 -t <target> -tc <test_case> [-h]"
+  echo ""
+  echo "Options:"
+  echo "  -t, --target         The target environment (oss, enterprise, cloud)."
+  echo "  -tc, --test-case     The test case to run (api-key, iam, azure, gcp, jwt)."
+  echo "  -h, --help           Show this help message."
+  echo ""
+  echo "Examples:"
+  echo "  $0 -t oss -tc api-key    # Run 'oss' target with 'api-key' test."
+  echo "  $0 -t enterprise -tc iam   # Run 'enterprise' target with 'iam' test."
+}
+
+# Parse command-line arguments
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -t|--target)
+      TARGET="$2"
+      shift 2
+      ;;
+    -tc|--test-case)
+      TEST_CASE="$2"
+      shift 2
+      ;;
+    -jwt|--jwt-setup)
+      JWT_SETUP="$2"
+      shift 2
+      ;;
+    -h|--help)
+      SHOW_HELP="true"
+      shift
+      ;;
+    *)
+      echo "Unknown option: $1"
+      show_help
+      exit 1
+      ;;
+  esac
+done
+
+# If --help flag is provided, show the help message
+if [[ "$SHOW_HELP" == "true" ]]; then
+  show_help
+  exit 0
+fi
+
+# Ensure mandatory arguments are provided
+if [[ -z "$TARGET" || -z "$TEST_CASE" ]]; then
+  echo "Error: Both --target and --test-case are mandatory."
+  show_help
+  exit 1
+fi
+
+# Validate --target value
+case "$TARGET" in
+  "oss" | "enterprise" | "cloud")
+    ;;
+  *)
+    echo "Error: Invalid target '$TARGET'. Valid options are 'oss', 'enterprise', or 'cloud'."
+    exit 1
+    ;;
+esac
+
+# Validate --test-case value
+case "$TEST_CASE" in
+  "api-key" | "iam" | "azure" | "gcp" | "jwt")
+    ;;
+  *)
+    echo "Error: Invalid test case '$TEST_CASE'. Valid options are 'api-key', 'iam', 'azure', 'jwt', or 'gcp'."
+    exit 1
+    ;;
+esac
+
+# Function to teardown
+function clean() {
+  if [[ "$JWT_SETUP" == "true" ]]; then
+    echo "> Skipping cleanup as JWT_SETUP is true"
+    return 0
+  fi
+
   case "$TARGET" in
   "oss"|"enterprise" )
   if [[ -z "$KEEP_CONTAINERS" ]]; then
@@ -33,57 +114,357 @@ function finish() {
   ;;
   esac
 }
-trap finish EXIT
+
+function replaceTemplates() {
+  case "$TEST_CASE" in
+    "azure")
+      if [[ -z "$AZURE_SUBSCRIPTION_ID" || -z "$AZURE_RESOURCE_GROUP" || -z "$USER_ASSIGNED_IDENTITY" ]]; then
+        echo "Error: Missing Azure environment variables."
+        exit 1
+      fi
+      for template in "oss_enterprise/authn-azure-hosts.template.yml" "cloud/authn-azure-hosts.template.yml"; do
+        ESCAPED_AZURE_SUBSCRIPTION_ID=$(printf '%s\n' "$AZURE_SUBSCRIPTION_ID" | sed 's/[&/\]/\\&/g')
+        ESCAPED_AZURE_RESOURCE_GROUP=$(printf '%s\n' "$AZURE_RESOURCE_GROUP" | sed 's/[&/\]/\\&/g')
+        ESCAPED_USER_ASSIGNED_IDENTITY=$(printf '%s\n' "$USER_ASSIGNED_IDENTITY" | sed 's/[&/\]/\\&/g')
+        
+        sed -e "s#{{ AZURE_SUBSCRIPTION_ID }}#$ESCAPED_AZURE_SUBSCRIPTION_ID#g" \
+            -e "s#{{ AZURE_RESOURCE_GROUP }}#$ESCAPED_AZURE_RESOURCE_GROUP#g" \
+            -e "s#{{ USER_ASSIGNED_IDENTITY }}#$ESCAPED_USER_ASSIGNED_IDENTITY#g" \
+            "conf/policy/azure/$template" > "conf/policy/azure/${template/.template/}"
+      done
+      ;;
+    "gcp")
+      export GCP_TOKEN=$(cat gcp/token)
+      GCP_PROJECT=$(cat gcp/project-id)
+      ESCAPED_GCP_PROJECT=$(printf '%s\n' "$GCP_PROJECT" | sed 's/[&/\]/\\&/g')
+      for template in "oss_enterprise/authn-gcp-hosts.template.yml" "cloud/authn-gcp-hosts.template.yml"; do
+        sed -e "s#{{ PROJECT_ID }}#$ESCAPED_GCP_PROJECT#g" \
+            "conf/policy/gcp/$template" > "conf/policy/gcp/${template/.template/}"
+      done
+      ;;
+  esac
+}
+
+trap clean EXIT
 
 function main() {
+  clean
+  replaceTemplates
   checkTarget
-  loadUtils
-  case "$TARGET" in
-  "oss" | "enterprise")
-    launchConjur
-    configureConjur
-    ;;
-  esac
-  runTerraformWithProviderVars
-  validateResults
 
-  runTerraformWithEnvVars
-  validateResults
+  case "$TARGET" in
+    "oss" | "enterprise")
+      launchConjur
+      configureConjur
+      ;;
+    "cloud")
+      export CONJUR_APPLIANCE_URL="$INFRAPOOL_CONJUR_APPLIANCE_URL/api"
+      deploy_conjur_cloud
+      ;;
+    *)
+      echo "> Error: '$TARGET' is not a supported target"
+      exit 1
+      ;;
+  esac
+
+  [[ "$JWT_SETUP" == "true" ]] && exit 0
+
+  local tests_to_run=()
+
+  case "$TEST_CASE" in
+    "jwt")
+      tests_to_run+=(
+        "jwt_authn_with_providers_vars"
+      )
+      ;;
+    "api-key")
+      tests_to_run+=(
+        "apikey_authn_with_env_vars"
+        "apikey_authn_with_providers_vars"
+      )
+      ;;
+    "iam")
+      tests_to_run+=(
+        "iam_authn_with_providers_vars"
+      )
+      ;;
+    "azure")
+      tests_to_run+=(
+        "azure_authn_with_provider_vars"
+      )
+      ;;
+    "gcp")
+      tests_to_run+=(
+        "gcp_authn_with_provider_vars"
+      )
+      ;;
+    *)
+      echo "Error: Invalid test case '$TEST_CASE'"
+      exit 1
+      ;;
+  esac
+
+  echo ">> Running tests for target: $TARGET with test case: $TEST_CASE"
+  overall_status=0
+
+  setTFVars
+  for test in "${tests_to_run[@]}"; do
+    case "$test" in
+      "apikey_authn_with_env_vars")
+        test_dir="tests/api-key"
+        ;;
+      "apikey_authn_with_providers_vars")
+        test_dir="tests/api-key"
+        ;;
+      "iam_authn_with_providers_vars")
+        test_dir="tests/iam"
+        ;;
+      "azure_authn_with_provider_vars")
+        test_dir="tests/azure"
+        ;;
+      "gcp_authn_with_provider_vars")
+        test_dir="tests/gcp"
+        ;;
+      "jwt_authn_with_providers_vars")
+        test_dir="tests/jwt"
+        ;;
+      *)
+        echo "Unknown test case: $test"
+        continue
+        ;;
+    esac
+
+    echo "Running test from directory: $test_dir/$test"
+    test -f "$test_dir/$test/env" && source "$test_dir/$test/env"
+    runTerraform "$test_dir/$test" || overall_status=1
+    validateResults || overall_status=1
+    sleep 5
+    rm -rf $LOCAL_SECRET_FILE
+  done
+
+  echo "###################################################################"
+  if [[ "$overall_status" -eq 0 ]]; then
+    echo "All tests passed successfully."
+    echo "###################################################################"
+  else
+    echo "One or more tests failed."
+    exit 1
+  fi
+  echo "###################################################################"
 }
 
 function checkTarget() {
   case "$TARGET" in
-  "oss")
-    export DOCKER_COMPOSE_ARGS="-f docker-compose.oss.yml -f docker-compose.yml"
-    export CONJUR_WAIT_COMMAND="conjurctl wait"
-    ;;
-  "enterprise")
-    export DOCKER_COMPOSE_ARGS="-f docker-compose.enterprise.yml -f docker-compose.yml"
-    export CONJUR_WAIT_COMMAND="/opt/conjur/evoke/bin/wait_for_conjur"
-    ;;
-  "cloud")
+    "oss")
+      export DOCKER_COMPOSE_ARGS="-f docker-compose.oss.yml -f docker-compose.yml"
+      export CONJUR_WAIT_COMMAND="/opt/conjur-server/bin/conjurctl wait"
+      ;;
+    "enterprise")
+      export DOCKER_COMPOSE_ARGS="-f docker-compose.enterprise.yml -f docker-compose.yml"
+      export CONJUR_WAIT_COMMAND="/opt/conjur/evoke/bin/wait_for_conjur"
+      ;;
+    "cloud")
 
-    ;;
-  *)
-    echo "> '$TARGET' is not a supported target"
-    exit 1
-    ;;
+      ;;
+    *)
+      echo "> Error: '$TARGET' is not a supported target"
+      exit 1
+      ;;
   esac
 }
 
+# deploy conjur cloud
+function url_encode() {
+  printf '%s' "$1" | jq -sRr @uri
+}
+
+function set_conjur_cloud_variable() {
+  local variable_name="$1"
+  local data="$2"
+  local encoded_variable_name
+  encoded_variable_name=$(url_encode "$variable_name")
+  curl -w "%{http_code}" -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
+       -X POST --data-urlencode "${data}" "${CONJUR_APPLIANCE_URL}/secrets/conjur/variable/${encoded_variable_name}"
+}
+
+function rotate_host_api_key() {
+  URL=$1
+  api_key=$(curl -k --request PUT --data "" \
+     -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
+     ${URL}/authn/conjur/api_key?role=host:data%2Fterraform%2Ftestapp)
+}
+
+function deploy_conjur_cloud() {
+
+  case "$TEST_CASE" in
+    "api-key")
+      curl -w "%{http_code}" -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
+        -X POST -d "$(cat conf/policy/apikey/cloud/root.yml)" "${CONJUR_APPLIANCE_URL}/policies/conjur/policy/data"
+      set_conjur_cloud_variable "data/terraform/target-password" "SECRETXcLhn23MJcimV"
+      ;;
+    "iam")
+      curl -w "%{http_code}" -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
+        -X POST -d "$(cat conf/policy/iam/cloud/authn-iam.yml)" "${CONJUR_APPLIANCE_URL}/policies/conjur/policy/conjur/authn-iam"
+      curl -w "%{http_code}" -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
+        -X POST -d "$(cat conf/policy/iam/cloud/authn-iam-host.yml)" "${CONJUR_APPLIANCE_URL}/policies/conjur/policy/data"
+      curl -w "%{http_code}" -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
+        -X POST -d "$(cat conf/policy/iam/cloud/authn-permission.yml)" "${CONJUR_APPLIANCE_URL}/policies/conjur/policy/conjur/authn-iam/prod"
+      curl -w "%{http_code}" -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
+        -X PATCH  -H 'Content-Type: text/plain' --data-raw 'enabled=true' "${CONJUR_APPLIANCE_URL}/authn-iam/prod/conjur"
+      set_conjur_cloud_variable "data/myspace/test-variable" "SECRETXcLhn23MJcimV"
+      ;;
+    "azure")
+      curl -w "%{http_code}" -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
+        -X POST -d "$(cat conf/policy/azure/cloud/authn-azure-AzureTerraform.yml)" "${CONJUR_APPLIANCE_URL}/policies/conjur/policy/conjur/authn-azure"
+      curl -w "%{http_code}" -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
+        -X POST -d "$(cat conf/policy/azure/cloud/authn-azure-hosts.yml)" "${CONJUR_APPLIANCE_URL}/policies/conjur/policy/data"
+      curl -w "%{http_code}" -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
+        -X POST -d "$(cat conf/policy/azure/cloud/authn-azure-secrets.yml)" "${CONJUR_APPLIANCE_URL}/policies/conjur/policy/data"
+      curl -w "%{http_code}" -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
+        -X POST -d "$(cat conf/policy/azure/cloud/authn-azure-permission.yml)" "${CONJUR_APPLIANCE_URL}/policies/conjur/policy/conjur/authn-azure/AzureTerraform"
+      curl -w "%{http_code}" -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
+        -X PATCH  -H 'Content-Type: text/plain' --data-raw 'enabled=true' "${CONJUR_APPLIANCE_URL}/authn-azure/AzureTerraform/conjur"
+
+      encoded_variable_name=$(url_encode "conjur/authn-azure/AzureTerraform/provider-uri")
+      data="https://sts.windows.net/df242c82-fe4a-47e0-b0f4-e3cb7f8104f1/"
+      curl -w "%{http_code}" -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
+       -X POST -d "${data}" "${CONJUR_APPLIANCE_URL}/secrets/conjur/variable/${encoded_variable_name}"
+
+      set_conjur_cloud_variable "data/terraform/target-password" "SECRETXcLhn23MJcimV"
+      set_conjur_cloud_variable "data/terraform/test-secret" "SECRETXcLhn23MJcimV"
+      ;;
+    "gcp")
+      curl -w "%{http_code}" -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
+        -X POST -d "$(cat conf/policy/gcp/cloud/authn-gcp.yml)" "${CONJUR_APPLIANCE_URL}/policies/conjur/policy/conjur/authn-gcp"
+      curl -w "%{http_code}" -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
+        -X POST -d "$(cat conf/policy/gcp/cloud/authn-gcp-hosts.yml)" "${CONJUR_APPLIANCE_URL}/policies/conjur/policy/data"
+      curl -w "%{http_code}" -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
+        -X POST -d "$(cat conf/policy/gcp/cloud/authn-gcp-secrets.yml)" "${CONJUR_APPLIANCE_URL}/policies/conjur/policy/data"
+      curl -w "%{http_code}" -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
+        -X POST -d "$(cat conf/policy/gcp/cloud/authn-gcp-permission.yml)" "${CONJUR_APPLIANCE_URL}/policies/conjur/policy/conjur/authn-gcp"
+      curl -w "%{http_code}" -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
+        -X PATCH  -H 'Content-Type: text/plain' --data-raw 'enabled=true' "${CONJUR_APPLIANCE_URL}/authn-gcp/conjur"
+      set_conjur_cloud_variable "data/secrets/test-variable" "SECRETXcLhn23MJcimV"
+      ;;
+    "jwt")
+      jwtConfig
+      curl -w "%{http_code}" -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
+        -X POST -d "$(cat conf/policy/jwt/cloud/authn-jwt.yml)" "${CONJUR_APPLIANCE_URL}/policies/conjur/policy/conjur/authn-jwt"
+      curl -w "%{http_code}" -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
+        -X POST -d "$(cat conf/policy/jwt/cloud/authn-host.yml)" "${CONJUR_APPLIANCE_URL}/policies/conjur/policy/data"
+      curl -w "%{http_code}" -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
+        -X POST -d "$(cat conf/policy/jwt/cloud/app-secret.yml)" "${CONJUR_APPLIANCE_URL}/policies/conjur/policy/data"
+      curl -w "%{http_code}" -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
+        -X POST -d "$(cat conf/policy/jwt/cloud/authn-grant-app.yml)" "${CONJUR_APPLIANCE_URL}/policies/conjur/policy/conjur/authn-jwt/github"
+      curl -w "%{http_code}" -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
+        -X PATCH  -H 'Content-Type: text/plain' --data-raw 'enabled=true' "${CONJUR_APPLIANCE_URL}/authn-jwt/github/conjur"
+      encoded_variable_name=$(url_encode "conjur/authn-jwt/github/token-app-property")
+      curl -w "%{http_code}" -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
+        -X POST -d "username" "${CONJUR_APPLIANCE_URL}/secrets/conjur/variable/${encoded_variable_name}"
+      encoded_identity_path=$(url_encode "conjur/authn-jwt/github/identity-path")
+      curl -w "%{http_code}" -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
+        -X POST -d "data/github-apps" "${CONJUR_APPLIANCE_URL}/secrets/conjur/variable/${encoded_identity_path}"
+      encoded_issuer=$(url_encode "conjur/authn-jwt/github/issuer")
+      curl -w "%{http_code}" -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
+        -X POST -d "http://jwt:8090" "${CONJUR_APPLIANCE_URL}/secrets/conjur/variable/${encoded_issuer}"
+      encoded_pub_key=$(url_encode "conjur/authn-jwt/github/public-keys")
+      curl -w "%{http_code}" -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
+        -X POST -d "{\"type\":\"jwks\", \"value\":$(cat file.json)}" "${CONJUR_APPLIANCE_URL}/secrets/conjur/variable/${encoded_pub_key}"
+
+      set_conjur_cloud_variable "data/Dev-Team-credential1" "SECRETXcLhn23MJcimV"
+      ;;
+    *)
+      echo "Unknown authentication type: $TEST_CASE"
+      exit 1
+      ;;
+  esac
+}
+
+
+function jwtConfig() {
+
+  # JWT configuration
+  KEY_SIZE=2048
+  KEY_ID="your-key-id"
+  EXPIRATION_TIME=$(perl -e 'print time + 30 * 60')
+  USER_ID="12345"
+  USERNAME="example_user"
+
+  # Generate private and public RSA keys
+  openssl genpkey -algorithm RSA -out private_key.pem -pkeyopt rsa_keygen_bits:$KEY_SIZE
+  openssl rsa -pubout -in private_key.pem -out public_key.pem
+
+  # Extract modulus (n) and exponent (e)
+  n_hex=$(openssl rsa -in private_key.pem -noout -text | awk '
+/modulus:/ {flag=1; next}
+/publicExponent:/ {flag=0}
+flag { gsub(/[: \n]/,""); printf $0 }')
+
+  e_dec=$(openssl rsa -in private_key.pem -noout -text | awk '/publicExponent:/ { print $2 }')
+
+  # Convert to base64url
+  n_b64=$(echo "$n_hex" | xxd -r -p | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+  e_hex=$(printf '%x' "$e_dec")
+  [ $(( ${#e_hex} % 2 )) -ne 0 ] && e_hex="0$e_hex"
+  e_b64=$(echo "$e_hex" | xxd -r -p | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+
+  # Create JWT payload
+  payload=$(cat <<EOF
+{
+  "user_id": "$USER_ID",
+  "username": "$USERNAME",
+  "iss": "http://jwt:8090",
+  "exp": $EXPIRATION_TIME
+}
+EOF
+)
+
+  # Encode header and payload in base64url
+  header=$(echo -n '{"alg":"RS256","typ":"JWT","kid":"'"$KEY_ID"'"}' | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+  payload_b64=$(echo -n "$payload" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+
+  # Sign the JWT
+  signature=$(echo -n "$header.$payload_b64" | openssl dgst -sha256 -sign private_key.pem | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+
+  # Construct final JWT
+  jwt_token="$header.$payload_b64.$signature"
+
+  # Output the token
+  echo "Generated JWT Token: $jwt_token"
+  export JWT_TOKEN="$jwt_token"
+  echo "$jwt_token" > jwt_token
+
+  # Construct JWKS JSON
+  jwks_json=$(cat <<EOF
+{
+  "keys": [
+    {
+      "kty": "RSA",
+      "kid": "$KEY_ID",
+      "use": "sig",
+      "alg": "RS256",
+      "n": "$n_b64",
+      "e": "$e_b64"
+    }
+  ]
+}
+EOF
+)
+
+  echo $jwks_json > file.json
+
+}
+
 function loadUtils() {
+  local cwd
   cwd="$(dirname "$0")"
-  # shellcheck source=utils.sh
   . "$cwd/utils.sh"
 }
 
 function launchConjur() {
-  
   echo "> Launching local Conjur environment"
-
   echo ">> Pulling images (this may take a long time)"
   dockerCompose pull -q
-
   echo ">> Starting Conjur/DAP server"
   dockerCompose up -d conjur-server
   echo ">> Creating account '$CONJUR_ACCOUNT'"
@@ -94,26 +475,15 @@ function launchConjur() {
       -p "$CONJUR_AUTHN_PASSWORD" \
       "$CONJUR_ACCOUNT"
   else
-    # We need to wait for Conjur OSS to establish a DB connection before
-    # attempting to create the account
     conjurExec $CONJUR_WAIT_COMMAND
     conjurExec conjurctl account create "$CONJUR_ACCOUNT"
   fi
-
   echo ">> Waiting on conjur..."
   conjurExec $CONJUR_WAIT_COMMAND
 }
 
-function unexportConjurVars() {
-  export -n CONJUR_APPLIANCE_URL
-  export -n CONJUR_SSL_CERTIFICATE
-  export -n CONJUR_ACCOUNT
-  export -n CONJUR_AUTHN_LOGIN
-  export -n CONJUR_AUTHN_API_KEY
-}
-
 function configureConjur() {
-  echo "> Configuring local Conjur environment"
+  echo "> Configuring Conjur"
   export CONJUR_APPLIANCE_URL=https://conjur-server
   export CONJUR_ACCOUNT="$CONJUR_ACCOUNT"
   export CONJUR_AUTHN_LOGIN="admin"
@@ -121,35 +491,69 @@ function configureConjur() {
   if [[ "$TARGET" == "enterprise" ]]; then
     ssl_cert=$(conjurExec cat /opt/conjur/etc/ssl/conjur.pem)
   else
-    ssl_cert=$(cat "test/https_config/ca.crt")
+    ssl_cert=$(< conf/https_config/ca.crt)
   fi
   export CONJUR_SSL_CERTIFICATE="$ssl_cert"
 
   if [[ "$TARGET" == "oss" ]]; then
-    api_key=$(conjurExec conjurctl role retrieve-key \
-      "$CONJUR_ACCOUNT:user:admin" | tr -d '\r')
+    api_key=$(conjurExec conjurctl role retrieve-key "$CONJUR_ACCOUNT:user:admin" | tr -d '\r')
     export CONJUR_AUTHN_API_KEY="$api_key"
   fi
-  echo ">> Starting CLI"
+
   dockerCompose up -d client
 
   if [[ "$TARGET" == "enterprise" ]]; then
-    echo ">> Logging in CLI to the server"
     clientExec conjur authn login -u admin -p "$CONJUR_AUTHN_PASSWORD"
     api_key=$(clientExec conjur user rotate_api_key)
-    echo ">> '$api_key' enterprise apikey "   
     export CONJUR_AUTHN_API_KEY="$api_key"
+    echo ">> Enterprise API Key: $api_key"
   fi
 
+  applyConjurPolicies
+}
+
+function applyConjurPolicies() {
   echo ">> Applying policies"
 
-    # Policy files are mounted in docker-compose
-  clientExec conjur policy load --replace root /test/policy.root.yml
-  clientExec conjur policy load terraform-example /test/policy.example.yml
+  # Api Key policies
+  clientExec conjur policy load --replace root /conf/policy/apikey/oss_enterprise/policy.root.yml
+  clientExec conjur policy load terraform-example /conf/policy/apikey/oss_enterprise/policy.example.yml
   clientExec conjur list
   clientExec conjur variable values add terraform-example/dbpass SECRETXcLhn23MJcimV
+  # IAM policies
+  clientExec conjur policy load root /conf/policy/iam/oss_enterprise/authn-iam.yml
+  clientExec conjur policy load root /conf/policy/iam/oss_enterprise/authn-iam-host.yml
+  clientExec conjur variable values add myspace/database/username SECRETXcLhn23MJcimV
 
-  unexportConjurVars
+  if [[ "$TEST_CASE" == "azure" ]]; then
+    # Azure Policies 
+    clientExec conjur policy load root /conf/policy/azure/oss_enterprise/authn-azure-AzureWS.yml
+    clientExec  conjur policy load root /conf/policy/azure/oss_enterprise/authn-azure-hosts.yml  
+    clientExec  conjur policy load root /conf/policy/azure/oss_enterprise/authn-azure-secrets.yml
+    clientExec  conjur variable values add conjur/authn-azure/AzureTerraform/provider-uri https://sts.windows.net/df242c82-fe4a-47e0-b0f4-e3cb7f8104f1/
+    clientExec  conjur variable values add secrets/test-variable SECRETXcLhn23MJcimV
+  fi
+
+  if [[ "$TEST_CASE" == "gcp" ]]; then
+   #GCP policies
+   clientExec conjur policy load root /conf/policy/gcp/oss_enterprise/authn-gcp.yml
+   clientExec conjur policy load conjur/authn-gcp /conf/policy/gcp/oss_enterprise/authn-gcp-hosts.yml
+   clientExec conjur policy load root  /conf/policy/gcp/oss_enterprise/authn-gcp-secrets.yml
+   clientExec conjur variable values add secrets/test-variable SECRETXcLhn23MJcimV
+  fi
+
+  if [[ "$TEST_CASE" == "jwt" ]]; then
+    # jwt Policies
+    jwtConfig 
+    clientExec conjur policy load root /conf/policy/jwt/oss_enterprise/authn-jwt.yml
+    clientExec  conjur policy load root /conf/policy/jwt/oss_enterprise/authn-host.yml  
+    clientExec  conjur policy load root /conf/policy/jwt/oss_enterprise/app-secret.yml
+    clientExec  conjur variable values add conjur/authn-jwt/github/token-app-property username
+    clientExec  conjur variable values add conjur/authn-jwt/github/identity-path github-apps
+    clientExec conjur variable values add conjur/authn-jwt/github/issuer "http://jwt:8090"
+    clientExec conjur variable values add conjur/authn-jwt/github/public-keys "{\"type\":\"jwks\", \"value\":$(cat file.json)}"
+    clientExec  conjur variable values add Dev-Team-credential1 SECRETXcLhn23MJcimV
+  fi
 }
 
 function runTerraform() {
@@ -157,7 +561,7 @@ function runTerraform() {
 
   echo ">> Planning and applying '$target_dir/main.tf' Terraform manifest"
 
-  export TF_LOG=INFO
+  export TF_LOG=DEBUG
 
   rm -f "$LOCAL_SECRET_FILE"
 
@@ -165,6 +569,8 @@ function runTerraform() {
 
   terraformRun \
     "cd $target_dir/ &&
+     rm -rf .terraform* 2>/dev/null &&
+     rm -rf terraform* 2>/dev/null &&
      terraform init &&
      terraform plan &&
      terraform apply -auto-approve"
@@ -175,68 +581,117 @@ function runTerraform() {
     terraform
 }
 
-function runTerraformWithProviderVars() {
-  echo "> Testing provider with tf-included vars"
-  case "$TARGET" in
-    "oss" | "enterprise")
-    unexportConjurVars
-
-    export TF_VAR_conjur_api_key="$api_key"
-    export TF_VAR_conjur_ssl_cert="$ssl_cert"
-    runTerraform "test/provider_vars"
-  ;;
-  *)
-    export TF_VAR_conjur_appliance_url="$CONJUR_APPLIANCE_URL"
-    export TF_VAR_conjur_account="$CONJUR_CLOUD_ACCOUNT"
-    export TF_VAR_conjur_authn_login="host/$HOST_ID"
-    export TF_VAR_conjur_api_key="$CONJUR_API_KEY"
-
-    runTerraform "test/cloudprovider_vars"
-  esac
-  export -n TF_VAR_conjur_api_key
-}
-
-function runTerraformWithEnvVars() {
-  echo "> Planning and applying env_vars/main.tf Terraform manifest"
-case "$TARGET" in
-  "oss" | "enterprise")
-  unexportConjurVars
-
-  export CONJUR_APPLIANCE_URL=https://conjur-server
-  export CONJUR_SSL_CERTIFICATE="$ssl_cert"
-  export CONJUR_ACCOUNT="$CONJUR_ACCOUNT"
-  export CONJUR_AUTHN_LOGIN="admin"
-  export CONJUR_AUTHN_API_KEY="$api_key"
-  runTerraform "test/env_vars"
-;;
-*)
-  export CONJUR_APPLIANCE_URL="$CONJUR_APPLIANCE_URL"
-  export CONJUR_ACCOUNT="$CONJUR_CLOUD_ACCOUNT"
-  export CONJUR_AUTHN_API_KEY="$CONJUR_API_KEY"
-  export CONJUR_AUTHN_LOGIN="host/$HOST_ID"
-  runTerraform "test/cloudenv_vars"
-esac
-}
-
 function validateResults() {
-  case "$TARGET" in
-  "oss" | "enterprise")
-    local expectedValue="SECRETXcLhn23MJcimV"
-  ;;
-  *)
-    local expectedValue="nirupma"
-  esac
-  local actualValue=$(cat $LOCAL_SECRET_FILE)
+  local actual expected="SECRETXcLhn23MJcimV"
+  
+  [[ ! -f "$LOCAL_SECRET_FILE" || ! -s "$LOCAL_SECRET_FILE" ]] && { echo "Error: unable to retrieve the secrets"; return 1; }
 
+  actual=$(< "$LOCAL_SECRET_FILE")
   rm -f "$LOCAL_SECRET_FILE"
 
-  if [[ "$expectedValue" == "$actualValue" ]]; then
-    echo "Secret succesfully retrieved!"
+  if [[ "$actual" == "$expected" ]]; then
+    echo "Secret successfully retrieved!: $expected"
+    return 0
   else
-    echo "Secret not successfully retrieved."
-    echo "Expected '$expectedValue', got '$actualValue'"
-    exit 1
+    echo "Secret mismatch: Expected '$expected', got '$actual'"
+    return 1
   fi
+}
+
+function setTFVars() {
+  case "$TARGET" in
+    "oss"|"enterprise")
+      export TF_VAR_conjur_appliance_url="https://conjur-server"
+      export TF_VAR_conjur_account="$CONJUR_ACCOUNT"
+      export TF_VAR_conjur_authn_login="$CONJUR_AUTHN_LOGIN"
+      export TF_VAR_conjur_api_key="$CONJUR_AUTHN_API_KEY"
+      export TF_VAR_conjur_ssl_cert="$ssl_cert"
+      set_authentication_variables
+      ;;
+    *)
+      export TF_VAR_conjur_appliance_url="$INFRAPOOL_CONJUR_APPLIANCE_URL/api"
+      export TF_VAR_conjur_account="conjur"
+      export TF_VAR_conjur_ssl_cert="$(cat conf/cloud_ca.pem)"
+      set_cloud_authentication_variables
+      ;;
+  esac
+}
+
+function set_authentication_variables {
+  case "$TEST_CASE" in
+    "api-key")
+      export TF_VAR_conjur_authn_type="api"
+      export TF_VAR_conjur_secret_variable="terraform-example/dbpass"
+      export TF_VAR_conjur_api_key="$api_key"
+      ;;
+    "jwt")
+      export TF_VAR_conjur_authn_type="jwt"
+      export TF_VAR_conjur_authn_service_id="github"
+      export TF_VAR_conjur_secret_variable="Dev-Team-credential1"
+      ;;
+    "iam")
+      export TF_VAR_conjur_authn_type="aws"
+      export TF_VAR_conjur_host_id="host/myspace/601277729239/InstanceReadJenkinsExecutorHostFactoryToken"
+      export TF_VAR_conjur_authn_service_id="prod"
+      export TF_VAR_conjur_secret_variable="myspace/database/username"
+      ;;
+    "azure")
+      export TF_VAR_conjur_authn_type="azure"
+      export TF_VAR_conjur_secret_variable="secrets/test-variable"
+      export TF_VAR_conjur_host_id="host/azure-apps/azureVM"
+      export TF_VAR_conjur_authn_service_id="AzureTerraform"
+      export TF_VAR_conjur_client_id="$USER_ASSIGNED_IDENTITY_CLIENT_ID"
+      ;;
+    "gcp")
+      export TF_VAR_conjur_authn_type="gcp"
+      export TF_VAR_conjur_authn_login="host/conjur/authn-gcp/gcp-apps/test-app"
+      export TF_VAR_conjur_secret_variable="secrets/test-variable"
+      ;;
+    *)
+      echo "Unknown authentication type: $TEST_CASE"
+      exit 1
+      ;;
+  esac
+}
+
+function set_cloud_authentication_variables {
+  case "$TEST_CASE" in
+    "api-key")
+      export CONJUR_AUTHN_LOGIN="host/data/terraform/testapp"
+      export TF_VAR_conjur_authn_type="api"
+      export TF_VAR_conjur_secret_variable="data/terraform/target-password"
+      export TF_VAR_conjur_authn_login="host/data/terraform/testapp"
+      rotate_host_api_key "$TF_VAR_conjur_appliance_url"
+      export TF_VAR_conjur_api_key="$api_key"
+      export CONJUR_AUTHN_API_KEY="$api_key"
+      ;;
+    "jwt")
+      export TF_VAR_conjur_authn_type="jwt"
+      export TF_VAR_conjur_authn_service_id="github"
+      export TF_VAR_conjur_secret_variable="data/Dev-Team-credential1"
+      ;;
+    "iam")
+      export TF_VAR_conjur_authn_type="aws"
+      export TF_VAR_conjur_host_id="host/data/myspace/601277729239/InstanceReadJenkinsExecutorHostFactoryToken"
+      export TF_VAR_conjur_authn_service_id="prod"
+      export TF_VAR_conjur_secret_variable="data/myspace/test-variable"
+      ;;
+    "azure")
+      export TF_VAR_conjur_authn_type="azure"
+      export TF_VAR_conjur_secret_variable="data/terraform/target-password"
+      export TF_VAR_conjur_host_id="host/data/azure-apps/azureVM"
+      export TF_VAR_conjur_authn_service_id="AzureTerraform"
+      export TF_VAR_conjur_client_id="$USER_ASSIGNED_IDENTITY_CLIENT_ID"
+      ;;
+    "gcp")
+      export TF_VAR_conjur_authn_type="gcp"
+      export TF_VAR_conjur_authn_login="host/data/gcp-apps/test-app"
+      export TF_VAR_conjur_secret_variable="data/secrets/test-variable"
+      ;;
+    *)
+      echo "Unknown authentication type: $TEST_CASE"
+      ;;
+  esac
 }
 
 main

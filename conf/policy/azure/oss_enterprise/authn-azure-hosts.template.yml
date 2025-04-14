@@ -1,0 +1,26 @@
+# conjur policy load -f authn-azure-host.yaml -b data/myspace
+# host:azure-apps/azureVM
+# conjur/authn-azure/AzureTerraform/provider-uri
+# secrets/test-variable 
+
+- !policy
+  id: azure-apps
+  body:
+    # Create a group to hold this application's hosts
+    - !group
+
+    - &hosts
+      - !host
+        id: azureVM
+        annotations:
+          authn-azure/subscription-id: {{ AZURE_SUBSCRIPTION_ID }}
+          authn-azure/resource-group: {{ AZURE_RESOURCE_GROUP }}
+          authn-azure/user-assigned-identity: {{ USER_ASSIGNED_IDENTITY }}
+
+    # Add the host into the group
+    - !grant
+      role: !group
+      members: *hosts
+- !grant
+  role: !group conjur/authn-azure/AzureTerraform/apps
+  member: !group azure-apps
