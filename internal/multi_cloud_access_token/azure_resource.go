@@ -3,7 +3,7 @@ package multi_cloud_access_token
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 )
@@ -52,8 +52,8 @@ func (a *AzureTokenProvider) Token(client_id string) (string, error) {
 	}
 	
 	// Pull out response body
-	responseBytes, err := ioutil.ReadAll(resp.Body)
-	defer resp.Body.Close()
+	responseBytes, err := io.ReadAll(resp.Body)
+
 	if err != nil {
 		fmt.Println("Error retrieving Azure token: ", err)
 		return "", err

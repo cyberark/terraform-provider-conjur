@@ -205,7 +205,7 @@ Create a IAM authenticator policy and save it as authn-iam.yml
 ```
 Load the policy to root
 ```
-conjur policy load root authn-iam.yml
+conjur policy load -b root -f authn-iam.yml
 ```
 
 Create a policy for hosts and save it as authn-iam-host.yal
@@ -245,7 +245,7 @@ Create a policy for hosts and save it as authn-iam-host.yal
 
 Load the policy into root
 ```
-conjur policy load root authn-iam-host.yml
+conjur policy load -b root -f authn-iam-host.yml
 ```
 #### Sample Policy of IAM for Conjur Cloud
 
@@ -1160,9 +1160,9 @@ $ summon terraform apply
 
 ---
 
-The current Terraform Secret Manager Provider supports API key authentication for retrieving secret. While API key-based authentication is secure, it introduces a secret-zero scenario, increases administrative overhead, and makes key rotations more difficult.
-By enabling AWS IAM role, Azure and GCP authentication for Terraform Secret Manager Provider, the risk can be reduced by using short-lived tokens instead of static API keys, eliminating the need for manual key rotation. Leveraging AWS, Azure's and GCP resources for the generation of  access token, which can be used for more secure authentication with Secret Manager. The existing API key-based authentication functionality will remain operational.
+The Terraform Secret Manager Provider currently supports API key authentication for retrieving secrets. While this method is secure, it creates a secret-zero situation, increases administrative overhead, and complicates key rotations.
 
+By adding support for AWS IAM roles, Azure, and GCP authentication, the risk is reduced by using short-lived tokens instead of static API keys, eliminating the need for manual key rotations. These cloud platforms can generate access tokens for more secure authentication with the Secret Manager. The existing API key-based authentication will still be available and continue to function.
 
 ## Contributing
 
