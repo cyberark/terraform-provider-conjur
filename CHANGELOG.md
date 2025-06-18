@@ -7,7 +7,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 ## [0.7.0] - 2025-06-09
 ### Added
-- Support AWS, Azure, GCP and JWT Token Authentication and telemetry changes
+- Support AWS, Azure, GCP and JWT Token Authentication
+- Telemetry changes
 
 ## [0.6.11] - 2025-04-04
 ### Added
