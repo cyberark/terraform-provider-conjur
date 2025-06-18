@@ -21,8 +21,8 @@ services:
       TF_AZ_HOST_ID: "host/data/azure-app/azureVM"
       TF_CLIENT_ID: ${USER_ASSIGNED_IDENTITY_CLIENT_ID}
       TF_CONJUR_SECRET_VARIABLE: "data/vault/ADO_Secret/ado_secret_apikey/username"
-      TF_SECRET_VALUE: "nirupma"
-      TF_JWT_SECRET_VALUE: "SECRETXcLhn23MJcimV"
+      TF_SECRET_VALUE: ${TF_SECRET_VALUE}
+      TF_JWT_SECRET_VALUE: ${TF_JWT_SECRET_VALUE}
       TF_JWT_CONJUR_SECRET_VARIABLE: "Dev-Team-credential1"
       JWT_TOKEN: ${JWT_TOKEN}
     volumes:

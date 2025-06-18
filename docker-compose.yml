@@ -1,6 +1,6 @@
 services:
   client:
-    image: cyberark/conjur-cli:5
+    image: cyberark/conjur-cli:8
     entrypoint: sleep
     command: infinity
     environment:

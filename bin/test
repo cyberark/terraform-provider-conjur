@@ -498,61 +498,59 @@ function configureConjur() {
   if [[ "$TARGET" == "oss" ]]; then
     api_key=$(conjurExec conjurctl role retrieve-key "$CONJUR_ACCOUNT:user:admin" | tr -d '\r')
     export CONJUR_AUTHN_API_KEY="$api_key"
-  fi
-
-  dockerCompose up -d client
-
-  if [[ "$TARGET" == "enterprise" ]]; then
-    clientExec conjur authn login -u admin -p "$CONJUR_AUTHN_PASSWORD"
-    api_key=$(clientExec conjur user rotate_api_key)
+    dockerCompose up -d client
+    applyConjurPolicies
+  elif [[ "$TARGET" == "enterprise" ]]; then
+    dockerCompose up -d client
+    clientExec conjur login -i admin -p "$CONJUR_AUTHN_PASSWORD"
+    applyConjurPolicies
+    api_key=$(clientExec conjur user rotate-api-key)
     export CONJUR_AUTHN_API_KEY="$api_key"
     echo ">> Enterprise API Key: $api_key"
   fi
-
-  applyConjurPolicies
 }
 
 function applyConjurPolicies() {
   echo ">> Applying policies"
 
   # Api Key policies
-  clientExec conjur policy load --replace root /conf/policy/apikey/oss_enterprise/policy.root.yml
-  clientExec conjur policy load terraform-example /conf/policy/apikey/oss_enterprise/policy.example.yml
+  clientExec conjur policy load -b root -f /conf/policy/apikey/oss_enterprise/policy.root.yml
+  clientExec conjur policy load -b terraform-example -f /conf/policy/apikey/oss_enterprise/policy.example.yml
   clientExec conjur list
-  clientExec conjur variable values add terraform-example/dbpass SECRETXcLhn23MJcimV
+  clientExec conjur variable set -i terraform-example/dbpass -v SECRETXcLhn23MJcimV
   # IAM policies
-  clientExec conjur policy load root /conf/policy/iam/oss_enterprise/authn-iam.yml
-  clientExec conjur policy load root /conf/policy/iam/oss_enterprise/authn-iam-host.yml
-  clientExec conjur variable values add myspace/database/username SECRETXcLhn23MJcimV
+  clientExec conjur policy load -b root -f /conf/policy/iam/oss_enterprise/authn-iam.yml
+  clientExec conjur policy load -b root -f /conf/policy/iam/oss_enterprise/authn-iam-host.yml
+  clientExec conjur variable set -i myspace/database/username -v SECRETXcLhn23MJcimV
 
   if [[ "$TEST_CASE" == "azure" ]]; then
     # Azure Policies 
-    clientExec conjur policy load root /conf/policy/azure/oss_enterprise/authn-azure-AzureWS.yml
-    clientExec  conjur policy load root /conf/policy/azure/oss_enterprise/authn-azure-hosts.yml  
-    clientExec  conjur policy load root /conf/policy/azure/oss_enterprise/authn-azure-secrets.yml
-    clientExec  conjur variable values add conjur/authn-azure/AzureTerraform/provider-uri https://sts.windows.net/df242c82-fe4a-47e0-b0f4-e3cb7f8104f1/
-    clientExec  conjur variable values add secrets/test-variable SECRETXcLhn23MJcimV
+    clientExec conjur policy load -b root -f /conf/policy/azure/oss_enterprise/authn-azure-AzureWS.yml
+    clientExec  conjur policy load -b root -f /conf/policy/azure/oss_enterprise/authn-azure-hosts.yml  
+    clientExec  conjur policy load -b root -f /conf/policy/azure/oss_enterprise/authn-azure-secrets.yml
+    clientExec  conjur variable set -i conjur/authn-azure/AzureTerraform/provider-uri -v https://sts.windows.net/df242c82-fe4a-47e0-b0f4-e3cb7f8104f1/
+    clientExec  conjur variable set -i secrets/test-variable -v SECRETXcLhn23MJcimV
   fi
 
   if [[ "$TEST_CASE" == "gcp" ]]; then
    #GCP policies
-   clientExec conjur policy load root /conf/policy/gcp/oss_enterprise/authn-gcp.yml
-   clientExec conjur policy load conjur/authn-gcp /conf/policy/gcp/oss_enterprise/authn-gcp-hosts.yml
-   clientExec conjur policy load root  /conf/policy/gcp/oss_enterprise/authn-gcp-secrets.yml
-   clientExec conjur variable values add secrets/test-variable SECRETXcLhn23MJcimV
+   clientExec conjur policy load -b root -f /conf/policy/gcp/oss_enterprise/authn-gcp.yml
+   clientExec conjur policy load -b conjur/authn-gcp -f /conf/policy/gcp/oss_enterprise/authn-gcp-hosts.yml
+   clientExec conjur policy load -b root  -f /conf/policy/gcp/oss_enterprise/authn-gcp-secrets.yml
+   clientExec conjur variable set -i secrets/test-variable -v SECRETXcLhn23MJcimV
   fi
 
   if [[ "$TEST_CASE" == "jwt" ]]; then
     # jwt Policies
     jwtConfig 
-    clientExec conjur policy load root /conf/policy/jwt/oss_enterprise/authn-jwt.yml
-    clientExec  conjur policy load root /conf/policy/jwt/oss_enterprise/authn-host.yml  
-    clientExec  conjur policy load root /conf/policy/jwt/oss_enterprise/app-secret.yml
-    clientExec  conjur variable values add conjur/authn-jwt/github/token-app-property username
-    clientExec  conjur variable values add conjur/authn-jwt/github/identity-path github-apps
-    clientExec conjur variable values add conjur/authn-jwt/github/issuer "http://jwt:8090"
-    clientExec conjur variable values add conjur/authn-jwt/github/public-keys "{\"type\":\"jwks\", \"value\":$(cat file.json)}"
-    clientExec  conjur variable values add Dev-Team-credential1 SECRETXcLhn23MJcimV
+    clientExec conjur policy load -b root -f /conf/policy/jwt/oss_enterprise/authn-jwt.yml
+    clientExec  conjur policy load -b root -f /conf/policy/jwt/oss_enterprise/authn-host.yml  
+    clientExec  conjur policy load -b root -f /conf/policy/jwt/oss_enterprise/app-secret.yml
+    clientExec  conjur variable set -i conjur/authn-jwt/github/token-app-property -v username
+    clientExec  conjur variable set -i conjur/authn-jwt/github/identity-path -v github-apps
+    clientExec conjur variable set -i conjur/authn-jwt/github/issuer -v "http://jwt:8090"
+    clientExec conjur variable set -i conjur/authn-jwt/github/public-keys -v "{\"type\":\"jwks\", \"value\":$(cat file.json)}"
+    clientExec  conjur variable set -i Dev-Team-credential1 -v SECRETXcLhn23MJcimV
   fi
 }
 

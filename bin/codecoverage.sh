@@ -21,7 +21,9 @@ mkdir -p "$output_dir"
 ./bin/test -t oss -tc jwt -jwt true
 export JWT_TOKEN=$(cat jwt_token)
 export CONJUR_CERT_CONTENT=$(cat conf/https_config/ca.crt)
-
+export TF_SECRET_VALUE="nirupma"
+export TF_JWT_SECRET_VALUE="SECRETXcLhn23MJcimV"
+ 
 docker compose -f docker-compose.test.yml build
 docker compose -f docker-compose.test.yml run -T\
   -e output_dir="$output_dir" \
