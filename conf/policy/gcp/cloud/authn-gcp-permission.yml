@@ -1,0 +1,7 @@
+- !grant
+  role: !group apps
+  member: !host /data/gcp-apps/test-app
+
+- !grant
+  role: !group apps
+  member: !group /data/secrets/consumers

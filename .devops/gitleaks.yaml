@@ -1,0 +1,9 @@
+config:
+  exclusions:
+    - "bin/codecoverage.sh"
+    - "docker-compose.test.yml"
+    - "internal/multi_cloud_access_token/iam_resource_test.go"
+    - "docs/index.md"
+    - "README.md"
+    - "test/https_config/conjur.key"
+    - "bin/test"

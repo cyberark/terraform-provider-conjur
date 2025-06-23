@@ -1,0 +1,7 @@
+- !grant
+  role: !group clients
+  member: !host /data/myspace/601277729239/InstanceReadJenkinsExecutorHostFactoryToken
+ 
+- !grant
+  role: !group clients
+  member: !group /data/myspace/secrets-users

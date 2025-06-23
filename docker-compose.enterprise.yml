@@ -3,6 +3,8 @@ services:
     image: registry.tld/conjur-appliance:5.0-stable
     security_opt:
       - seccomp:unconfined # --security-opt seccomp=unconfined
+    environment:
+      CONJUR_AUTHENTICATORS: authn,authn-iam/prod,authn-azure/AzureTerraform,authn-gcp,authn-jwt/github
     hostname: conjur
     ports:
       - "443"

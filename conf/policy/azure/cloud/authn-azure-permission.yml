@@ -1,0 +1,9 @@
+# conjur policy load -f authn-azure-permission.yml -b conjur/authn-azure/AzureTerraform
+
+- !grant
+  role: !group apps
+  member: !host /data/azure-apps/azureVM
+
+- !grant
+  role: !group apps
+  member: !group /data/terraform/consumers

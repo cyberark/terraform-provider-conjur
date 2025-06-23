@@ -24,3 +24,4 @@ build_ca_certificate/
 
 demo/conjurrc
 demo/conjur-cucumber.pem
+.DS_Store

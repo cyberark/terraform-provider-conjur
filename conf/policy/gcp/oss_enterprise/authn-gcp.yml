@@ -1,0 +1,14 @@
+- !policy
+  id: conjur/authn-gcp
+  body:
+  - !webservice
+
+  - !group 
+    id: apps
+    annotations:
+      description: Group of hosts that can authenticate using the authn-gcp authenticator
+
+  - !permit
+    role: !group apps
+    privilege: [ read, authenticate ]
+    resource: !webservice

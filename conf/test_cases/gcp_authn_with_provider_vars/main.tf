@@ -1,5 +1,10 @@
-variable "conjur_api_key" {}
 variable "conjur_ssl_cert" {}
+variable "conjur_appliance_url" {}
+variable "conjur_account" {}
+variable "conjur_authn_login" {}
+variable "conjur_authn_type" {}
+variable "conjur_secret_variable" {}
+
 
 terraform {
   required_providers {
@@ -11,16 +16,15 @@ terraform {
 }
 
 provider "conjur" {
-  appliance_url = "https://conjur-server"
-  account       = "myaccount"
-  login         = "admin"
-  api_key       = var.conjur_api_key
+  appliance_url = var.conjur_appliance_url
+  account       = var.conjur_account
+  authn_type    = var.conjur_authn_type
+  login         = conjur_authn_login
   ssl_cert      = var.conjur_ssl_cert
-  # ssl_cert_path = "/etc/conjur.pem"
 }
 
 data "conjur_secret" "dbpass" {
-  name = "terraform-example/dbpass"
+  name = var.conjur_secret_variable
 }
 
 output "dbpass-to-output" {
