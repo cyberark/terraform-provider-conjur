@@ -8,6 +8,7 @@ JWT_SETUP="false"
 SHOW_HELP="false"
 
 export CONJUR_PLUGIN_VERSION="$(cut -d'-' -f1 < VERSION)"
+export CONJUR_PLUGIN_VERSION="${CONJUR_PLUGIN_VERSION:-0.0-dev}"
 export CONJUR_DATA_KEY='iFra75qdvsLENSV+qXYFMkv7KJS3t+82Po4mmjZLxZc='
 export REGISTRY_URL="${INFRAPOOL_REGISTRY_URL:-docker.io}"
 CONJUR_ACCOUNT='myaccount'
@@ -366,10 +367,10 @@ function deploy_conjur_cloud() {
         -X POST -d "data/github-apps" "${CONJUR_APPLIANCE_URL}/secrets/conjur/variable/${encoded_identity_path}"
       encoded_issuer=$(url_encode "conjur/authn-jwt/github/issuer")
       curl -w "%{http_code}" -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
-        -X POST -d "http://jwt:8090" "${CONJUR_APPLIANCE_URL}/secrets/conjur/variable/${encoded_issuer}"
+        -X POST -d "mock-jwt-server" "${CONJUR_APPLIANCE_URL}/secrets/conjur/variable/${encoded_issuer}"
       encoded_pub_key=$(url_encode "conjur/authn-jwt/github/public-keys")
       curl -w "%{http_code}" -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
-        -X POST -d "{\"type\":\"jwks\", \"value\":$(cat file.json)}" "${CONJUR_APPLIANCE_URL}/secrets/conjur/variable/${encoded_pub_key}"
+        -X POST -d "{\"type\":\"jwks\", \"value\":$(cat jwks.json)}" "${CONJUR_APPLIANCE_URL}/secrets/conjur/variable/${encoded_pub_key}"
 
       set_conjur_cloud_variable "data/Dev-Team-credential1" "SECRETXcLhn23MJcimV"
       ;;
@@ -382,77 +383,20 @@ function deploy_conjur_cloud() {
 
 
 function jwtConfig() {
-
-  # JWT configuration
-  KEY_SIZE=2048
-  KEY_ID="your-key-id"
-  EXPIRATION_TIME=$(perl -e 'print time + 30 * 60')
-  USER_ID="12345"
-  USERNAME="example_user"
-
-  # Generate private and public RSA keys
-  openssl genpkey -algorithm RSA -out private_key.pem -pkeyopt rsa_keygen_bits:$KEY_SIZE
-  openssl rsa -pubout -in private_key.pem -out public_key.pem
-
-  # Extract modulus (n) and exponent (e)
-  n_hex=$(openssl rsa -in private_key.pem -noout -text | awk '
-/modulus:/ {flag=1; next}
-/publicExponent:/ {flag=0}
-flag { gsub(/[: \n]/,""); printf $0 }')
-
-  e_dec=$(openssl rsa -in private_key.pem -noout -text | awk '/publicExponent:/ { print $2 }')
-
-  # Convert to base64url
-  n_b64=$(echo "$n_hex" | xxd -r -p | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
-  e_hex=$(printf '%x' "$e_dec")
-  [ $(( ${#e_hex} % 2 )) -ne 0 ] && e_hex="0$e_hex"
-  e_b64=$(echo "$e_hex" | xxd -r -p | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
-
-  # Create JWT payload
-  payload=$(cat <<EOF
-{
-  "user_id": "$USER_ID",
-  "username": "$USERNAME",
-  "iss": "http://jwt:8090",
-  "exp": $EXPIRATION_TIME
-}
-EOF
-)
-
-  # Encode header and payload in base64url
-  header=$(echo -n '{"alg":"RS256","typ":"JWT","kid":"'"$KEY_ID"'"}' | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
-  payload_b64=$(echo -n "$payload" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
-
-  # Sign the JWT
-  signature=$(echo -n "$header.$payload_b64" | openssl dgst -sha256 -sign private_key.pem | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
-
-  # Construct final JWT
-  jwt_token="$header.$payload_b64.$signature"
+  dockerCompose up -d mock-jwt-server
+  export JWT_TOKEN=$(curl -s http://localhost:8080/token | jq -r .token)
+  retries=5
+  while [[ -z "$JWT_TOKEN" && $retries -gt 0 ]]; do
+    echo "Waiting for JWT token to be generated..."
+    sleep 2
+    export JWT_TOKEN=$(curl -s http://localhost:8080/token | jq -r .token)
+    retries=$((retries - 1))
+  done
 
   # Output the token
-  echo "Generated JWT Token: $jwt_token"
-  export JWT_TOKEN="$jwt_token"
-  echo "$jwt_token" > jwt_token
+  echo "Received JWT Token: $JWT_TOKEN"
 
-  # Construct JWKS JSON
-  jwks_json=$(cat <<EOF
-{
-  "keys": [
-    {
-      "kty": "RSA",
-      "kid": "$KEY_ID",
-      "use": "sig",
-      "alg": "RS256",
-      "n": "$n_b64",
-      "e": "$e_b64"
-    }
-  ]
-}
-EOF
-)
-
-  echo $jwks_json > file.json
-
+  echo $(curl -s http://localhost:8080/.well-known/jwks.json) > jwks.json
 }
 
 function loadUtils() {
@@ -549,7 +493,7 @@ function applyConjurPolicies() {
     clientExec  conjur variable set -i conjur/authn-jwt/github/token-app-property -v username
     clientExec  conjur variable set -i conjur/authn-jwt/github/identity-path -v github-apps
     clientExec conjur variable set -i conjur/authn-jwt/github/issuer -v "http://jwt:8090"
-    clientExec conjur variable set -i conjur/authn-jwt/github/public-keys -v "{\"type\":\"jwks\", \"value\":$(cat file.json)}"
+    clientExec conjur variable set -i conjur/authn-jwt/github/public-keys -v "{\"type\":\"jwks\", \"value\":$(cat jwks.json)}"
     clientExec  conjur variable set -i Dev-Team-credential1 -v SECRETXcLhn23MJcimV
   fi
 }

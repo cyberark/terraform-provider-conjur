@@ -48,3 +48,11 @@ services:
     volumes:
       - .:/terraform-provider-conjur
     working_dir: /terraform-provider-conjur
+  
+  mock-jwt-server:
+    image: cyberark/mock-jwt-server:latest
+    ports:
+      - 8080:8080
+    environment:
+      AUDIENCE: "conjur"
+      EXTRA_CLAIMS: "user_id=12345;username=example_user"
