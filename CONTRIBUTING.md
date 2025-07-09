@@ -9,24 +9,31 @@ on your system.
 
 ### Build binaries:
 
-```
+```sh
 ./bin/build
 ```
 
 ### Run integration tests:
 
-#### Conjur 5 OSS
+#### Conjur OSS
 
+```sh
+./bin/test --target oss --test-case <test_case>
 ```
-./bin/test oss
-```
+Where `<test_case>` is one of:
+- api-key
+- jwt
+- iam 
+- azure
+- gcp
 
-#### Conjur 5 Enterprise
+
+#### Conjur Enterprise
 Note that to run the enterprise tests, you'll need to have set up your machine
 to access our [internal registry](https://github.com/conjurinc/docs/blob/master/reference/docker_registry.md#docker-registry-v2), and you must be logged in.
 
-```
-./bin/test enterprise
+```sh
+./bin/test --target enterprise --test-case <test_case>
 ```
 
 ## Contributing

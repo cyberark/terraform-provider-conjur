@@ -15,16 +15,6 @@ builds:
   - linux
   goarch:
   - amd64
-  ldflags: []
-
-# Apple silicon support
-- id: terraform-provider-conjur-arm
-  binary: terraform-provider-conjur_v{{.Env.CONJUR_PLUGIN_VERSION}}
-  env:
-  - CGO_ENABLED=0
-  goos:
-  - darwin  # MacOS
-  goarch:
   - arm64
   ldflags: []
 

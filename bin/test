@@ -8,7 +8,8 @@ JWT_SETUP="false"
 SHOW_HELP="false"
 
 export CONJUR_PLUGIN_VERSION="$(cut -d'-' -f1 < VERSION)"
-export CONJUR_PLUGIN_VERSION="${CONJUR_PLUGIN_VERSION:-0.0-dev}"
+# Set a dummy version for local builds (must satisfy constraint '~> 0')
+export CONJUR_PLUGIN_VERSION="${CONJUR_PLUGIN_VERSION:-0.0.1}"
 export CONJUR_DATA_KEY='iFra75qdvsLENSV+qXYFMkv7KJS3t+82Po4mmjZLxZc='
 export REGISTRY_URL="${INFRAPOOL_REGISTRY_URL:-docker.io}"
 CONJUR_ACCOUNT='myaccount'
@@ -492,7 +493,7 @@ function applyConjurPolicies() {
     clientExec  conjur policy load -b root -f /conf/policy/jwt/oss_enterprise/app-secret.yml
     clientExec  conjur variable set -i conjur/authn-jwt/github/token-app-property -v username
     clientExec  conjur variable set -i conjur/authn-jwt/github/identity-path -v github-apps
-    clientExec conjur variable set -i conjur/authn-jwt/github/issuer -v "http://jwt:8090"
+    clientExec conjur variable set -i conjur/authn-jwt/github/issuer -v "mock-jwt-server"
     clientExec conjur variable set -i conjur/authn-jwt/github/public-keys -v "{\"type\":\"jwks\", \"value\":$(cat jwks.json)}"
     clientExec  conjur variable set -i Dev-Team-credential1 -v SECRETXcLhn23MJcimV
   fi
