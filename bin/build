@@ -1,6 +1,8 @@
 #!/bin/bash -e
 
 export CONJUR_PLUGIN_VERSION="$(cat VERSION | cut -d'-' -f1)"
+# Set a dummy version for local builds (must satisfy constraint '~> 0')
+export CONJUR_PLUGIN_VERSION="${CONJUR_PLUGIN_VERSION:-0.0.1}"
 
 main() {
   retrieve_cyberark_ca_cert

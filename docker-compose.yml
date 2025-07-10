@@ -38,6 +38,7 @@ services:
     volumes:
       - $PWD:/src
       - $PWD/dist/terraform-provider-conjur_linux_amd64_v1/:/usr/share/terraform/plugins/terraform.example.com/cyberark/conjur/${CONJUR_PLUGIN_VERSION}/linux_amd64/
+      - $PWD/dist/terraform-provider-conjur_linux_arm64_v8.0/:/usr/share/terraform/plugins/terraform.example.com/cyberark/conjur/${CONJUR_PLUGIN_VERSION}/linux_arm64/
 
   goreleaser:
     build:
@@ -48,3 +49,11 @@ services:
     volumes:
       - .:/terraform-provider-conjur
     working_dir: /terraform-provider-conjur
+  
+  mock-jwt-server:
+    image: cyberark/mock-jwt-server:latest
+    ports:
+      - 8080:8080
+    environment:
+      AUDIENCE: "conjur"
+      EXTRA_CLAIMS: "user_id=12345;username=example_user"
