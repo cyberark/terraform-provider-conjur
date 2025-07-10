@@ -5,7 +5,11 @@ vendor/
 *.tfstate*
 dist/
 test/dbpass
+
+# Test resources/output
 jwks.json
+jwt_token
+output
 
 # Temporary directory to store the CyberArk proxy CA certificate.
 build_ca_certificate/

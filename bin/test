@@ -99,7 +99,8 @@ esac
 # Function to teardown
 function clean() {
   if [[ "$JWT_SETUP" == "true" ]]; then
-    echo "> Skipping cleanup as JWT_SETUP is true"
+    echo "> Skipping cleanup as JWT_SETUP is true. Stashing token in the file: jwt_token"
+    echo $JWT_TOKEN > jwt_token
     return 0
   fi
 
