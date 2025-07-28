@@ -194,6 +194,7 @@ func (p *conjurProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		resp.Diagnostics.AddError("Unable to load config", err.Error())
 		return
 	}
+	conjurConfig.CredentialStorage = conjurapi.CredentialStorageNone
 
 	account := data.Account.ValueString()
 	if account == "" {
