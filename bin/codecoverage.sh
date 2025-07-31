@@ -3,7 +3,7 @@
 JWT_TOKEN=""
 TOKENGCP="gcp/token"
 export GCP_TOKEN=$(cat $TOKENGCP)
-TESTCASE="${1:-TestAPISecretDataSource|TestJWTSecretDataSource}"
+TESTCASE="${1:-TestAPISecretDataSource|TestJWTSecretDataSource|TestConfigFromEnvVars}"
 
 if [ -z "$TESTCASE" ]; then
     output_dir="output/tests" 

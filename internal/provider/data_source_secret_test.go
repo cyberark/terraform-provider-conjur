@@ -2,8 +2,8 @@ package provider
 
 import (
 	"context"
-	"os"
 	"fmt"
+	"os"
 	"testing"
 
 	fwdatasource "github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -37,7 +37,7 @@ func TestAPISecretDataSource(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: providerApiConfig + testRetrievSecret(),
+				Config: providerApiConfig + testRetrieveSecret(),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr("data.conjur_secret.test", "value", os.Getenv("TF_SECRET_VALUE")),
 				),
@@ -51,7 +51,7 @@ func TestIAMSecretDataSource(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: providerIAMConfig + testRetrievSecret(),
+				Config: providerIAMConfig + testRetrieveSecret(),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr("data.conjur_secret.test", "value", os.Getenv("TF_SECRET_VALUE")),
 				),
@@ -65,7 +65,7 @@ func TestAzureSecretDataSource(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: providerAzureConfig + testRetrievSecret(),
+				Config: providerAzureConfig + testRetrieveSecret(),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr("data.conjur_secret.test", "value", os.Getenv("TF_SECRET_VALUE")),
 				),
@@ -79,7 +79,7 @@ func TestGCPSecretDataSource(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: providerGCPConfig + testRetrievSecret(),
+				Config: providerGCPConfig + testRetrieveSecret(),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr("data.conjur_secret.test", "value", os.Getenv("TF_SECRET_VALUE")),
 				),
@@ -93,7 +93,7 @@ func TestJWTSecretDataSource(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: providerJWTConfig + testJwtRetrievSecret(),
+				Config: providerJWTConfig + testJwtRetrieveSecret(),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr("data.conjur_secret.test", "value", os.Getenv("TF_JWT_SECRET_VALUE")),
 				),
@@ -102,7 +102,21 @@ func TestJWTSecretDataSource(t *testing.T) {
 	})
 }
 
-func testRetrievSecret() string {
+func TestConfigFromEnvVars(t *testing.T) {
+    resource.Test(t, resource.TestCase{
+        ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+        Steps: []resource.TestStep{
+            {
+                Config: `provider "conjur" {}` + testRetrieveSecret(),
+                Check: resource.ComposeTestCheckFunc(
+                    resource.TestCheckResourceAttr("data.conjur_secret.test", "value", os.Getenv("TF_SECRET_VALUE")),
+                ),
+            },
+        },
+    })
+}
+
+func testRetrieveSecret() string {
 	return fmt.Sprintf(`
 	data "conjur_secret" "test" {
 		name               = %[1]q
@@ -110,7 +124,7 @@ func testRetrievSecret() string {
 	`, os.Getenv("TF_CONJUR_SECRET_VARIABLE"))
 }
 
-func testJwtRetrievSecret() string {
+func testJwtRetrieveSecret() string {
 	return fmt.Sprintf(`
 	data "conjur_secret" "test" {
 		name               = %[1]q
