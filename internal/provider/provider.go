@@ -55,11 +55,11 @@ func (p *conjurProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 				Description: "Conjur Authentication Type",
 			},
 			"appliance_url": schema.StringAttribute{
-				Required:    true,
+				Optional:    true,
 				Description: "Conjur endpoint URL",
 			},
 			"account": schema.StringAttribute{
-				Required:    true,
+				Optional:    true,
 				Description: "Conjur account",
 			},
 			"login": schema.StringAttribute{
@@ -140,8 +140,8 @@ func (p *conjurProvider) ValidateConfig(ctx context.Context, req provider.Valida
 	}
 
 	authnJWTAttributes := map[string]types.String{
-		"appliance_url": data.ApplianceUrl,
-		"service_id":    data.ServiceID,
+		"appliance_url":   data.ApplianceUrl,
+		"service_id":      data.ServiceID,
 		"authn_jwt_token": data.AuthnJWT,
 	}
 
@@ -200,14 +200,27 @@ func (p *conjurProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	if account == "" {
 		account = "conjur"
 	}
-	conjurConfig.ApplianceURL = data.ApplianceUrl.ValueString()
-	conjurConfig.Account = account
-	conjurConfig.SSLCert = data.SSLCert.ValueString()
-	conjurConfig.SSLCertPath = data.SSLCertPath.ValueString()
+
+	if data.ApplianceUrl.ValueString() != "" {
+		conjurConfig.ApplianceURL = data.ApplianceUrl.ValueString()
+	}
+
+	if data.Account.ValueString() != "" {
+		conjurConfig.Account = data.Account.ValueString()
+	}
+
+	if data.SSLCert.ValueString() != "" {
+		conjurConfig.SSLCert = data.SSLCert.ValueString()
+	}
+
+	if data.SSLCertPath.ValueString() != "" {
+		conjurConfig.SSLCertPath = data.SSLCertPath.ValueString()
+	}
+
 	conjurConfig.SetIntegrationName("TerraformSecretsManager")
-    conjurConfig.SetIntegrationType("cybr-secretsmanager-go-sdk")
-    conjurConfig.SetIntegrationVersion("0.6.12")
-    conjurConfig.SetVendorName("HashiCorp")
+	conjurConfig.SetIntegrationType("cybr-secretsmanager-go-sdk")
+	conjurConfig.SetIntegrationVersion("0.6.12")
+	conjurConfig.SetVendorName("HashiCorp")
 
 	var client *conjurapi.Client
 	authnType := data.AuthnType.ValueString()
@@ -223,7 +236,7 @@ func (p *conjurProvider) Configure(ctx context.Context, req provider.ConfigureRe
 					Account: account,
 					HostID:  data.Login.ValueString(),
 				}
-		    } else {
+			} else {
 				token = gcpEnvToken
 			}
 		case "aws":
@@ -245,7 +258,7 @@ func (p *conjurProvider) Configure(ctx context.Context, req provider.ConfigureRe
 				)
 				return
 			}
-	    }
+		}
 		conjurConfig.JWTContent = token
 		client, err = conjurapi.NewClientFromJwt(conjurConfig)
 		token = ""
