@@ -46,6 +46,7 @@ services:
       dockerfile: Dockerfile.goreleaser
     environment:
       CONJUR_PLUGIN_VERSION:
+      GOTOOLCHAIN: auto
     volumes:
       - .:/terraform-provider-conjur
     working_dir: /terraform-provider-conjur

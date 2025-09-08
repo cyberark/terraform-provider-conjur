@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 ## [0.7.2] - 2025-08-14
+### Added
+- Support for Conjur V2 Authenticators API via the conjur_autheticator resource
 
 ## [0.7.1] - 2025-07-01
 ### Fixed

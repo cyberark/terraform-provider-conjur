@@ -1,4 +1,5 @@
 FROM hashicorp/terraform:latest
 
 RUN apk add --no-cache coreutils \
-                       file
+                       file \
+                       jq
