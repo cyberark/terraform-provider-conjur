@@ -206,9 +206,9 @@ function main() {
   sleep 5
   rm -rf $LOCAL_SECRET_FILE
 
-  # This currently only runs on API key tests scenarios since we are guaranteed to have the
-  # necessary permissions
-  if [[ "$run_resource_tests" == "true" ]]; then
+  # Resource tests currently only run on API key tests scenario against OSS/Enterprise
+  # where we know the required permissions will be available
+  if [[ "$run_resource_tests" == "true" ]] && [[ "$TARGET" != "cloud" ]]; then
     ./bin/run_resource_tests
   fi
 
