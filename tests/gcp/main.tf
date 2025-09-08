@@ -1,10 +1,8 @@
 variable "conjur_ssl_cert" {}
 variable "conjur_appliance_url" {}
 variable "conjur_account" {}
-variable "conjur_host_id" {}
+variable "conjur_authn_login" {}
 variable "conjur_authn_type" {}
-variable "conjur_authn_service_id" {}
-variable "conjur_client_id" {}
 variable "conjur_secret_variable" {}
 
 
@@ -21,9 +19,7 @@ provider "conjur" {
   appliance_url = var.conjur_appliance_url
   account       = var.conjur_account
   authn_type    = var.conjur_authn_type
-  service_id    = var.conjur_authn_service_id
-  host_id       = var.conjur_host_id
-  client_id     = var.conjur_client_id
+  login         = var.conjur_authn_login
   ssl_cert      = var.conjur_ssl_cert
 }
 
@@ -38,6 +34,6 @@ output "dbpass-to-output" {
 
 resource "local_file" "dbpass-to-file" {
   content         = data.conjur_secret.dbpass.value
-  filename        = "${path.module}/../../dbpass"
+  filename        = "${path.module}/../dbpass"
   file_permission = "0664"
 }

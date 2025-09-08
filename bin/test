@@ -172,34 +172,22 @@ function main() {
 
   [[ "$JWT_SETUP" == "true" ]] && exit 0
 
-  local tests_to_run=()
-
   case "$TEST_CASE" in
     "jwt")
-      tests_to_run+=(
-        "jwt_authn_with_providers_vars"
-      )
+      test_dir="tests/jwt"
       ;;
     "api-key")
-      tests_to_run+=(
-        "apikey_authn_with_env_vars"
-        "apikey_authn_with_providers_vars"
-      )
+      test_dir="tests/api-key"
+      run_resource_tests=true
       ;;
     "iam")
-      tests_to_run+=(
-        "iam_authn_with_providers_vars"
-      )
+      test_dir="tests/iam"
       ;;
     "azure")
-      tests_to_run+=(
-        "azure_authn_with_provider_vars"
-      )
+      test_dir="tests/azure"
       ;;
     "gcp")
-      tests_to_run+=(
-        "gcp_authn_with_provider_vars"
-      )
+      test_dir="tests/gcp"
       ;;
     *)
       echo "Error: Invalid test case '$TEST_CASE'"
@@ -211,39 +199,18 @@ function main() {
   overall_status=0
 
   setTFVars
-  for test in "${tests_to_run[@]}"; do
-    case "$test" in
-      "apikey_authn_with_env_vars")
-        test_dir="tests/api-key"
-        ;;
-      "apikey_authn_with_providers_vars")
-        test_dir="tests/api-key"
-        ;;
-      "iam_authn_with_providers_vars")
-        test_dir="tests/iam"
-        ;;
-      "azure_authn_with_provider_vars")
-        test_dir="tests/azure"
-        ;;
-      "gcp_authn_with_provider_vars")
-        test_dir="tests/gcp"
-        ;;
-      "jwt_authn_with_providers_vars")
-        test_dir="tests/jwt"
-        ;;
-      *)
-        echo "Unknown test case: $test"
-        continue
-        ;;
-    esac
+  echo "Running test from directory: $test_dir"
+  test -f "$test_dir/env" && source "$test_dir/env"
+  runTerraformTest "$test_dir" || overall_status=1
+  validateResults || overall_status=1
+  sleep 5
+  rm -rf $LOCAL_SECRET_FILE
 
-    echo "Running test from directory: $test_dir/$test"
-    test -f "$test_dir/$test/env" && source "$test_dir/$test/env"
-    runTerraform "$test_dir/$test" || overall_status=1
-    validateResults || overall_status=1
-    sleep 5
-    rm -rf $LOCAL_SECRET_FILE
-  done
+  # This currently only runs on API key tests scenarios since we are guaranteed to have the
+  # necessary permissions
+  if [[ "$run_resource_tests" == "true" ]]; then
+    ./bin/run_resource_tests
+  fi
 
   echo "###################################################################"
   if [[ "$overall_status" -eq 0 ]]; then
@@ -464,6 +431,11 @@ function applyConjurPolicies() {
   clientExec conjur policy load -b terraform-example -f /conf/policy/apikey/oss_enterprise/policy.example.yml
   clientExec conjur list
   clientExec conjur variable set -i terraform-example/dbpass -v SECRETXcLhn23MJcimV
+
+  if [[ "$TARGET" == "oss" ]] || [[ "$TARGET" == "enterprise" ]]; then
+    clientExec conjur policy load -b root -f /conf/policy/common/oss_enterprise/authenticator_branches.yml
+  fi
+
   # IAM policies
   clientExec conjur policy load -b root -f /conf/policy/iam/oss_enterprise/authn-iam.yml
   clientExec conjur policy load -b root -f /conf/policy/iam/oss_enterprise/authn-iam-host.yml
@@ -472,10 +444,10 @@ function applyConjurPolicies() {
   if [[ "$TEST_CASE" == "azure" ]]; then
     # Azure Policies 
     clientExec conjur policy load -b root -f /conf/policy/azure/oss_enterprise/authn-azure-AzureWS.yml
-    clientExec  conjur policy load -b root -f /conf/policy/azure/oss_enterprise/authn-azure-hosts.yml  
-    clientExec  conjur policy load -b root -f /conf/policy/azure/oss_enterprise/authn-azure-secrets.yml
-    clientExec  conjur variable set -i conjur/authn-azure/AzureTerraform/provider-uri -v https://sts.windows.net/df242c82-fe4a-47e0-b0f4-e3cb7f8104f1/
-    clientExec  conjur variable set -i secrets/test-variable -v SECRETXcLhn23MJcimV
+    clientExec conjur policy load -b root -f /conf/policy/azure/oss_enterprise/authn-azure-hosts.yml  
+    clientExec conjur policy load -b root -f /conf/policy/azure/oss_enterprise/authn-azure-secrets.yml
+    clientExec conjur variable set -i conjur/authn-azure/AzureTerraform/provider-uri -v https://sts.windows.net/df242c82-fe4a-47e0-b0f4-e3cb7f8104f1/
+    clientExec conjur variable set -i secrets/test-variable -v SECRETXcLhn23MJcimV
   fi
 
   if [[ "$TEST_CASE" == "gcp" ]]; then
@@ -490,17 +462,17 @@ function applyConjurPolicies() {
     # jwt Policies
     jwtConfig 
     clientExec conjur policy load -b root -f /conf/policy/jwt/oss_enterprise/authn-jwt.yml
-    clientExec  conjur policy load -b root -f /conf/policy/jwt/oss_enterprise/authn-host.yml  
-    clientExec  conjur policy load -b root -f /conf/policy/jwt/oss_enterprise/app-secret.yml
-    clientExec  conjur variable set -i conjur/authn-jwt/github/token-app-property -v username
-    clientExec  conjur variable set -i conjur/authn-jwt/github/identity-path -v github-apps
+    clientExec conjur policy load -b root -f /conf/policy/jwt/oss_enterprise/authn-host.yml  
+    clientExec conjur policy load -b root -f /conf/policy/jwt/oss_enterprise/app-secret.yml
+    clientExec conjur variable set -i conjur/authn-jwt/github/token-app-property -v username
+    clientExec conjur variable set -i conjur/authn-jwt/github/identity-path -v github-apps
     clientExec conjur variable set -i conjur/authn-jwt/github/issuer -v "mock-jwt-server"
     clientExec conjur variable set -i conjur/authn-jwt/github/public-keys -v "{\"type\":\"jwks\", \"value\":$(cat jwks.json)}"
-    clientExec  conjur variable set -i Dev-Team-credential1 -v SECRETXcLhn23MJcimV
+    clientExec conjur variable set -i Dev-Team-credential1 -v SECRETXcLhn23MJcimV
   fi
 }
 
-function runTerraform() {
+function runTerraformTest() {
   target_dir=$1
 
   echo ">> Planning and applying '$target_dir/main.tf' Terraform manifest"

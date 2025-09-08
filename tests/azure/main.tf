@@ -1,8 +1,10 @@
 variable "conjur_ssl_cert" {}
 variable "conjur_appliance_url" {}
 variable "conjur_account" {}
-variable "conjur_authn_login" {}
+variable "conjur_host_id" {}
 variable "conjur_authn_type" {}
+variable "conjur_authn_service_id" {}
+variable "conjur_client_id" {}
 variable "conjur_secret_variable" {}
 
 
@@ -19,7 +21,9 @@ provider "conjur" {
   appliance_url = var.conjur_appliance_url
   account       = var.conjur_account
   authn_type    = var.conjur_authn_type
-  login         = conjur_authn_login
+  service_id    = var.conjur_authn_service_id
+  host_id       = var.conjur_host_id
+  client_id     = var.conjur_client_id
   ssl_cert      = var.conjur_ssl_cert
 }
 
