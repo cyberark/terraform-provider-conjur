@@ -16,9 +16,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.terraform
-
     entrypoint: sleep infinity
     environment:
+      CONJURAPI_LOG: stderr
       CONJUR_AUTHN_LOGIN:
       CONJUR_AUTHN_API_KEY:
       TF_LOG: "${TF_LOG:-INFO}"
@@ -46,6 +46,7 @@ services:
       dockerfile: Dockerfile.goreleaser
     environment:
       CONJUR_PLUGIN_VERSION:
+      GOTOOLCHAIN: auto
     volumes:
       - .:/terraform-provider-conjur
     working_dir: /terraform-provider-conjur

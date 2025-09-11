@@ -1,6 +1,11 @@
 #!/usr/bin/env groovy
 
-@Library("product-pipelines-shared-library") _
+// 'product-pipelines-shared-library' draws from DevOps/product-pipelines-shared-library repository.
+// 'conjur-enterprise-sharedlib' draws from Conjur-Enterprise/jenkins-pipeline-library repository.
+// Point to a branch of a shared library by appending @my-branch-name to the library name
+// TODO: Revert to main sharedlib branch once Go dependency replacement is merged or conjur-api-go
+// has been released with V2 API support
+@Library(['product-pipelines-shared-library', 'conjur-enterprise-sharedlib@main-go-deps-replace']) _
 
   // Automated release, promotion and dependencies
 properties([
@@ -82,9 +87,11 @@ pipeline {
       steps {
         script {
           updatePrivateGoDependencies("${WORKSPACE}/go.mod")
-          // Copy the vendor directory onto infrapool
+          // Copy the vendor directory onto infrapool (every agent that runs the build script)
           INFRAPOOL_EXECUTORV2_AGENT_0.agentPut from: "vendor", to: "${WORKSPACE}"
           INFRAPOOL_EXECUTORV2_AGENT_0.agentPut from: "go.*", to: "${WORKSPACE}"
+          INFRAPOOL_AZURE_EXECUTORV2_AGENT_0.agentPut from: "vendor", to: "${WORKSPACE}"
+          INFRAPOOL_AZURE_EXECUTORV2_AGENT_0.agentPut from: "go.*", to: "${WORKSPACE}"
         }
       }
     }
@@ -95,6 +102,27 @@ pipeline {
           INFRAPOOL_EXECUTORV2_AGENT_0.agentSh './bin/build'
           INFRAPOOL_AZURE_EXECUTORV2_AGENT_0.agentSh './bin/build'
         }
+      }
+    }
+
+    stage('Generate GCP token') {
+      steps {
+        script {
+          INFRAPOOL_GCP_EXECUTORV2_AGENT_0.agentSh './bin/get_gcp_token.sh host/conjur/authn-gcp/gcp-apps/test-app myaccount'
+          INFRAPOOL_GCP_EXECUTORV2_AGENT_0.agentStash name: 'token-out', includes: 'gcp/*'
+        }
+      }
+    }
+
+    stage('Run Code Coverage'){
+      steps {
+        script {
+          INFRAPOOL_EXECUTORV2_AGENT_0.agentUnstash name: 'token-out'
+          INFRAPOOL_EXECUTORV2_AGENT_0.agentSh 'summon ./bin/codecoverage.sh'
+          INFRAPOOL_EXECUTORV2_AGENT_0.agentStash name: 'xml-out1', includes: 'output/tests/*'
+          INFRAPOOL_AZURE_EXECUTORV2_AGENT_0.agentSh 'summon ./bin/codecoverage.sh TestAzureSecretDataSource'
+          INFRAPOOL_AZURE_EXECUTORV2_AGENT_0.agentStash name: 'xml-out2', includes: 'output/azure/*'
+        } 
       }
     }
     
@@ -142,14 +170,6 @@ pipeline {
       }
     }
     
-    stage('Generate GCP token') {
-      steps {
-        script {
-          INFRAPOOL_GCP_EXECUTORV2_AGENT_0.agentSh './bin/get_gcp_token.sh host/conjur/authn-gcp/gcp-apps/test-app myaccount'
-          INFRAPOOL_GCP_EXECUTORV2_AGENT_0.agentStash name: 'token-out', includes: 'gcp/*'
-        }
-      }
-    }
     stage('Run integration tests (OSS) for GCP') {
       environment {
         INFRAPOOL_REGISTRY_URL = "registry.tld"
@@ -318,18 +338,6 @@ pipeline {
             }
           }
         }
-      }
-    }
-    
-    stage('Run Code Coverage'){
-      steps {
-        script {
-          INFRAPOOL_EXECUTORV2_AGENT_0.agentUnstash name: 'token-out'
-          INFRAPOOL_EXECUTORV2_AGENT_0.agentSh 'summon ./bin/codecoverage.sh'
-          INFRAPOOL_EXECUTORV2_AGENT_0.agentStash name: 'xml-out1', includes: 'output/tests/*'
-          INFRAPOOL_AZURE_EXECUTORV2_AGENT_0.agentSh 'summon ./bin/codecoverage.sh TestAzureSecretDataSource'
-          INFRAPOOL_AZURE_EXECUTORV2_AGENT_0.agentStash name: 'xml-out2', includes: 'output/azure/*'
-        } 
       }
     }
 

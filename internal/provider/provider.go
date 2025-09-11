@@ -181,117 +181,18 @@ func validateAttributes(attributes map[string]types.String, label string, resp *
 
 func (p *conjurProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
 	var data conjurProviderModel
-	var err error
-	var token string
-	gcpEnvToken := os.Getenv("GCP_TOKEN")
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	conjurConfig, err := conjurapi.LoadConfig()
+	config, err := p.buildConjurConfig(&data)
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to load config", err.Error())
 		return
 	}
-	conjurConfig.CredentialStorage = conjurapi.CredentialStorageNone
 
-	account := data.Account.ValueString()
-	if account == "" {
-		account = "conjur"
-	}
-
-	if data.ApplianceUrl.ValueString() != "" {
-		conjurConfig.ApplianceURL = data.ApplianceUrl.ValueString()
-	}
-
-	if data.Account.ValueString() != "" {
-		conjurConfig.Account = data.Account.ValueString()
-	}
-
-	if data.SSLCert.ValueString() != "" {
-		conjurConfig.SSLCert = data.SSLCert.ValueString()
-	}
-
-	if data.SSLCertPath.ValueString() != "" {
-		conjurConfig.SSLCertPath = data.SSLCertPath.ValueString()
-	}
-
-	conjurConfig.SetIntegrationName("TerraformSecretsManager")
-	conjurConfig.SetIntegrationType("cybr-secretsmanager-go-sdk")
-	conjurConfig.SetIntegrationVersion("0.6.12")
-	conjurConfig.SetVendorName("HashiCorp")
-
-	var client *conjurapi.Client
-	authnType := data.AuthnType.ValueString()
-	switch authnType {
-	case "aws", "azure", "gcp":
-		var tkprovider multi_cloud_access_token.TokenProvider
-		switch authnType {
-		case "azure":
-			tkprovider = &multi_cloud_access_token.AzureTokenProvider{}
-		case "gcp":
-			if gcpEnvToken == "" {
-				tkprovider = &multi_cloud_access_token.GCPTokenProvider{
-					Account: account,
-					HostID:  data.Login.ValueString(),
-				}
-			} else {
-				token = gcpEnvToken
-			}
-		case "aws":
-			tkprovider = &multi_cloud_access_token.IAMTokenProvider{}
-		}
-		if authnType == "aws" {
-			conjurConfig.AuthnType = "iam"
-		} else {
-			conjurConfig.AuthnType = data.AuthnType.ValueString()
-		}
-		conjurConfig.ServiceID = data.ServiceID.ValueString()
-		conjurConfig.JWTHostID = data.HostID.ValueString()
-		if gcpEnvToken == "" {
-			token, err = tkprovider.Token(data.ClientID.ValueString())
-			if err != nil {
-				resp.Diagnostics.AddError(
-					fmt.Sprintf("Error getting token from %s provider", authnType),
-					fmt.Sprintf("Error getting token: %s", err.Error()),
-				)
-				return
-			}
-		}
-		conjurConfig.JWTContent = token
-		client, err = conjurapi.NewClientFromJwt(conjurConfig)
-		token = ""
-		if err != nil {
-			resp.Diagnostics.AddError(
-				fmt.Sprintf("Failed to initialize Conjur client for %s authn-type", authnType),
-				fmt.Sprintf("Failed to initialize Conjur client: %s", err.Error()),
-			)
-			return
-		}
-	case "jwt":
-		conjurConfig.ServiceID = data.ServiceID.ValueString()
-		conjurConfig.JWTHostID = data.HostID.ValueString()
-		conjurConfig.AuthnType = data.AuthnType.ValueString()
-		conjurConfig.JWTContent = data.AuthnJWT.ValueString()
-		client, err = conjurapi.NewClientFromJwt(conjurConfig)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				fmt.Sprintf("Failed to initialize Conjur client for %s authn-type", authnType),
-				fmt.Sprintf("Failed to initialize Conjur client: %s", err.Error()),
-			)
-			return
-		}
-	case "", "api":
-		if data.Login.ValueString() != "" && data.APIKey.ValueString() != "" {
-			client, err = conjurapi.NewClientFromKey(conjurConfig, authn.LoginPair{
-				Login:  data.Login.ValueString(),
-				APIKey: data.APIKey.ValueString(),
-			})
-		} else {
-			client, err = conjurapi.NewClientFromEnvironment(conjurConfig)
-		}
-	}
+	client, err := p.createConjurClient(config, &data)
 	if err != nil {
 		resp.Diagnostics.AddError("Client initialization failed", err.Error())
 		return
@@ -299,6 +200,147 @@ func (p *conjurProvider) Configure(ctx context.Context, req provider.ConfigureRe
 
 	resp.DataSourceData = client
 	resp.ResourceData = client
+}
+
+func (p *conjurProvider) buildConjurConfig(data *conjurProviderModel) (*conjurapi.Config, error) {
+	config, err := conjurapi.LoadConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	config.SetIntegrationName("TerraformSecretsManager")
+	config.SetIntegrationType("cybr-secretsmanager-go-sdk")
+	config.SetIntegrationVersion("0.6.12")
+	config.SetVendorName("HashiCorp")
+
+	// Apply configuration overrides if specified in the Terraform provider block
+	p.applyConfigOverrides(&config, data)
+
+	return &config, nil
+}
+
+func (p *conjurProvider) applyConfigOverrides(config *conjurapi.Config, data *conjurProviderModel) {
+	if url := data.ApplianceUrl.ValueString(); url != "" {
+		config.ApplianceURL = url
+	}
+
+	if account := data.Account.ValueString(); account != "" {
+		config.Account = account
+	}
+
+	if cert := data.SSLCert.ValueString(); cert != "" {
+		config.SSLCert = cert
+	}
+
+	if certPath := data.SSLCertPath.ValueString(); certPath != "" {
+		config.SSLCertPath = certPath
+	}
+}
+
+func (p *conjurProvider) createConjurClient(config *conjurapi.Config, data *conjurProviderModel) (*conjurapi.Client, error) {
+	authnType := data.AuthnType.ValueString()
+
+	switch authnType {
+	case "azure", "gcp":
+		return p.createCloudAuthClient(config, data, authnType)
+	case "aws", "iam":
+		return p.createIAMClient(config, data)
+	case "jwt":
+		return p.createJWTClient(config, data)
+	case "", "api":
+		return p.createAPIKeyClient(config, data)
+	default:
+		return nil, fmt.Errorf("unsupported authentication type: %s", authnType)
+	}
+}
+
+func (p *conjurProvider) createCloudAuthClient(config *conjurapi.Config, data *conjurProviderModel, authnType string) (*conjurapi.Client, error) {
+	token, err := p.getCloudAuthToken(data, authnType)
+	if err != nil {
+		return nil, fmt.Errorf("error getting token from %s provider: %w", authnType, err)
+	}
+
+	config.AuthnType = authnType
+	config.ServiceID = data.ServiceID.ValueString()
+	config.JWTHostID = data.HostID.ValueString()
+	config.JWTContent = token
+
+	client, err := conjurapi.NewClientFromJwt(*config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize Conjur client for %s authn-type: %w", authnType, err)
+	}
+
+	return client, nil
+}
+
+func (p *conjurProvider) getCloudAuthToken(data *conjurProviderModel, authnType string) (string, error) {
+	// Check for GCP environment token first
+	if authnType == "gcp" {
+		if gcpToken := os.Getenv("GCP_TOKEN"); gcpToken != "" {
+			return gcpToken, nil
+		}
+	}
+
+	provider, err := p.createTokenProvider(data, authnType)
+	if err != nil {
+		return "", err
+	}
+
+	return provider.Token(data.ClientID.ValueString())
+}
+
+func (p *conjurProvider) createTokenProvider(data *conjurProviderModel, authnType string) (multi_cloud_access_token.TokenProvider, error) {
+	account := data.Account.ValueString()
+	if account == "" {
+		account = "conjur"
+	}
+
+	switch authnType {
+	case "azure":
+		return &multi_cloud_access_token.AzureTokenProvider{}, nil
+	case "gcp":
+		return &multi_cloud_access_token.GCPTokenProvider{
+			Account: account,
+			HostID:  data.Login.ValueString(),
+		}, nil
+	default:
+		return nil, fmt.Errorf("unsupported cloud authentication type: %s", authnType)
+	}
+}
+
+func (p *conjurProvider) createJWTClient(config *conjurapi.Config, data *conjurProviderModel) (*conjurapi.Client, error) {
+	config.ServiceID = data.ServiceID.ValueString()
+	config.JWTHostID = data.HostID.ValueString()
+	config.AuthnType = data.AuthnType.ValueString()
+	config.JWTContent = data.AuthnJWT.ValueString()
+
+	client, err := conjurapi.NewClientFromJwt(*config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize Conjur client for authn-type: %w", err)
+	}
+
+	return client, nil
+}
+
+func (p *conjurProvider) createIAMClient(config *conjurapi.Config, data *conjurProviderModel) (*conjurapi.Client, error) {
+	config.ServiceID = data.ServiceID.ValueString()
+	config.AuthnType = "iam"
+	config.JWTHostID = data.HostID.ValueString()
+	return conjurapi.NewClientFromAWSCredentials(*config)
+}
+
+func (p *conjurProvider) createAPIKeyClient(config *conjurapi.Config, data *conjurProviderModel) (*conjurapi.Client, error) {
+	login := data.Login.ValueString()
+	apiKey := data.APIKey.ValueString()
+
+	if login != "" && apiKey != "" {
+		return conjurapi.NewClientFromKey(*config, authn.LoginPair{
+			Login:  login,
+			APIKey: apiKey,
+		})
+	}
+
+	return conjurapi.NewClientFromEnvironment(*config)
 }
 
 func (p *conjurProvider) DataSources(_ context.Context) []func() datasource.DataSource {
@@ -309,7 +351,9 @@ func (p *conjurProvider) DataSources(_ context.Context) []func() datasource.Data
 
 // Resources define the resources implemented in the provider.
 func (p *conjurProvider) Resources(_ context.Context) []func() resource.Resource {
-	return nil
+	return []func() resource.Resource{
+		NewConjurAuthenticatorResource,
+	}
 }
 
 // New creates a new provider instance.

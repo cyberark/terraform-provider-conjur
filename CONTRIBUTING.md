@@ -4,7 +4,7 @@ For general contribution and community guidelines, please see the [community rep
 
 ### Prerequisites
 
-To work on this code, you must have at least Go version 1.12 installed locally
+To work on this code, you must have at least Go version 1.24 installed locally
 on your system.
 
 ### Build binaries:
