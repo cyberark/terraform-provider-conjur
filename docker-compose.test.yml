@@ -4,6 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile.testfile
     environment:
+      CONJURAPI_LOG: stderr
       CONJUR_APPLIANCE_URL: ${CONJUR_APPLIANCE_URL}
       CONJUR_ACCOUNT: ${CONJUR_CLOUD_ACCOUNT}
       CONJUR_AUTHN_LOGIN: "host/${HOST_ID}"

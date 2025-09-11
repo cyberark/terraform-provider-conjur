@@ -352,7 +352,7 @@ function deploy_conjur_cloud() {
 
 
 function jwtConfig() {
-  dockerCompose up -d mock-jwt-server
+  dockerCompose up -d mock-jwt-server || true # keep going if an instance is already running on port 8080
   export JWT_TOKEN=$(curl -s http://localhost:8080/token | jq -r .token)
   retries=5
   while [[ -z "$JWT_TOKEN" && $retries -gt 0 ]]; do
@@ -362,10 +362,13 @@ function jwtConfig() {
     retries=$((retries - 1))
   done
 
-  # Output the token
+  # Output the token and stash it in a file
   echo "Received JWT Token: $JWT_TOKEN"
-
+  echo $JWT_TOKEN > jwt_token
+  
   echo $(curl -s http://localhost:8080/.well-known/jwks.json) > jwks.json
+
+  dockerCompose down mock-jwt-server
 }
 
 function loadUtils() {

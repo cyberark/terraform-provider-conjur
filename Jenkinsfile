@@ -104,6 +104,27 @@ pipeline {
         }
       }
     }
+
+    stage('Generate GCP token') {
+      steps {
+        script {
+          INFRAPOOL_GCP_EXECUTORV2_AGENT_0.agentSh './bin/get_gcp_token.sh host/conjur/authn-gcp/gcp-apps/test-app myaccount'
+          INFRAPOOL_GCP_EXECUTORV2_AGENT_0.agentStash name: 'token-out', includes: 'gcp/*'
+        }
+      }
+    }
+
+    stage('Run Code Coverage'){
+      steps {
+        script {
+          INFRAPOOL_EXECUTORV2_AGENT_0.agentUnstash name: 'token-out'
+          INFRAPOOL_EXECUTORV2_AGENT_0.agentSh 'summon ./bin/codecoverage.sh'
+          INFRAPOOL_EXECUTORV2_AGENT_0.agentStash name: 'xml-out1', includes: 'output/tests/*'
+          INFRAPOOL_AZURE_EXECUTORV2_AGENT_0.agentSh 'summon ./bin/codecoverage.sh TestAzureSecretDataSource'
+          INFRAPOOL_AZURE_EXECUTORV2_AGENT_0.agentStash name: 'xml-out2', includes: 'output/azure/*'
+        } 
+      }
+    }
     
     stage('Run integration tests (OSS) for Api Key') {
       environment {
@@ -149,14 +170,6 @@ pipeline {
       }
     }
     
-    stage('Generate GCP token') {
-      steps {
-        script {
-          INFRAPOOL_GCP_EXECUTORV2_AGENT_0.agentSh './bin/get_gcp_token.sh host/conjur/authn-gcp/gcp-apps/test-app myaccount'
-          INFRAPOOL_GCP_EXECUTORV2_AGENT_0.agentStash name: 'token-out', includes: 'gcp/*'
-        }
-      }
-    }
     stage('Run integration tests (OSS) for GCP') {
       environment {
         INFRAPOOL_REGISTRY_URL = "registry.tld"
@@ -325,18 +338,6 @@ pipeline {
             }
           }
         }
-      }
-    }
-    
-    stage('Run Code Coverage'){
-      steps {
-        script {
-          INFRAPOOL_EXECUTORV2_AGENT_0.agentUnstash name: 'token-out'
-          INFRAPOOL_EXECUTORV2_AGENT_0.agentSh 'summon ./bin/codecoverage.sh'
-          INFRAPOOL_EXECUTORV2_AGENT_0.agentStash name: 'xml-out1', includes: 'output/tests/*'
-          INFRAPOOL_AZURE_EXECUTORV2_AGENT_0.agentSh 'summon ./bin/codecoverage.sh TestAzureSecretDataSource'
-          INFRAPOOL_AZURE_EXECUTORV2_AGENT_0.agentStash name: 'xml-out2', includes: 'output/azure/*'
-        } 
       }
     }
 
