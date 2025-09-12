@@ -3,22 +3,46 @@ declare DOCKER_COMPOSE_ARGS
 
 # shellcheck disable=SC2086
 # DOCKER_COMPOSE_ARGS needs to stay unquoted to work 
-function dockerCompose() {
+function docker_compose() {
   docker compose $DOCKER_COMPOSE_ARGS "$@"
 }
 
-function conjurExec() {
+function conjur_exec() {
   if [[ "$TARGET" == "oss" ]]; then
-    dockerCompose exec -T conjur "$@"
+    docker_compose exec -T conjur "$@"
   else
-    dockerCompose exec -T conjur-server "$@"
+    docker_compose exec -T conjur-server "$@"
   fi
 }
 
-function clientExec() {
-  dockerCompose exec -T client "$@"
+function client_exec() {
+  docker_compose exec -T client "$@"
 }
 
-function terraformRun() {
-  dockerCompose exec -T terraform sh -ec "$@"
+function terraform_exec() {
+  docker_compose exec -T terraform sh -ec "$@"
+}
+
+function url_encode() {
+  printf '%s' "$1" | jq -sRr @uri
+}
+
+function check_target() {
+  case "$TARGET" in
+    "oss")
+      export DOCKER_COMPOSE_ARGS="-f docker-compose.oss.yml -f docker-compose.yml"
+      export CONJUR_WAIT_COMMAND="/opt/conjur-server/bin/conjurctl wait"
+      ;;
+    "enterprise")
+      export DOCKER_COMPOSE_ARGS="-f docker-compose.enterprise.yml -f docker-compose.yml"
+      export CONJUR_WAIT_COMMAND="/opt/conjur/evoke/bin/wait_for_conjur"
+      ;;
+    "cloud")
+
+      ;;
+    *)
+      echo "> Error: '$TARGET' is not a supported target"
+      exit 1
+      ;;
+  esac
 }

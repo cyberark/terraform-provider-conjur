@@ -1,6 +1,6 @@
 #conjur policy load -f authn-host.yml -b data
 - !policy
-  id: github-apps
+  id: my-service-apps
   body:
       - !group
 
@@ -8,7 +8,7 @@
         - !host
           id: example_user
           annotations:
-              authn-jwt/github/user_id: 12345
+              authn-jwt/my-service/user_id: 12345
   
       - !grant
         role: !group

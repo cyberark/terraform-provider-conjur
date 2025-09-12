@@ -1,5 +1,0 @@
-# Create empty policy branches for each authenticator type (used to mirror Conjur Cloud in OSS/Enterprise)
-- !policy conjur/authn-jwt
-- !policy conjur/authn-gcp
-- !policy conjur/authn-iam
-- !policy conjur/authn-azure

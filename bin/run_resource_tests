@@ -1,39 +1,33 @@
+#!/bin/bash
+set -eo pipefail
 
+source "$(git rev-parse --show-toplevel)/bin/utils.sh"
+
+# Note - this script must be executed from the main script (bin/test) so the environment is pre-configured
 function main() {
-  echo ">> build image"
-  dockerCompose build
-
-  dockerCompose up -d terraform
+  generate_random_values
+  docker_compose up -d terraform
 
   echo ">> Testing provider with tf-included vars"
 
   declare -a test_results=()
 
   # Run CRUD tests for each resource and collect results
-
   echo ">> Running Authenticator CRUD test"
   test_resource_crud "tests/resources/authenticator" "authenticator" "name"
   test_results+=("Authenticator|$?")
 
   # Stop the container
-  dockerCompose down
+  docker_compose down
 
   # Report results and set exit code
   report_test_results "${test_results[@]}"
   exit $?
 }
 
-function dockerCompose() {
-  docker compose $DOCKER_COMPOSE_ARGS "$@"
-}
-
-function terraformExecute() {
-  dockerCompose exec -T terraform sh -ec "$@"
-}
-
 function test_resource_crud() {
-  local test_dir="$1"
-  local resource_name="$2"
+  local test_dir="$1" # Directory containing create/ and update/ subdirectories
+  local resource_name="$2" # Resource name (e.g., "authenticator")
   local id_output_name="$3" # Output variable name for the resource ID
 
   echo "Testing ${resource_name} CRUD operations"
@@ -43,7 +37,7 @@ function test_resource_crud() {
 
   # Step 1: Create Resources
   echo "Step 1: Creating ${resource_name}"
-  if ! terraformExecute "cd $test_dir/create && \
+  if ! terraform_exec "cd $test_dir/create && \
     terraform init && \
     terraform validate && \
     terraform plan && \
@@ -53,52 +47,34 @@ function test_resource_crud() {
   fi
 
   # Get the resource ID for validation (all fields)
-  local resource_id_all_fields=$(terraformExecute "cd $test_dir/create && jq -r '.outputs.${resource_name}_${id_output_name}_all_fields.value' terraform.tfstate")
-  if [[ -z "$resource_id_all_fields" || "$resource_id_all_fields" == "null" ]]; then
+  local resource_id=$(terraform_exec "cd $test_dir/create && jq -r '.outputs.${resource_name}_${id_output_name}.value' terraform.tfstate")
+  if [[ -z "$resource_id" || "$resource_id" == "null" ]]; then
     echo "FAILED: Could not get $id_output_name from terraform output"
     return 1
   fi
-  echo "Created ${resource_name} with ID: $resource_id_all_fields"
+  echo "Created ${resource_name} with ID: $resource_id"
 
-  # Get the resource ID for validation (required_only)
-  local resource_id_required_only=$(terraformExecute "cd $test_dir/create && jq -r '.outputs.${resource_name}_${id_output_name}_required_only.value' terraform.tfstate")
-  if [[ -z "$resource_id_required_only" || "$resource_id_required_only" == "null" ]]; then
-    echo "FAILED: Could not get $id_output_name from terraform output"
-    return 1
-  fi
-  echo "Created ${resource_name} with ID: $resource_id_required_only"
 
   # Step 2: Import the Resource
   echo "Step 2: Importing ${resource_name}"
-  if ! terraformExecute "cd $test_dir/update && \
+  if ! terraform_exec "cd $test_dir/update && \
     terraform init && \
-    terraform import conjur_${resource_name}.imported_all_fields jwt:${resource_id_all_fields}"; then
+    terraform import conjur_${resource_name}.imported jwt:${resource_id}"; then
     echo "FAILED: ${resource_name} import command failed"
     return 1
   fi
 
-  echo "Step 2: Importing ${resource_name}"
-  if ! terraformExecute "cd $test_dir/update && \
-    terraform init && \
-    terraform import conjur_${resource_name}.imported_required_only jwt:${resource_id_required_only}"; then
-    echo "FAILED: ${resource_name} import command failed"
-    return 1
-  fi
 
   echo "Verifying import of ${resource_name}"
-  local import_ids=$(terraformExecute "cd $test_dir/update && jq -r '.resources[] | select(.type == \"conjur_${resource_name}\") | .instances[0].attributes.name' terraform.tfstate")
-  local expected_ids=("$resource_id_all_fields" "$resource_id_required_only")
-  for expected in "${expected_ids[@]}"; do
-    if ! grep -qx "$expected" <<< "$import_ids"; then
-      echo "FAILED: ${resource_name} import verification failed (missing $expected)"
-      return 1
-    fi
-  done
-
+  local import_ids=$(terraform_exec "cd $test_dir/update && jq -r '.resources[] | select(.type == \"conjur_${resource_name}\") | .instances[0].attributes.name' terraform.tfstate")
+  if ! grep -qx "$resource_id$" <<< "$import_ids"; then
+    echo "FAILED: ${resource_name} import verification failed (missing $resource_id)"
+    return 1
+  fi
   echo "${resource_name} import successful"
 
   # Step 3: Update the Resource
-  if ! terraformExecute "cd $test_dir/update && \
+  if ! terraform_exec "cd $test_dir/update && \
     terraform validate && \
     terraform plan && \
     terraform apply -auto-approve"; then
@@ -107,16 +83,15 @@ function test_resource_crud() {
   fi
 
   # Verify update was successful
-  local update_status_all_fields=$(terraformExecute "cd $test_dir/update && jq -r '.outputs.update_status_all_fields.value // \"fail\"' terraform.tfstate")
-  local update_status_required_only=$(terraformExecute "cd $test_dir/update && jq -r '.outputs.update_status_required_only.value // \"fail\"' terraform.tfstate")
-  if [[ "$update_status_all_fields" != "success" ]] || [[ "$update_status_required_only" != "success" ]]; then
+  local update_status=$(terraform_exec "cd $test_dir/update && jq -r '.outputs.update_status.value // \"fail\"' terraform.tfstate")
+  if [[ "$update_status" != "success" ]]; then
     echo "FAILED: ${resource_name} update verification failed with status: $update_status"
     return 1
   fi
 
   # Step 4: Delete the Resource
   echo "Step 4: Deleting ${resource_name}"
-  if ! terraformExecute "cd $test_dir/update && terraform destroy -auto-approve"; then
+  if ! terraform_exec "cd $test_dir/update && terraform destroy -auto-approve"; then
     echo "FAILED: ${resource_name} deletion failed"
     return 1
   fi
@@ -125,10 +100,18 @@ function test_resource_crud() {
   return 0
 }
 
+# Generate unique IDs for each run to avoid conflicts
+# NOTE: When adding a new TF Var here it also must be copied to the 'terraform' container
+# env variables in docker-compose.yml
+function generate_random_values() {
+  local rand_suffix=$(openssl rand -hex 6)
+  export TF_VAR_conjur_authenticator_name="tf-auth-$rand_suffix"
+}
+
 function cleanup_terraform() {
   local test_dir="$1"
-  terraformExecute "cd $test_dir/create && rm -rf .terraform* terraform.tfstate*"
-  terraformExecute "cd $test_dir/update && rm -rf .terraform* terraform.tfstate*"
+  terraform_exec "cd $test_dir/create && rm -rf .terraform* terraform.tfstate*"
+  terraform_exec "cd $test_dir/update && rm -rf .terraform* terraform.tfstate*"
 }
 
 function report_test_results() {

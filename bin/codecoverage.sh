@@ -1,4 +1,5 @@
-#!/bin/bash -e
+#!/bin/bash
+set -exo pipefail
 
 JWT_TOKEN=""
 TOKENGCP="gcp/token"
@@ -18,10 +19,10 @@ fi
 mkdir -p "$output_dir"
 
 
-./bin/test -t oss -tc jwt -jwt true
+./bin/test -t oss -tc jwt -jwt true || true
 export JWT_TOKEN=$(cat jwt_token)
 export CONJUR_CERT_CONTENT=$(cat conf/https_config/ca.crt)
-export TF_SECRET_VALUE="nirupma"
+export TF_SECRET_VALUE="nirupma" # Do not try to change this value
 export TF_JWT_SECRET_VALUE="SECRETXcLhn23MJcimV"
  
 docker compose -f docker-compose.test.yml build

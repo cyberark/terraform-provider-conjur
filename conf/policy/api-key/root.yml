@@ -22,3 +22,8 @@
     privileges: [ read, execute ]
     resource: *variables
 
+# Allow the host to manage authenticators
+- !grant
+  role: !group Authn_Admins
+  members:
+    - !host terraform/testapp

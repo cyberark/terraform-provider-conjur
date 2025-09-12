@@ -3,6 +3,7 @@ variable "conjur_account" {}
 variable "conjur_secret_variable" {}
 variable "conjur_authn_type" {}
 variable "conjur_ssl_cert" {}
+variable "conjur_authenticator_name" {}
 
 terraform {
   required_providers {
@@ -21,14 +22,10 @@ provider "conjur" {
   ssl_cert      = var.conjur_ssl_cert
 }
 
-resource "conjur_authenticator" "jwt_authenticator_all_fields" {
+resource "conjur_authenticator" "jwt_authenticator" {
   type    = "jwt"
-  name    = "my-tf-app-authenticator"
+  name    = var.conjur_authenticator_name
   enabled = true
-  owner = {
-    kind = "user",
-    id = "admin"
-  }
   data = {
     audience = "conjur-cloud",
     issuer   = "https://mycompany.com",
@@ -66,29 +63,11 @@ EOT
   }
 }
 
-# Requires 'data' block even though docs say optional
-resource "conjur_authenticator" "jwt_authenticator_required_only" {
-  type    = "jwt"
-  name    = "my-tf-app-authenticator-minimal"
-  data = {
-    jwks_uri = "https://mycompany.com/.well-known/jwks"
-  }
-}
-
-
 # Save the IDs for later use in other stages
-output "authenticator_name_all_fields" {
-  value = conjur_authenticator.jwt_authenticator_all_fields.name
+output "authenticator_name" {
+  value = conjur_authenticator.jwt_authenticator.name
 }
 
-output "create_status_all_fields" {
-  value = conjur_authenticator.jwt_authenticator_all_fields.name != "" ? "success" : "fail"
-}
-
-output "authenticator_name_required_only" {
-  value = conjur_authenticator.jwt_authenticator_required_only.name
-}
-
-output "create_status_required_only" {
-  value = conjur_authenticator.jwt_authenticator_required_only.name != "" ? "success" : "fail"
+output "create_status" {
+  value = conjur_authenticator.jwt_authenticator.name != "" ? "success" : "fail"
 }

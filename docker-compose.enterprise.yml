@@ -4,7 +4,7 @@ services:
     security_opt:
       - seccomp:unconfined # --security-opt seccomp=unconfined
     environment:
-      CONJUR_AUTHENTICATORS: authn,authn-iam/prod,authn-azure/AzureTerraform,authn-gcp,authn-jwt/github
+      CONJUR_AUTHENTICATORS: authn,authn-iam/prod,authn-azure/AzureTerraform,authn-gcp,authn-jwt/my-service
     hostname: conjur
     ports:
       - "443"
