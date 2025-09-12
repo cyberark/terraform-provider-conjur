@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -325,7 +326,8 @@ func (p *conjurProvider) createJWTClient(config *conjurapi.Config, data *conjurP
 func (p *conjurProvider) createIAMClient(config *conjurapi.Config, data *conjurProviderModel) (*conjurapi.Client, error) {
 	config.ServiceID = data.ServiceID.ValueString()
 	config.AuthnType = "iam"
-	config.JWTHostID = data.HostID.ValueString()
+	config.JWTHostID = strings.TrimPrefix(data.HostID.ValueString(), "host/")
+
 	return conjurapi.NewClientFromAWSCredentials(*config)
 }
 

@@ -3,4 +3,4 @@
   roles:
      - !group apps
   members:
-     - !group /data/github-apps
+     - !group /data/my-service-apps

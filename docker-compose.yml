@@ -33,6 +33,7 @@ services:
       TF_VAR_conjur_authn_service_id:
       TF_VAR_conjur_client_id:
       TF_VAR_authn_jwt_token: "${JWT_TOKEN}"
+      TF_VAR_conjur_authenticator_name:
       GCP_TOKEN: ${GCP_TOKEN}
     working_dir: /src
     volumes:
@@ -46,7 +47,6 @@ services:
       dockerfile: Dockerfile.goreleaser
     environment:
       CONJUR_PLUGIN_VERSION:
-      GOTOOLCHAIN: auto
     volumes:
       - .:/terraform-provider-conjur
     working_dir: /terraform-provider-conjur

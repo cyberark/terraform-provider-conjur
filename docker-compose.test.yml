@@ -14,8 +14,8 @@ services:
       TF_IAM_HOST_ID: "host/data/myspace/601277729239/InstanceReadJenkinsExecutorHostFactoryToken"
       TF_AZ_SERVICE_ID: "AzureTerraform"
       TF_CONJUR_APPLIANCE_URL: "https://conjur-server"
-      TF_CONJUR_ACCOUNT: "myaccount"
-      TF_JWT_SERVICE_ID: "github"
+      TF_CONJUR_ACCOUNT: "conjur"
+      TF_JWT_SERVICE_ID: "my-service"
       TF_JWT_HOST_ID: ""
       TF_CONJUR_CERT_FILE: ${CONJUR_CERT_CONTENT}
       GCP_TOKEN: ${GCP_TOKEN}
@@ -24,7 +24,7 @@ services:
       TF_CONJUR_SECRET_VARIABLE: "data/vault/ADO_Secret/ado_secret_apikey/username"
       TF_SECRET_VALUE: ${TF_SECRET_VALUE}
       TF_JWT_SECRET_VALUE: ${TF_JWT_SECRET_VALUE}
-      TF_JWT_CONJUR_SECRET_VARIABLE: "Dev-Team-credential1"
+      TF_JWT_CONJUR_SECRET_VARIABLE: "data/Dev-Team-credential1"
       JWT_TOKEN: ${JWT_TOKEN}
     volumes:
       - ./ssl_cert:/terraform-provider-conjur/ssl_cert

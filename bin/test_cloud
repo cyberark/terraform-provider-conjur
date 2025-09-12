@@ -1,0 +1,58 @@
+#!/bin/bash
+set -eo pipefail
+
+# This script is a helper for running tests against a Conjur Cloud tenant locally.
+# It requires a tenant (provisioned via Tenant Manager) and user credentials.
+# It defaults to running the 'api-key' test case which includes resource tests,
+# but can be modified to run other test cases as needed on the last line.
+
+if [ "$#" -eq 4 ]; then
+  tenant_id="$1"
+  tenant_name="$2"
+  user="$3"
+  password="$4"
+else  
+  echo "Example usage: ./bin/test_cloud <tenant_id> <tenant_name> <user> <password>"
+  exit 1
+fi
+
+echo "StartAuthentication request..."
+resp=$(curl --request POST \
+    --url https://$tenant_id.id.integration-cyberark.cloud/Security/StartAuthentication \
+    --header 'Accept: application/json' \
+    --header 'Content-Type: application/json' \
+    --data "{ \"TenantId\": \"$tenant_id\", \"Version\": \"1.0\", \"User\": \"$user\" }")
+session_id=$(echo "$resp" | jq -r '.Result.SessionId')
+mech_id=$(echo "$resp" | jq -r '.Result.Challenges[0].Mechanisms[0].MechanismId')
+echo
+echo "AdvanceAuthentication request..."
+resp=$(curl --request POST \
+  --url https://$tenant_id.id.integration-cyberark.cloud/Security/AdvanceAuthentication \
+  --header 'Accept: application/json' \
+  --header 'Content-Type: application/json' \
+  --data "{
+  \"Action\": \"Answer\",
+  \"Answer\": \"$password\",
+  \"MechanismId\": \"$mech_id\",
+  \"SessionId\": \"$session_id\",
+  \"TenantId\": \"$tenant_id\",
+  \"PersistentLogin\": true
+}")
+identity_token=$(echo "$resp" | jq -r '.Result.Token')
+echo
+echo "Identity Token:\n$identity_token"
+echo
+echo "Authenticating to Conjur Cloud..."
+conjur_token=$(curl --request POST \
+  --url https://$tenant_name.secretsmgr.integration-cyberark.cloud/api/authn-oidc/cyberark/conjur/authenticate \
+  --header 'Accept-Encoding: base64' \
+  --header 'Content-Type: application/x-www-form-urlencoded' \
+  --data "id_token=$identity_token")
+echo "Conjur Token:\n$conjur_token"
+
+# Export the required variables for the test script and run
+export INFRAPOOL_CONJUR_AUTHN_TOKEN="$conjur_token"
+export INFRAPOOL_CONJUR_APPLIANCE_URL="https://$tenant_name.secretsmgr.integration-cyberark.cloud"
+export INFRAPOOL_CONJUR_AUTHN_LOGIN="$user"
+
+./bin/test -t cloud -tc api-key

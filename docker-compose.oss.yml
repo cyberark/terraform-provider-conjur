@@ -15,7 +15,7 @@ services:
     environment:
       DATABASE_URL: postgres://postgres@database/postgres
       CONJUR_DATA_KEY:
-      CONJUR_AUTHENTICATORS: authn,authn-iam/prod,authn-azure/AzureTerraform,authn-gcp,authn-jwt/github
+      CONJUR_AUTHENTICATORS: authn,authn-iam/prod,authn-azure/AzureTerraform,authn-gcp,authn-jwt/my-service
     depends_on: [ database ]
     ports:
       - "80"

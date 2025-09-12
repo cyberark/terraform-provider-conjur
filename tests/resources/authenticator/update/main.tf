@@ -3,6 +3,7 @@ variable "conjur_account" {}
 variable "conjur_secret_variable" {}
 variable "conjur_authn_type" {}
 variable "conjur_ssl_cert" {}
+variable "conjur_authenticator_name" {}
 
 terraform {
   required_providers {
@@ -22,14 +23,10 @@ provider "conjur" {
 }
 
 # updates issuer
-resource "conjur_authenticator" "imported_all_fields" {
+resource "conjur_authenticator" "imported" {
   type    = "jwt"
-  name    = "my-tf-app-authenticator"
+  name    = var.conjur_authenticator_name
   enabled = true
-  owner = {
-    kind = "user",
-    id = "admin"
-  }
   data = {
     audience = "conjur-cloud",
     issuer   = "https://some-other-company.com",
@@ -67,19 +64,6 @@ EOT
   }
 }
 
-# updates jwks_uri
-resource "conjur_authenticator" "imported_required_only" {
-  type    = "jwt"
-  name    = "my-tf-app-authenticator-minimal"
-  data = {
-    jwks_uri = "https://some-other-company.com/.well-known/jwks"
-  }
-}
-
-output "update_status_all_fields" {
-  value = conjur_authenticator.imported_all_fields.data.issuer == "https://some-other-company.com" ? "success" : "fail"
-}
-
-output "update_status_required_only" {
-  value = conjur_authenticator.imported_required_only.data.jwks_uri == "https://some-other-company.com/.well-known/jwks" ? "success" : "fail"
+output "update_status" {
+  value = conjur_authenticator.imported.data.issuer == "https://some-other-company.com" ? "success" : "fail"
 }

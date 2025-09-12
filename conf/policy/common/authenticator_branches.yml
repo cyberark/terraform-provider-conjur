@@ -1,0 +1,22 @@
+# This policy bootstraps Conjur OSS/Enterprise to mirror the default policy tree in Conjur Cloud
+- !policy
+  id: data
+  body:
+  - !group Authn_Admins
+
+- !policy
+  id: conjur/authn-jwt
+  owner: !group data/Authn_Admins
+
+- !policy
+  id: conjur/authn-gcp
+  owner: !group data/Authn_Admins
+
+- !policy
+  id: conjur/authn-iam
+  owner: !group data/Authn_Admins
+
+- !policy
+  id: conjur/authn-azure
+  owner: !group data/Authn_Admins
+

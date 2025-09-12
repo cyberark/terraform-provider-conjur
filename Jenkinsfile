@@ -50,8 +50,14 @@ pipeline {
   }
 
   triggers {
-    cron(getDailyCronString())
-    parameterizedCron(getWeeklyCronString("H(1-5)","%MODE=RELEASE"))
+    parameterizedCron("""
+      ${getDailyCronString("%TEST_CLOUD=true")}
+      ${getWeeklyCronString("H(1-5)", "%MODE=RELEASE")}
+    """)
+  }
+
+  parameters {
+    booleanParam(name: 'TEST_CLOUD', defaultValue: true, description: 'Run integration tests against a Conjur Cloud tenant')
   }
 
   stages {
@@ -108,7 +114,7 @@ pipeline {
     stage('Generate GCP token') {
       steps {
         script {
-          INFRAPOOL_GCP_EXECUTORV2_AGENT_0.agentSh './bin/get_gcp_token.sh host/conjur/authn-gcp/gcp-apps/test-app myaccount'
+          INFRAPOOL_GCP_EXECUTORV2_AGENT_0.agentSh './bin/get_gcp_token.sh host/data/gcp-apps/test-app conjur'
           INFRAPOOL_GCP_EXECUTORV2_AGENT_0.agentStash name: 'token-out', includes: 'gcp/*'
         }
       }
@@ -122,6 +128,18 @@ pipeline {
           INFRAPOOL_EXECUTORV2_AGENT_0.agentStash name: 'xml-out1', includes: 'output/tests/*'
           INFRAPOOL_AZURE_EXECUTORV2_AGENT_0.agentSh 'summon ./bin/codecoverage.sh TestAzureSecretDataSource'
           INFRAPOOL_AZURE_EXECUTORV2_AGENT_0.agentStash name: 'xml-out2', includes: 'output/azure/*'
+        } 
+      }
+    }
+
+    stage('Generate code coverage xml'){
+      steps {
+        script {
+          INFRAPOOL_EXECUTORV2_AGENT_0.agentUnstash name: 'xml-out1'
+          INFRAPOOL_EXECUTORV2_AGENT_0.agentUnstash name: 'xml-out2'
+          INFRAPOOL_EXECUTORV2_AGENT_0.agentSh './bin/generate_xml.sh'
+          INFRAPOOL_EXECUTORV2_AGENT_0.agentStash name: 'output-xml', includes: 'output/*.xml'
+
         } 
       }
     }
@@ -181,56 +199,11 @@ pipeline {
         }
       }
     }
-    stage('Run integration tests (Conjur Enterprise) for Api Key') {
-      steps {
-        script {
-          INFRAPOOL_EXECUTORV2_AGENT_0.agentSh './bin/test -t enterprise -tc api-key'
-        }
-      }
-    }
-
-    stage('Run integration tests (Conjur Enterprise) for JWT') {
-      steps {
-        script {
-          INFRAPOOL_EXECUTORV2_AGENT_0.agentSh './bin/test -t enterprise -tc jwt'
-        }
-      }
-    }
-
-    stage('Run integration tests (Conjur Enterprise) for IAM') {
-      steps {
-        script {
-          INFRAPOOL_EXECUTORV2_AGENT_0.agentSh './bin/test -t enterprise -tc iam'
-        }
-      }
-    }
-
-    stage('Run integration tests (Conjur Enterprise) for Azure') {
-      steps {
-        script {
-          INFRAPOOL_AZURE_EXECUTORV2_AGENT_0.agentSh 'summon ./bin/test -t enterprise -tc azure'
-        }
-      }
-    }
-    
-    stage('Generate GCP token for Conjur Enterprise') {
-      steps {
-        script {
-          INFRAPOOL_GCP_EXECUTORV2_AGENT_0.agentSh './bin/get_gcp_token.sh host/conjur/authn-gcp/gcp-apps/test-app myaccount'
-          INFRAPOOL_GCP_EXECUTORV2_AGENT_0.agentStash name: 'token-out-enterprise', includes: 'gcp/*'
-        }
-      }
-    }
-    stage('Run integration tests (Conjur Enterprise) for GCP') {
-      steps {
-        script {
-          INFRAPOOL_EXECUTORV2_AGENT_0.agentUnstash name: 'token-out-enterprise'
-          INFRAPOOL_EXECUTORV2_AGENT_0.agentSh './bin/test -t enterprise -tc gcp'
-        }
-      }
-    }
 
     stage('Run Conjur Cloud tests') {
+      when {
+        expression { params.TEST_CLOUD }
+      }
       stages {
         stage('Create a Tenant') {
           steps {
@@ -264,7 +237,6 @@ pipeline {
             INFRAPOOL_CONJUR_APPLIANCE_URL="${TENANT.conjur_cloud_url}"
             INFRAPOOL_CONJUR_AUTHN_LOGIN="${TENANT.login_name}"
             INFRAPOOL_CONJUR_AUTHN_TOKEN="${env.conj_token}"
-            INFRAPOOL_TEST_CLOUD=true
           }
           steps {
             script {
@@ -278,7 +250,6 @@ pipeline {
             INFRAPOOL_CONJUR_APPLIANCE_URL="${TENANT.conjur_cloud_url}"
             INFRAPOOL_CONJUR_AUTHN_LOGIN="${TENANT.login_name}"
             INFRAPOOL_CONJUR_AUTHN_TOKEN="${env.conj_token}"
-            INFRAPOOL_TEST_CLOUD=true
           }
           steps {
             script {
@@ -292,7 +263,6 @@ pipeline {
             INFRAPOOL_CONJUR_APPLIANCE_URL="${TENANT.conjur_cloud_url}"
             INFRAPOOL_CONJUR_AUTHN_LOGIN="${TENANT.login_name}"
             INFRAPOOL_CONJUR_AUTHN_TOKEN="${env.conj_token}"
-            INFRAPOOL_TEST_CLOUD=true
           }
           steps {
             script {
@@ -306,7 +276,6 @@ pipeline {
             INFRAPOOL_CONJUR_APPLIANCE_URL="${TENANT.conjur_cloud_url}"
             INFRAPOOL_CONJUR_AUTHN_LOGIN="${TENANT.login_name}"
             INFRAPOOL_CONJUR_AUTHN_TOKEN="${env.conj_token}"
-            INFRAPOOL_TEST_CLOUD=true
           }
           steps {
             script {
@@ -329,7 +298,6 @@ pipeline {
             INFRAPOOL_CONJUR_APPLIANCE_URL="${TENANT.conjur_cloud_url}"
             INFRAPOOL_CONJUR_AUTHN_LOGIN="${TENANT.login_name}"
             INFRAPOOL_CONJUR_AUTHN_TOKEN="${env.conj_token}"
-            INFRAPOOL_TEST_CLOUD=true
           }
           steps {
             script {
@@ -339,17 +307,12 @@ pipeline {
           }
         }
       }
-    }
-
-    stage('Generate code coverage xml'){
-      steps {
-        script {
-          INFRAPOOL_EXECUTORV2_AGENT_0.agentUnstash name: 'xml-out1'
-          INFRAPOOL_EXECUTORV2_AGENT_0.agentUnstash name: 'xml-out2'
-          INFRAPOOL_EXECUTORV2_AGENT_0.agentSh './bin/generate_xml.sh'
-          INFRAPOOL_EXECUTORV2_AGENT_0.agentStash name: 'output-xml', includes: 'output/*.xml'
-
-        } 
+      post {
+        always {
+          script {
+            deleteConjurCloudTenant("${TENANT.id}")
+          }
+        }
       }
     }
 
