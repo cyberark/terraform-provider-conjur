@@ -292,22 +292,18 @@ func (r *ConjurAuthenticatorResource) ImportState(ctx context.Context, req resou
 
 // buildAuthenticatorPayload maps the resource model to an API payload
 func (r *ConjurAuthenticatorResource) buildAuthenticatorPayload(data *ConjurAuthenticatorResourceModel) (*conjurapi.AuthenticatorBase, error) {
-
-	// Initialize with required fields
 	authenticator := conjurapi.AuthenticatorBase{
 		Type: data.Type.ValueString(),
 		Name: data.Name.ValueString(),
 	}
 
-	// Only include optional fields if they have values
-	if !data.Subtype.IsNull() && !data.Subtype.IsUnknown() {
-		authenticator.Subtype = data.Subtype.ValueStringPointer()
+	// Top level optional fields (only set if not null/unknown)
+	if strPtr := valueStringPtr(data.Subtype); strPtr != nil {
+		authenticator.Subtype = strPtr
 	}
-
-	if !data.Enabled.IsNull() && !data.Enabled.IsUnknown() {
-		authenticator.Enabled = data.Enabled.ValueBoolPointer()
+	if boolPtr := valueBoolPtr(data.Enabled); boolPtr != nil {
+		authenticator.Enabled = boolPtr
 	}
-
 	if data.Owner != nil {
 		authenticator.Owner = &conjurapi.AuthOwner{
 			Kind: data.Owner.Kind.ValueString(),
@@ -315,55 +311,10 @@ func (r *ConjurAuthenticatorResource) buildAuthenticatorPayload(data *ConjurAuth
 		}
 	}
 
-	if data.Data != nil {
-		dataPayload := make(map[string]interface{})
-
-		if !data.Data.Audience.IsNull() && !data.Data.Audience.IsUnknown() {
-			dataPayload["audience"] = data.Data.Audience.ValueString()
-		}
-		if !data.Data.JwksURI.IsNull() && !data.Data.JwksURI.IsUnknown() {
-			dataPayload["jwks_uri"] = data.Data.JwksURI.ValueString()
-		}
-		if !data.Data.Issuer.IsNull() && !data.Data.Issuer.IsUnknown() {
-			dataPayload["issuer"] = data.Data.Issuer.ValueString()
-		}
-		if !data.Data.CACert.IsNull() && !data.Data.CACert.IsUnknown() {
-			dataPayload["ca_cert"] = data.Data.CACert.ValueString()
-		}
-		if !data.Data.PublicKeys.IsNull() && !data.Data.PublicKeys.IsUnknown() {
-			var publicKeysObj interface{}
-			jsonStr := data.Data.PublicKeys.ValueString()
-			err := json.Unmarshal([]byte(jsonStr), &publicKeysObj)
-			if err != nil {
-				return nil, fmt.Errorf("invalid JSON in public_keys: %w", err)
-			}
-			dataPayload["public_keys"] = publicKeysObj
-		}
-
-		if data.Data.Identity != nil {
-			identityPayload := make(map[string]interface{})
-
-			if !data.Data.Identity.IdentityPath.IsNull() && !data.Data.Identity.IdentityPath.IsUnknown() {
-				identityPayload["identity_path"] = data.Data.Identity.IdentityPath.ValueString()
-			}
-			if !data.Data.Identity.TokenAppProperty.IsNull() && !data.Data.Identity.TokenAppProperty.IsUnknown() {
-				identityPayload["token_app_property"] = data.Data.Identity.TokenAppProperty.ValueString()
-			}
-			if len(data.Data.Identity.ClaimAliases) > 0 {
-				identityPayload["claim_aliases"] = data.Data.Identity.ClaimAliases
-			}
-			if len(data.Data.Identity.EnforcedClaims) > 0 {
-				identityPayload["enforced_claims"] = data.Data.Identity.EnforcedClaims
-			}
-
-			if len(identityPayload) > 0 {
-				dataPayload["identity"] = identityPayload
-			}
-		}
-
-		if len(dataPayload) > 0 {
-			authenticator.Data = dataPayload
-		}
+	if authenticatorData, err := buildDataPayload(data.Data); err != nil {
+		return nil, err
+	} else if len(authenticatorData) > 0 {
+		authenticator.Data = authenticatorData
 	}
 
 	if len(data.Annotations) > 0 {
@@ -373,20 +324,59 @@ func (r *ConjurAuthenticatorResource) buildAuthenticatorPayload(data *ConjurAuth
 	return &authenticator, nil
 }
 
+// buildDataPayload creates a nested Authenticator.Data object if provided
+func buildDataPayload(d *ConjurAuthenticatorDataModel) (map[string]interface{}, error) {
+	if d == nil {
+		return nil, nil
+	}
+
+	payload := map[string]interface{}{}
+	addIfNotNull(payload, "audience", d.Audience)
+	addIfNotNull(payload, "jwks_uri", d.JwksURI)
+	addIfNotNull(payload, "issuer", d.Issuer)
+	addIfNotNull(payload, "ca_cert", d.CACert)
+
+	if !d.PublicKeys.IsNull() && !d.PublicKeys.IsUnknown() {
+		var obj interface{}
+		if err := json.Unmarshal([]byte(d.PublicKeys.ValueString()), &obj); err != nil {
+			return nil, fmt.Errorf("invalid JSON in public_keys: %w", err)
+		}
+		payload["public_keys"] = obj
+	}
+
+	if id := buildIdentityPayload(d.Identity); len(id) > 0 {
+		payload["identity"] = id
+	}
+
+	return payload, nil
+}
+
+// buildDataPayload creates a nested Authenticator.Data.Identity object if provided
+func buildIdentityPayload(identity *ConjurAuthenticatorIdentityModel) map[string]interface{} {
+	if identity == nil {
+		return nil
+	}
+	payload := map[string]interface{}{}
+
+	addIfNotNull(payload, "identity_path", identity.IdentityPath)
+	addIfNotNull(payload, "token_app_property", identity.TokenAppProperty)
+
+	if len(identity.ClaimAliases) > 0 {
+		payload["claim_aliases"] = identity.ClaimAliases
+	}
+	if len(identity.EnforcedClaims) > 0 {
+		payload["enforced_claims"] = identity.EnforcedClaims
+	}
+	return payload
+}
+
 // parseAuthenticatorResponse maps the API response to the resource model
 func (r *ConjurAuthenticatorResource) parseAuthenticatorResponse(authenticator *conjurapi.AuthenticatorResponse, data *ConjurAuthenticatorResourceModel) error {
 	data.Type = types.StringValue(authenticator.Type)
 	data.Name = types.StringValue(authenticator.Name)
-	if authenticator.Subtype != nil {
-		data.Subtype = types.StringValue(*authenticator.Subtype)
-	} else {
-		data.Subtype = types.StringNull()
-	}
-	if authenticator.Enabled != nil {
-		data.Enabled = types.BoolValue(*authenticator.Enabled)
-	} else {
-		data.Enabled = types.BoolNull()
-	}
+	data.Subtype = stringOrNull(authenticator.Subtype)
+	data.Enabled = boolOrNull(authenticator.Enabled)
+
 	if authenticator.Owner != nil {
 		data.Owner = &ConjurAuthenticatorOwnerModel{
 			Kind: types.StringValue(authenticator.Owner.Kind),
@@ -395,83 +385,113 @@ func (r *ConjurAuthenticatorResource) parseAuthenticatorResponse(authenticator *
 	} else {
 		data.Owner = nil
 	}
-	if authenticator.Data != nil {
-		dataModel := ConjurAuthenticatorDataModel{}
 
-		if audience, ok := authenticator.Data["audience"].(string); ok {
-			dataModel.Audience = types.StringValue(audience)
-		} else {
-			dataModel.Audience = types.StringNull()
-		}
-		if jwksURI, ok := authenticator.Data["jwks_uri"].(string); ok {
-			dataModel.JwksURI = types.StringValue(jwksURI)
-		} else {
-			dataModel.JwksURI = types.StringNull()
-		}
-		if issuer, ok := authenticator.Data["issuer"].(string); ok {
-			dataModel.Issuer = types.StringValue(issuer)
-		} else {
-			dataModel.Issuer = types.StringNull()
-		}
-		if caCert, ok := authenticator.Data["ca_cert"].(string); ok {
-			dataModel.CACert = types.StringValue(caCert)
-		} else {
-			dataModel.CACert = types.StringNull()
-		}
-		if publicKeys, ok := authenticator.Data["public_keys"]; ok {
-			publicKeysJSON, err := json.Marshal(publicKeys)
-			if err != nil {
-				return fmt.Errorf("invalid JSON in public_keys: %w", err)
-			}
-			dataModel.PublicKeys = types.StringValue(string(publicKeysJSON))
-		} else {
-			dataModel.PublicKeys = types.StringNull()
-		}
-
-		if identityRaw, ok := authenticator.Data["identity"].(map[string]interface{}); ok {
-			identityModel := ConjurAuthenticatorIdentityModel{}
-
-			if identityPath, ok := identityRaw["identity_path"].(string); ok {
-				identityModel.IdentityPath = types.StringValue(identityPath)
-			} else {
-				identityModel.IdentityPath = types.StringNull()
-			}
-			if tokenAppProperty, ok := identityRaw["token_app_property"].(string); ok {
-				identityModel.TokenAppProperty = types.StringValue(tokenAppProperty)
-			} else {
-				identityModel.TokenAppProperty = types.StringNull()
-			}
-			if claimAliases, ok := identityRaw["claim_aliases"].(map[string]interface{}); ok {
-				stringMap := make(map[string]string)
-				for k, v := range claimAliases {
-					if strVal, ok := v.(string); ok {
-						stringMap[k] = strVal
-					}
-				}
-				identityModel.ClaimAliases = stringMap
-			} else {
-				identityModel.ClaimAliases = nil
-			}
-			if enforcedClaims, ok := identityRaw["enforced_claims"].([]interface{}); ok {
-				stringList := make([]string, 0, len(enforcedClaims))
-				for _, v := range enforcedClaims {
-					if strVal, ok := v.(string); ok {
-						stringList = append(stringList, strVal)
-					}
-				}
-				identityModel.EnforcedClaims = stringList
-			} else {
-				identityModel.EnforcedClaims = nil
-			}
-			dataModel.Identity = &identityModel
-		} else {
-			dataModel.Identity = nil
-		}
-		data.Data = &dataModel
+	if authenticatorData, err := parseDataFromMap(authenticator.Data); err != nil {
+		return err
 	} else {
-		data.Data = nil
+		data.Data = authenticatorData
 	}
-	data.Annotations = authenticator.Annotations
 
+	data.Annotations = authenticator.Annotations
 	return nil
+}
+
+// parseDataFromMap maps the API response nested Authenticator.Data object to the resource model
+func parseDataFromMap(data map[string]interface{}) (*ConjurAuthenticatorDataModel, error) {
+	if data == nil {
+		return nil, nil
+	}
+
+	authenticatorData := &ConjurAuthenticatorDataModel{
+		Audience: stringFromMap(data, "audience"),
+		JwksURI:  stringFromMap(data, "jwks_uri"),
+		Issuer:   stringFromMap(data, "issuer"),
+		CACert:   stringFromMap(data, "ca_cert"),
+	}
+
+	if pk, ok := data["public_keys"]; ok {
+		raw, err := json.Marshal(pk)
+		if err != nil {
+			return nil, fmt.Errorf("invalid JSON in public_keys: %w", err)
+		}
+		authenticatorData.PublicKeys = types.StringValue(string(raw))
+	} else {
+		authenticatorData.PublicKeys = types.StringNull()
+	}
+
+	authenticatorData.Identity = parseIdentityFromMap(data)
+
+	return authenticatorData, nil
+}
+
+// parseIdentityFromMap maps the API response nested Authenticator.Data.Identity object to the resource model
+func parseIdentityFromMap(data map[string]interface{}) *ConjurAuthenticatorIdentityModel {
+	raw, ok := data["identity"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+
+	im := ConjurAuthenticatorIdentityModel{
+		IdentityPath:     stringFromMap(raw, "identity_path"),
+		TokenAppProperty: stringFromMap(raw, "token_app_property"),
+	}
+
+	if aliases, ok := raw["claim_aliases"].(map[string]interface{}); ok {
+		im.ClaimAliases = make(map[string]string, len(aliases))
+		for k, v := range aliases {
+			if str, ok := v.(string); ok {
+				im.ClaimAliases[k] = str
+			}
+		}
+	}
+	if enforced, ok := raw["enforced_claims"].([]interface{}); ok {
+		for _, v := range enforced {
+			if str, ok := v.(string); ok {
+				im.EnforcedClaims = append(im.EnforcedClaims, str)
+			}
+		}
+	}
+	return &im
+}
+
+// Helper functions to ensure properly handling of null/unknown/unset values
+func valueStringPtr(v types.String) *string {
+	if v.IsNull() || v.IsUnknown() {
+		return nil
+	}
+	return v.ValueStringPointer()
+}
+
+func valueBoolPtr(v types.Bool) *bool {
+	if v.IsNull() || v.IsUnknown() {
+		return nil
+	}
+	return v.ValueBoolPointer()
+}
+
+func addIfNotNull(m map[string]interface{}, key string, v types.String) {
+	if !v.IsNull() && !v.IsUnknown() {
+		m[key] = v.ValueString()
+	}
+}
+
+func stringOrNull(s *string) types.String {
+	if s != nil {
+		return types.StringValue(*s)
+	}
+	return types.StringNull()
+}
+
+func boolOrNull(b *bool) types.Bool {
+	if b != nil {
+		return types.BoolValue(*b)
+	}
+	return types.BoolNull()
+}
+
+func stringFromMap(m map[string]interface{}, key string) types.String {
+	if val, ok := m[key].(string); ok {
+		return types.StringValue(val)
+	}
+	return types.StringNull()
 }
