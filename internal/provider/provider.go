@@ -355,6 +355,7 @@ func (p *conjurProvider) DataSources(_ context.Context) []func() datasource.Data
 func (p *conjurProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewConjurAuthenticatorResource,
+		NewConjurHostResource,
 	}
 }
 

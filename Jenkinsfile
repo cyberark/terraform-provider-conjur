@@ -120,6 +120,9 @@ pipeline {
       }
     }
 
+
+    // Whoever implemented the 'codecoverage' script should be in jail
+    // We need to nuke it ASAP
     stage('Run Code Coverage'){
       steps {
         script {

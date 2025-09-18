@@ -1,29 +1,24 @@
----
+# Create a policy for the host
 - !policy
   id: terraform
+  owner: !host /data/testapp
   annotations:
     description: Policy for terraform
   body:
-
-  - !host
-    id: testapp
-    annotations:
-      description: Host for running Terraform on remote targets
-      authn/api-key: true
-
   - &variables
     - !variable target-password
-    - !variable test-secret
-    - !variable test-secret-in-file
-    - !variable var with spaces
+  
+  - !group consumers
 
   - !permit
-    role: !host testapp
-    privileges: [ read, execute ]
+    role: !group consumers
+    privilege: [ read, execute ]
     resource: *variables
 
-# Allow the host to manage authenticators
-- !grant
-  role: !group Authn_Admins
-  members:
-    - !host terraform/testapp
+  # Child policy for the testapp user to manipulate
+  - !policy test
+
+  - !permit 
+    role: !host /data/testapp
+    privileges: [ read, update, create, delete ]
+    resource: !policy test
