@@ -219,7 +219,7 @@ func (r *ConjurAuthenticatorResource) Read(ctx context.Context, req resource.Rea
 		return
 	}
 
-	err = r.parseAuthenticatorPayload(authenticatorResponse, &data)
+	err = r.parseAuthenticatorResponse(authenticatorResponse, &data)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Parsing Authenticator Payload", fmt.Sprintf("Could not parse authenticator payload: %s", err))
 		return
@@ -231,12 +231,11 @@ func (r *ConjurAuthenticatorResource) Read(ctx context.Context, req resource.Rea
 }
 
 func (r *ConjurAuthenticatorResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data, state ConjurAuthenticatorResourceModel
+	var data ConjurAuthenticatorResourceModel
 
-	// Read Terraform plan data and current state into the model
-	// TODO - do we need state if we are recreating the entire resource?
+	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
-	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+
 	authenticator, err := r.buildAuthenticatorPayload(&data)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Building Authenticator Payload", fmt.Sprintf("Could not build authenticator payload: %s", err))
@@ -374,8 +373,8 @@ func (r *ConjurAuthenticatorResource) buildAuthenticatorPayload(data *ConjurAuth
 	return &authenticator, nil
 }
 
-// parseAuthenticatorPayload maps the API response to the resource model
-func (r *ConjurAuthenticatorResource) parseAuthenticatorPayload(authenticator *conjurapi.AuthenticatorResponse, data *ConjurAuthenticatorResourceModel) error {
+// parseAuthenticatorResponse maps the API response to the resource model
+func (r *ConjurAuthenticatorResource) parseAuthenticatorResponse(authenticator *conjurapi.AuthenticatorResponse, data *ConjurAuthenticatorResourceModel) error {
 	data.Type = types.StringValue(authenticator.Type)
 	data.Name = types.StringValue(authenticator.Name)
 	if authenticator.Subtype != nil {
