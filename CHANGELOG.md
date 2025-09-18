@@ -5,10 +5,11 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-## [0.8.0] - 2025-08-14
+## [0.8.0] - 2025-09-22
 ### Added
 - Support for Conjur V2 Workloads API via the conjur_host resource
 - Support for Conjur V2 Authenticators API via the conjur_authenticator resource
+- Support for Conjur Groups via the conjur_group resource
 
 ## [0.7.1] - 2025-07-01
 ### Fixed

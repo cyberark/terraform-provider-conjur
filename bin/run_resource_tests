@@ -16,6 +16,10 @@ function main() {
   echo ">> Running Authenticator CRUD test"
   test_resource_crud "tests/resources/authenticator" "authenticator" "name" "jwt:$TF_VAR_conjur_authenticator_name"
   test_results+=("Authenticator|$?")
+  
+  echo ">> Running Group CRUD test"
+  test_resource_crud "tests/resources/group" "group" "name"
+  test_results+=("Group|$?")
 
   if [[ "$TARGET" == "cloud" ]]; then
     echo ">> Running Host CRUD test"
@@ -120,6 +124,7 @@ function generate_random_values() {
   local rand_suffix=$(openssl rand -hex 6)
   export TF_VAR_conjur_authenticator_name="tf-auth-$rand_suffix"
   export TF_VAR_conjur_host_name="tf-host-$rand_suffix"
+  export TF_VAR_conjur_group_name="tf-group-$rand_suffix"
 }
 
 function cleanup_terraform() {

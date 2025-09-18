@@ -236,6 +236,8 @@ func (p *conjurProvider) applyConfigOverrides(config *conjurapi.Config, data *co
 	if certPath := data.SSLCertPath.ValueString(); certPath != "" {
 		config.SSLCertPath = certPath
 	}
+
+	config.CredentialStorage = conjurapi.CredentialStorageNone
 }
 
 func (p *conjurProvider) createConjurClient(config *conjurapi.Config, data *conjurProviderModel) (*conjurapi.Client, error) {
@@ -356,6 +358,7 @@ func (p *conjurProvider) Resources(_ context.Context) []func() resource.Resource
 	return []func() resource.Resource{
 		NewConjurAuthenticatorResource,
 		NewConjurHostResource,
+		NewConjurGroupResource,
 	}
 }
 
