@@ -1,6 +1,6 @@
 # terraform-provider-conjur 
 
-Terraform provider for [Conjur](https://www.conjur.org).
+Terraform provider for [CyberArk Secrets Manager](https://www.cyberark.com/products/secrets-management/).
 
 [![GitHub release](https://img.shields.io/github/release/cyberark/terraform-provider-conjur.svg)](https://github.com/cyberark/terraform-provider-conjur/releases/latest)
 
@@ -10,13 +10,13 @@ Terraform provider for [Conjur](https://www.conjur.org).
 
 ## Installation
 
-### Using terraform-provider-conjur with Conjur Open Source 
+### Using terraform-provider-conjur with Conjur OSS
 
-Are you using this project with [Conjur Open Source](https://github.com/cyberark/conjur)? Then we 
+Are you using this project with [Conjur OSS](https://github.com/cyberark/conjur)? Then we 
 **strongly** recommend choosing the version of this project to use from the latest [Conjur OSS 
 suite release](https://docs.conjur.org/Latest/en/Content/Overview/Conjur-OSS-Suite-Overview.html). 
 Conjur maintainers perform additional testing on the suite release versions to ensure 
-compatibility. When possible, upgrade your Conjur version to match the 
+compatibility. When possible, upgrade your Conjur OSS version to match the 
 [latest suite release](https://docs.conjur.org/Latest/en/Content/ReleaseNotes/ConjurOSS-suite-RN.htm); 
 when using integrations, choose the latest suite release that matches your Conjur version. For any 
 questions, please contact us on [Discourse](https://discuss.cyberarkcommons.org/c/conjur/5).
@@ -97,18 +97,18 @@ $ go build -o ~/.terraform.d/plugins/terraform-provider-conjur main.go
 ### Workflow
 
 Terraform can be run manually by users, but it is often run by machines.
-Conjur supports authentication and authorization for both.
+Secrets Manager supports authentication and authorization for both.
 
-If you are logged into the [Conjur CLI](https://docs.conjur.org/Latest/en/Content/Tools/cli.html),
+If you are logged into the [Secrets Manager CLI](https://docs.cyberark.com/conjur-enterprise/latest/en/content/developer/cli/cli-lp.htm),
 this provider will read your configuration.
-If you have applied [Conjur machine identity](https://www.conjur.org/tutorials/policy/applications.html),
+If you have applied [Secrets Manager machine identity](https://www.conjur.org/tutorials/policy/applications.html),
 this provider will read the machine's configuration.
 
 To access the values of secrets, the user/machine needs `execute` privilege
-on the Conjur variables referenced in your Terraform manifests.
+on the Secrets Manager variables referenced in your Terraform manifests.
 
 For more details, see the "Authentication" section
-[on this page](https://docs.conjur.org/Latest/en/Content/Integrations/terraform.htm).
+[on this page](https://docs.cyberark.com/conjur-open-source/latest/en/content/integrations/terraform.htm).
 
 ### Provider configuration using API Key
 
@@ -131,7 +131,7 @@ No other configuration is necessary in `main.tf`:
 ```terraform
 # main.tf
 
-# Configure the Conjur provider using the required_providers stanza
+# Configure the Secrets Manager provider using the required_providers stanza
 # required with Terraform 0.13 and beyond. You may optionally use version
 # directive to prevent breaking changes occurring unannounced.
 terraform {
@@ -187,7 +187,7 @@ provider "conjur" {
 **Below section describes the provider configuration with cloud authenticators**
 ### AWS IAM Role Authentication
 
-#### Sample Policy of IAM for OSS/Enterprise
+#### Sample Policy of IAM for Conjur OSS / Secrets Manager, Self-Hosted
 
 Create a IAM authenticator policy and save it as authn-iam.yml
 ```
@@ -247,9 +247,9 @@ Load the policy into root
 ```
 conjur policy load -b root -f authn-iam-host.yml
 ```
-#### Sample Policy of IAM for Conjur Cloud
+#### Sample Policy of IAM for Secrets Manager, SaaS
 
-Create a policy file that defines the IAM authenticator and a workload (host) group whose members can use this IAM authenticator to authenticate to Conjur Cloud
+Create a policy file that defines the IAM authenticator and a workload (host) group whose members can use this IAM authenticator to authenticate to Secrets Manager, SaaS:
 ```
 - !policy
   id: prod
@@ -291,7 +291,7 @@ Save the policy using the following naming convention: authn-iam-<name>.yml; for
 ```
 conjur policy load -f authn-iam-prod.yml -b conjur/authn-iam
 ```
-Define the AWS resource as a Conjur Cloud workload ID (host)
+Define the AWS resource as a Secrets Manager, SaaS workload ID (host)
 ```
 - !policy
   id: iam-ec2
@@ -395,7 +395,7 @@ provider "conjur" {
 }
 ```
 
-#### Sample Policy of Azure Authentication for OSS/Enterprise
+#### Sample Policy of Azure Authentication for Conjur OSS / Secrets Manager, Self-Hosted
 
 Create a policy as save it as authn-azure-AzureWS.yml
 
@@ -493,7 +493,7 @@ Load the policy to root
 conjur policy load -f authn-azure-secrets.yml -b root
 ```
 
-#### Sample Policy of Azure Authentication for Conjur Cloud
+#### Sample Policy of Azure Authentication for Secrets Manager, SaaS
 Define Azure Authentication Policy
 ```
 - !policy
@@ -577,7 +577,7 @@ Save the policy as app-grants.yaml, and load the policy file into conjur/authn-a
 ```
 conjur policy load -f app-grants.yaml -b conjur/authn-azure/AzureWS
 ```
-Define Conjur Cloud variables (secrets) and a group that has permissions on the variables
+Define Secrets Manager, SaaS variables (secrets) and a group that has permissions on the variables
 ```
 - !policy
   id: variablespace
@@ -661,7 +661,7 @@ provider "conjur" {
 }
 ```
 
-#### Sample policy of GCP for OSS/Enterprise
+#### Sample policy of GCP for Conjur OSS / Secrets Manager, Self-Hosted
 
 Create a GCP authenticator policy and save it as authn-gcp.yml
 ```
@@ -736,7 +736,7 @@ Load the policy into root
 conjur policy load -f authn-gcp-secrets.yml -b root
 ```
 
-#### Sample Policy of GCP for Conjur Cloud
+#### Sample Policy of GCP for Secrets Manager, SaaS
 
 Define the GCP Authenticator policy
 ```
@@ -777,7 +777,7 @@ Enable the GCP authenticator
 ```
 conjur authenticator enable --id authn-gcp
 ```
-Define the Google Cloud service as a host in Conjur Cloud
+Define the Google Cloud service as a host in Secrets Manager, SaaS
 ```
 - !policy
   id: gcp-apps
@@ -845,9 +845,9 @@ provider "conjur" {
 ```
 ### Provider Configuration using JWT Authentication
 
-#### Below section describes JWT authentication for conjur OSS/Enterprise
+#### Below section describes JWT authentication for Conjur OSS / Secrets Manager, Self-Hosted
 
-#### Sample policy of JWT for OSS/Enterprise
+#### Sample policy of JWT for Conjur OSS / Secrets Manager, Self-Hosted
 Define JWT Authentication Policy
 ```
 - !policy
@@ -952,9 +952,9 @@ Save it as app-secret.yml and load it to root
 conjur policy load -f app-secret.yml -b root
 ```
 
-#### Below section describes JWT authentication for conjur cloud
+#### Below section describes JWT authentication for Secrets Manager, SaaS
 
-#### Sample policy of JWT for Conjur cloud
+#### Sample policy of JWT for Secrets Manager, SaaS
 Define JWT AUthenticator policy
 ```
 - !policy
@@ -1049,7 +1049,7 @@ Save the policy as authn-grantapp.yaml and load it to conjur/authn-jwt/github br
 ```
 conjur policy load -f authn-grantapp.yaml -b conjur/authn-jwt/github
 ```
-Give the workload access to secrets synced from your PAM solution.Assume that secrets in the ADO_Secret Safe have been synced to Conjur Cloud from your PAM solution
+Give the workload access to secrets synced from your PAM solution.Assume that secrets in the ADO_Secret Safe have been synced to Secrets Manager, SaaS from your PAM solution
 ```
 - !grant
   role: !group vault/ADO_Secret/delegation/consumers
@@ -1112,7 +1112,7 @@ output "dbpass_output" {
   value = "${data.conjur_secret.dbpass.value}"
   
   # Must mark this output value as sensitive for Terraform v0.15+,
-  # because it's derived from a Conjur variable value that is declared
+  # because it's derived from a Secrets Manager variable value that is declared
   # as sensitive.
   sensitive = true
 }
@@ -1120,7 +1120,7 @@ output "dbpass_output" {
 
 Secrets like `data.conjur_secret.dbpass.value` can be used in any Terraform resources.
 
-View an example Terraform manifest and Conjur policies in the
+View an example Terraform manifest and Secrets Manager policies in the
 [test/](test/) directory in this project.
 
 ---
@@ -1131,7 +1131,7 @@ If this Terraform provider does not fit your needs, you can also use
 [summon](https://github.com/cyberark/summon) with the
 [summon-conjur](https://github.com/cyberark/summon-conjur) provider
 to provide secrets to Terraform via environment variables.
-The user running `terraform` must already be authenticated with Conjur.
+The user running `terraform` must already be authenticated with Secrets Manager.
 
 Terraform's [`TF_VAR_name` syntax](https://www.terraform.io/docs/configuration/environment-variables.html#tf_var_name)
 allows a user to set Terraform variables via environment variables.
