@@ -86,7 +86,7 @@ function main() {
   validate_results || overall_status=1
 
   if [[ "$run_resource_tests" == "true" ]]; then
-    ./bin/run_resource_tests || overall_status=1
+    TARGET=$TARGET ./bin/run_resource_tests || overall_status=1
   fi
 
   echo "###################################################################"
@@ -157,9 +157,9 @@ function rotate_host_api_key() {
   if [[ $TARGET == "cloud" ]]; then
     api_key=$(curl -k --request PUT --data "" \
       -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
-      $CONJUR_APPLIANCE_URL/authn/conjur/api_key?role=host:$(url_encode "data/terraform/testapp"))
+      $CONJUR_APPLIANCE_URL/authn/conjur/api_key?role=host:$(url_encode "data/testapp"))
   else
-    api_key=$(client_exec conjur host rotate-api-key -i "data/terraform/testapp" | tr -d '\r')
+    api_key=$(client_exec conjur host rotate-api-key -i "data/testapp" | tr -d '\r')
   fi
 }
 
@@ -268,6 +268,7 @@ function load_test_policies() {
 
   case "$TEST_CASE" in
     "api-key")
+      load_policy "data" "$policy_folder/host.yml"
       load_policy "data" "$policy_folder/root.yml"
       set_variable "data/terraform/target-password" "$TEST_SECRET_VAL"
       ;;
@@ -361,12 +362,12 @@ function set_TF_vars() {
     "api-key")
       export TF_VAR_conjur_authn_type="api"
       export TF_VAR_conjur_secret_variable="data/terraform/target-password"
-      export TF_VAR_conjur_authn_login="host/data/terraform/testapp"
-      export TF_VAR_conjur_resource_owner_id="data/terraform/testapp"
+      export TF_VAR_conjur_authn_login="host/data/testapp"
+      export TF_VAR_conjur_resource_owner_id="data/testapp"
       rotate_host_api_key
       export TF_VAR_conjur_api_key="$api_key"
       # NOTE: These are only used if configuring the provider with env vars instead of TF vars
-      export CONJUR_AUTHN_LOGIN="host/data/terraform/testapp"
+      export CONJUR_AUTHN_LOGIN="host/data/testapp"
       export CONJUR_AUTHN_API_KEY="$api_key"
       ;;
     "jwt")

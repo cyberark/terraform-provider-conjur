@@ -1,0 +1,12 @@
+# Create a host for testing
+- !host
+  id: testapp
+  annotations:
+    description: Host for running Terraform on remote targets
+    authn/api-key: true
+
+# Allow the host to manage authenticators
+- !grant
+  role: !group Authn_Admins
+  members:
+    - !host testapp
