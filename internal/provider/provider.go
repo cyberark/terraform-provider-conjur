@@ -244,7 +244,9 @@ func (p *conjurProvider) createConjurClient(config *conjurapi.Config, data *conj
 	authnType := data.AuthnType.ValueString()
 
 	switch authnType {
-	case "azure", "gcp":
+	case "azure":
+		return p.createAzureClient(config, data)
+	case "gcp":
 		return p.createCloudAuthClient(config, data, authnType)
 	case "aws", "iam":
 		return p.createIAMClient(config, data)
@@ -299,8 +301,6 @@ func (p *conjurProvider) createTokenProvider(data *conjurProviderModel, authnTyp
 	}
 
 	switch authnType {
-	case "azure":
-		return &multi_cloud_access_token.AzureTokenProvider{}, nil
 	case "gcp":
 		return &multi_cloud_access_token.GCPTokenProvider{
 			Account: account,
@@ -323,6 +323,14 @@ func (p *conjurProvider) createJWTClient(config *conjurapi.Config, data *conjurP
 	}
 
 	return client, nil
+}
+
+func (p *conjurProvider) createAzureClient(config *conjurapi.Config, data *conjurProviderModel) (*conjurapi.Client, error) {
+	config.ServiceID = data.ServiceID.ValueString()
+	config.AuthnType = "azure"
+	config.JWTHostID = strings.TrimPrefix(data.HostID.ValueString(), "host/")
+
+	return conjurapi.NewClientFromAzureCredentials(*config)
 }
 
 func (p *conjurProvider) createIAMClient(config *conjurapi.Config, data *conjurProviderModel) (*conjurapi.Client, error) {
