@@ -1,5 +1,5 @@
 #!/bin/bash
-set -exo pipefail
+set -eo pipefail
 
 # Default values
 TARGET=""
@@ -317,7 +317,7 @@ function run_terraform_tests() {
 
   echo ">> Planning and applying '$target_dir/main.tf' Terraform manifest"
 
-  export TF_LOG=DEBUG
+  # export TF_LOG=DEBUG
 
   rm -f "$LOCAL_SECRET_FILE"
 

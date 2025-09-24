@@ -16,7 +16,11 @@
     resource: *variables
 
   # Child policy for the testapp user to manipulate
-  - !policy test
+  - !policy 
+    id: test
+    body: 
+    - !host test-workload
+    - !variable workload-secret
 
   - !permit 
     role: !host /data/testapp
