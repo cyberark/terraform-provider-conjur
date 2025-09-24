@@ -15,7 +15,7 @@ terraform {
 }
 
 provider "conjur" {
-  # Login and api_key are passed thorugh environmental variables
+  # Login and api_key are passed through environmental variables
   appliance_url = var.conjur_appliance_url
   account       = var.conjur_account
   authn_type    = var.conjur_authn_type

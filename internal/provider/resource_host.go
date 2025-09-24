@@ -7,6 +7,8 @@ import (
 	"github.com/cyberark/conjur-api-go/conjurapi"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -77,6 +79,9 @@ func (r *ConjurHostResource) Schema(ctx context.Context, req resource.SchemaRequ
 			"type": schema.StringAttribute{
 				MarkdownDescription: "The host type",
 				Optional:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"owner": schema.SingleNestedAttribute{
 				MarkdownDescription: "Owner of the host",
@@ -85,10 +90,16 @@ func (r *ConjurHostResource) Schema(ctx context.Context, req resource.SchemaRequ
 					"kind": schema.StringAttribute{
 						MarkdownDescription: "Owner kind (user, group, etc.)",
 						Optional:            true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplace(),
+						},
 					},
 					"id": schema.StringAttribute{
 						MarkdownDescription: "Owner identifier",
 						Optional:            true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplace(),
+						},
 					},
 				},
 			},
@@ -96,6 +107,9 @@ func (r *ConjurHostResource) Schema(ctx context.Context, req resource.SchemaRequ
 				MarkdownDescription: "List of CIDR blocks the host is restricted to",
 				ElementType:         types.StringType,
 				Optional:            true,
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.RequiresReplace(),
+				},
 			},
 			"authn_descriptors": schema.ListNestedAttribute{
 				MarkdownDescription: "List of authentication descriptors for the host",
@@ -105,10 +119,16 @@ func (r *ConjurHostResource) Schema(ctx context.Context, req resource.SchemaRequ
 						"type": schema.StringAttribute{
 							MarkdownDescription: "Type of authentication",
 							Required:            true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.RequiresReplace(),
+							},
 						},
 						"service_id": schema.StringAttribute{
 							MarkdownDescription: "Service ID for the authentication type",
 							Optional:            true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.RequiresReplace(),
+							},
 						},
 						"data": schema.SingleNestedAttribute{
 							MarkdownDescription: "Additional data for the authentication descriptor",
@@ -118,6 +138,9 @@ func (r *ConjurHostResource) Schema(ctx context.Context, req resource.SchemaRequ
 									MarkdownDescription: "Map of claim keys to expected values",
 									ElementType:         types.StringType,
 									Optional:            true,
+									PlanModifiers: []planmodifier.Map{
+										mapplanmodifier.RequiresReplace(),
+									},
 								},
 							},
 						},
@@ -128,6 +151,9 @@ func (r *ConjurHostResource) Schema(ctx context.Context, req resource.SchemaRequ
 				MarkdownDescription: "Key-value annotations for the host",
 				Optional:            true,
 				ElementType:         types.StringType,
+				PlanModifiers: []planmodifier.Map{
+					mapplanmodifier.RequiresReplace(),
+				},
 			},
 		},
 	}
@@ -203,29 +229,9 @@ func (r *ConjurHostResource) Read(ctx context.Context, req resource.ReadRequest,
 
 // Update replaces the host by deleting and recreating it since there's no PATCH support
 func (r *ConjurHostResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data, state ConjurHostResourceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
-	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-	host, err := r.buildHostPayload(&data)
-	if err != nil {
-		resp.Diagnostics.AddError("Error Building Host Payload", fmt.Sprintf("Could not build host payload: %s", err))
-		return
-	}
-
-	_, err = r.client.V2().DeleteWorkload(fmt.Sprintf("%s/%s", state.Branch.ValueString(), state.Name.ValueString()))
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete existing host for update, got error: %s", err))
-		return
-	}
-
-	_, err = r.client.V2().CreateWorkload(*host)
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create host, got error: %s", err))
-		return
-	}
-
-	tflog.Trace(ctx, "updated host resource")
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	// This should never be called since in-place updates are not supported by the API. Therefore any attribute changes
+	// require replacement of the resource (Delete + Create) as denoted by the plan modifiers.
+	resp.Diagnostics.AddWarning("Update not supported", "Host resources require replacement for any changes, so update is not supported. Please recreate the resource with the desired changes.")
 }
 
 func (r *ConjurHostResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
