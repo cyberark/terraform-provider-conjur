@@ -35,6 +35,7 @@ services:
       TF_VAR_authn_jwt_token: "${JWT_TOKEN}"
       TF_VAR_conjur_authenticator_name:
       TF_VAR_conjur_host_name:
+      TF_VAR_conjur_group_name:
       GCP_TOKEN: ${GCP_TOKEN}
     working_dir: /src
     volumes:
