@@ -14,7 +14,6 @@ import (
 
 	"github.com/cyberark/conjur-api-go/conjurapi"
 	"github.com/cyberark/conjur-api-go/conjurapi/authn"
-	"github.com/cyberark/terraform-provider-conjur/internal/multi_cloud_access_token"
 )
 
 var (
@@ -244,8 +243,10 @@ func (p *conjurProvider) createConjurClient(config *conjurapi.Config, data *conj
 	authnType := data.AuthnType.ValueString()
 
 	switch authnType {
-	case "azure", "gcp":
-		return p.createCloudAuthClient(config, data, authnType)
+	case "azure":
+		return p.createAzureClient(config, data)
+	case "gcp":
+		return p.createGCPClient(config, data)
 	case "aws", "iam":
 		return p.createIAMClient(config, data)
 	case "jwt":
@@ -257,72 +258,39 @@ func (p *conjurProvider) createConjurClient(config *conjurapi.Config, data *conj
 	}
 }
 
-func (p *conjurProvider) createCloudAuthClient(config *conjurapi.Config, data *conjurProviderModel, authnType string) (*conjurapi.Client, error) {
-	token, err := p.getCloudAuthToken(data, authnType)
-	if err != nil {
-		return nil, fmt.Errorf("error getting token from %s provider: %w", authnType, err)
-	}
-
-	config.AuthnType = authnType
-	config.ServiceID = data.ServiceID.ValueString()
-	config.JWTHostID = data.HostID.ValueString()
-	config.JWTContent = token
-
-	client, err := conjurapi.NewClientFromJwt(*config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize Conjur client for %s authn-type: %w", authnType, err)
-	}
-
-	return client, nil
-}
-
-func (p *conjurProvider) getCloudAuthToken(data *conjurProviderModel, authnType string) (string, error) {
-	// Check for GCP environment token first
-	if authnType == "gcp" {
-		if gcpToken := os.Getenv("GCP_TOKEN"); gcpToken != "" {
-			return gcpToken, nil
-		}
-	}
-
-	provider, err := p.createTokenProvider(data, authnType)
-	if err != nil {
-		return "", err
-	}
-
-	return provider.Token(data.ClientID.ValueString())
-}
-
-func (p *conjurProvider) createTokenProvider(data *conjurProviderModel, authnType string) (multi_cloud_access_token.TokenProvider, error) {
-	account := data.Account.ValueString()
-	if account == "" {
-		account = "conjur"
-	}
-
-	switch authnType {
-	case "azure":
-		return &multi_cloud_access_token.AzureTokenProvider{}, nil
-	case "gcp":
-		return &multi_cloud_access_token.GCPTokenProvider{
-			Account: account,
-			HostID:  data.Login.ValueString(),
-		}, nil
-	default:
-		return nil, fmt.Errorf("unsupported cloud authentication type: %s", authnType)
-	}
-}
-
 func (p *conjurProvider) createJWTClient(config *conjurapi.Config, data *conjurProviderModel) (*conjurapi.Client, error) {
 	config.ServiceID = data.ServiceID.ValueString()
 	config.JWTHostID = data.HostID.ValueString()
 	config.AuthnType = data.AuthnType.ValueString()
 	config.JWTContent = data.AuthnJWT.ValueString()
 
-	client, err := conjurapi.NewClientFromJwt(*config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize Conjur client for authn-type: %w", err)
+	return conjurapi.NewClientFromJwt(*config)
+}
+
+func (p *conjurProvider) createGCPClient(config *conjurapi.Config, data *conjurProviderModel) (*conjurapi.Client, error) {
+	config.ServiceID = data.ServiceID.ValueString()
+	config.AuthnType = "gcp"
+	config.JWTHostID = strings.TrimPrefix(data.HostID.ValueString(), "host/")
+
+	// The below is sort-of a hack to test this in CI, where our GCP runners apparently don't
+	// have docker, and therefore can not use the GCP metadata service to fetch tokens
+	if gcpToken := os.Getenv("GCP_TOKEN"); gcpToken != "" {
+		config.JWTContent = gcpToken
+		return conjurapi.NewClientFromJwt(*config)
 	}
 
-	return client, nil
+	return conjurapi.NewClientFromStoredGCPConfig(*config)
+}
+
+func (p *conjurProvider) createAzureClient(config *conjurapi.Config, data *conjurProviderModel) (*conjurapi.Client, error) {
+	config.ServiceID = data.ServiceID.ValueString()
+	config.AuthnType = "azure"
+	config.JWTHostID = strings.TrimPrefix(data.HostID.ValueString(), "host/")
+	if !data.ClientID.IsNull() && !data.ClientID.IsUnknown() {
+		config.AzureClientID = data.ClientID.ValueString()
+	}
+
+	return conjurapi.NewClientFromAzureCredentials(*config)
 }
 
 func (p *conjurProvider) createIAMClient(config *conjurapi.Config, data *conjurProviderModel) (*conjurapi.Client, error) {
