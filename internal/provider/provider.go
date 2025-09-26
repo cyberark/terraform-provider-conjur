@@ -272,8 +272,11 @@ func (p *conjurProvider) createGCPClient(config *conjurapi.Config, data *conjurP
 	config.AuthnType = "gcp"
 	config.JWTHostID = strings.TrimPrefix(data.HostID.ValueString(), "host/")
 
+	// The below is sort-of a hack to test this in CI, where our GCP runners apparently don't
+	// have docker, and therefore can not use the GCP metadata service to fetch tokens
 	if gcpToken := os.Getenv("GCP_TOKEN"); gcpToken != "" {
 		config.JWTContent = gcpToken
+		return conjurapi.NewClientFromJwt(*config)
 	}
 
 	return conjurapi.NewClientFromStoredGCPConfig(*config)
@@ -283,6 +286,9 @@ func (p *conjurProvider) createAzureClient(config *conjurapi.Config, data *conju
 	config.ServiceID = data.ServiceID.ValueString()
 	config.AuthnType = "azure"
 	config.JWTHostID = strings.TrimPrefix(data.HostID.ValueString(), "host/")
+	if !data.ClientID.IsNull() && !data.ClientID.IsUnknown() {
+		config.AzureClientID = data.ClientID.ValueString()
+	}
 
 	return conjurapi.NewClientFromAzureCredentials(*config)
 }
