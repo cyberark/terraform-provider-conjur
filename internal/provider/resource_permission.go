@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
+	"github.com/cyberark/terraform-provider-conjur/internal/policy"
 	"github.com/doodlesbykumbi/conjur-policy-go/pkg/conjurpolicy"
 	"gopkg.in/yaml.v3"
 )
@@ -142,14 +143,14 @@ func (r *ConjurPermissionResource) Create(ctx context.Context, req resource.Crea
 		return
 	}
 
-	branch, policy, err := r.generatePermissionPolicy(&data)
+	branch, permissionPolicy, err := r.generatePermissionPolicy(&data)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Building Permission Policy", fmt.Sprintf("Could not build Permission policy: %s", err))
 		return
 	}
 
 	// TODO - determine root branch manually since we can't assume "data" for on-prem users?
-	err = r.applyPolicy(policy, branch)
+	err = policy.ApplyPolicy(r.client, permissionPolicy, branch)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to load Permission policy, got error: %s", err))
 		return
@@ -195,13 +196,13 @@ func (r *ConjurPermissionResource) Update(ctx context.Context, req resource.Upda
 	var data ConjurPermissionResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 
-	branch, policy, err := r.generatePermissionPolicy(&data)
+	branch, permissionPolicy, err := r.generatePermissionPolicy(&data)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Building Permission Policy", fmt.Sprintf("Could not build Permission policy: %s", err))
 		return
 	}
 
-	err = r.applyPolicy(policy, branch)
+	err = policy.ApplyPolicy(r.client, permissionPolicy, branch)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to load Permission policy, got error: %s", err))
 		return
@@ -219,13 +220,13 @@ func (r *ConjurPermissionResource) Delete(ctx context.Context, req resource.Dele
 		return
 	}
 
-	branch, policy, err := r.generatePermissionDenyPolicy(&data)
+	branch, permissionPolicy, err := r.generatePermissionDenyPolicy(&data)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Building Permission Delete Policy", fmt.Sprintf("Could not build Permission Delete policy: %s", err))
 		return
 	}
 
-	err = r.applyPolicy(policy, branch)
+	err = policy.ApplyPolicy(r.client, permissionPolicy, branch)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to load Permission policy, got error: %s", err))
 		return
@@ -411,22 +412,6 @@ func validateKinds(data *ConjurPermissionResourceModel) (conjurpolicy.Kind, conj
 		return 0, 0, fmt.Errorf("invalid resource kind: %s", data.Resource.Kind.ValueString())
 	}
 	return roleKind, resKind, nil
-}
-
-// applyPolicy applies a policy to Conjur using PATCH mode
-func (r *ConjurPermissionResource) applyPolicy(policy, branch string) error {
-	policyResponse, err := r.client.LoadPolicy(conjurapi.PolicyModePatch, branch, strings.NewReader(policy))
-	if err != nil {
-		return fmt.Errorf("failed to load policy: %w", err)
-	}
-
-	// Log the policy response for debugging
-	tflog.Debug(context.Background(), "Policy applied successfully", map[string]interface{}{
-		"created_roles": policyResponse.CreatedRoles,
-		"version":       policyResponse.Version,
-	})
-
-	return nil
 }
 
 // derivePolicyContext calculates the lowest shared branch, plus relative role/resource IDs

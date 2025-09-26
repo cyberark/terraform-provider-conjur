@@ -3,9 +3,9 @@ package provider
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/cyberark/conjur-api-go/conjurapi"
+	"github.com/cyberark/terraform-provider-conjur/internal/policy"
 	"github.com/doodlesbykumbi/conjur-policy-go/pkg/conjurpolicy"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -123,14 +123,14 @@ func (r *ConjurGroupResource) Create(ctx context.Context, req resource.CreateReq
 	}
 
 	// Generate the policy for creating the group
-	policy, err := r.generateGroupPolicy(&data)
+	groupPolicy, err := r.generateGroupPolicy(&data)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Generating Policy", fmt.Sprintf("Could not generate group policy: %s", err))
 		return
 	}
 
 	// Apply the policy to Conjur
-	err = r.applyPolicy(policy, data.Branch.ValueString())
+	err = policy.ApplyPolicy(r.client, groupPolicy, data.Branch.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Error Applying Policy", fmt.Sprintf("Could not apply group policy: %s", err))
 		return
@@ -191,14 +191,14 @@ func (r *ConjurGroupResource) Delete(ctx context.Context, req resource.DeleteReq
 	}
 
 	// Generate policy to delete the group
-	policy, err := r.generateGroupDeletionPolicy(&data)
+	groupPolicy, err := r.generateGroupDeletionPolicy(&data)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Generating Deletion Policy", fmt.Sprintf("Could not generate group deletion policy: %s", err))
 		return
 	}
 
 	// Apply the deletion policy
-	err = r.applyPolicy(policy, data.Branch.ValueString())
+	err = policy.ApplyPolicy(r.client, groupPolicy, data.Branch.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Error Applying Deletion Policy", fmt.Sprintf("Could not apply group deletion policy: %s", err))
 		return
@@ -264,20 +264,4 @@ func (r *ConjurGroupResource) generateGroupDeletionPolicy(data *ConjurGroupResou
 	}
 
 	return string(yamlBytes), nil
-}
-
-// applyPolicy applies a policy to Conjur
-func (r *ConjurGroupResource) applyPolicy(policy, branch string) error {
-	policyResponse, err := r.client.LoadPolicy(conjurapi.PolicyModePatch, branch, strings.NewReader(policy))
-	if err != nil {
-		return fmt.Errorf("failed to load policy: %w", err)
-	}
-
-	// Log the policy response for debugging
-	tflog.Debug(context.Background(), "Policy applied successfully", map[string]interface{}{
-		"created_roles": policyResponse.CreatedRoles,
-		"version":       policyResponse.Version,
-	})
-
-	return nil
 }
