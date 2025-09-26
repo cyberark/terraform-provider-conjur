@@ -3,7 +3,6 @@ variable "conjur_account" {}
 variable "conjur_secret_variable" {}
 variable "conjur_authn_type" {}
 variable "conjur_ssl_cert" {}
-variable "conjur_host_name" {}
 
 terraform {
   required_providers {
@@ -22,22 +21,25 @@ provider "conjur" {
   ssl_cert      = var.conjur_ssl_cert
 }
 
-resource "conjur_host" "test_app" {
-  name = var.conjur_host_name
-  branch = "data/terraform/test"
-  annotations = {
-    note = "UPDATED workload provisioned by Terraform",
-    key2 = "value2"
+resource "conjur_permission" "test_app_privileges" {
+  role = {
+    name     = "test-workload"
+    kind   = "host"
+    branch = "data/terraform/test"
   }
-  restricted_to = ["1.2.4.5", "10.20.30.10"]
-  authn_descriptors = [
-    {
-      type = "api_key"
-    }
-  ]
+  resource = {
+    name     = "workload-secret"
+    kind   = "variable"
+    branch = "data/terraform/test"
+  }
+  privileges = ["read", "execute"]
 }
 
-output "update_status" {
-  value = conjur_host.test_app.annotations.note == "UPDATED workload provisioned by Terraform" ? "success" : "fail"
+# Save the name for later use in other stages
+output "permission_role_name" {
+  value = conjur_permission.test_app_privileges.role.name
 }
 
+output "create_status" {
+  value = conjur_permission.test_app_privileges.role.name != "" ? "success" : "fail"
+}

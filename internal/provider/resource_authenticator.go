@@ -7,10 +7,13 @@ import (
 	"strings"
 
 	"github.com/cyberark/conjur-api-go/conjurapi"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -32,18 +35,13 @@ type ConjurAuthenticatorResource struct {
 
 // ConjurAuthenticatorResourceModel describes the resource data model.
 type ConjurAuthenticatorResourceModel struct {
-	Type        types.String                   `tfsdk:"type"`
-	Name        types.String                   `tfsdk:"name"`
-	Subtype     types.String                   `tfsdk:"subtype"`
-	Enabled     types.Bool                     `tfsdk:"enabled"`
-	Owner       *ConjurAuthenticatorOwnerModel `tfsdk:"owner"`
-	Data        *ConjurAuthenticatorDataModel  `tfsdk:"data"`
-	Annotations map[string]string              `tfsdk:"annotations"`
-}
-
-type ConjurAuthenticatorOwnerModel struct {
-	Kind types.String `tfsdk:"kind"`
-	ID   types.String `tfsdk:"id"`
+	Type        types.String                  `tfsdk:"type"`
+	Name        types.String                  `tfsdk:"name"`
+	Subtype     types.String                  `tfsdk:"subtype"`
+	Enabled     types.Bool                    `tfsdk:"enabled"`
+	Owner       types.Object                  `tfsdk:"owner"`
+	Data        *ConjurAuthenticatorDataModel `tfsdk:"data"`
+	Annotations map[string]string             `tfsdk:"annotations"`
 }
 
 type ConjurAuthenticatorDataModel struct {
@@ -74,6 +72,9 @@ func (r *ConjurAuthenticatorResource) Schema(ctx context.Context, req resource.S
 			"type": schema.StringAttribute{
 				MarkdownDescription: "The authenticator type (e.g., jwt, ldap, oidc)",
 				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"name": schema.StringAttribute{
 				MarkdownDescription: "The name of the authenticator",
@@ -85,6 +86,9 @@ func (r *ConjurAuthenticatorResource) Schema(ctx context.Context, req resource.S
 			"subtype": schema.StringAttribute{
 				MarkdownDescription: "Authenticator subtype (e.g., github)",
 				Optional:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"enabled": schema.BoolAttribute{
 				MarkdownDescription: "Whether the authenticator is enabled",
@@ -96,18 +100,28 @@ func (r *ConjurAuthenticatorResource) Schema(ctx context.Context, req resource.S
 				MarkdownDescription: "Key-value annotations for the authenticator",
 				Optional:            true,
 				ElementType:         types.StringType,
+				PlanModifiers: []planmodifier.Map{
+					mapplanmodifier.RequiresReplace(),
+				},
 			},
 			"owner": schema.SingleNestedAttribute{
 				MarkdownDescription: "Owner of the authenticator",
 				Optional:            true,
+				Computed:            true,
 				Attributes: map[string]schema.Attribute{
 					"kind": schema.StringAttribute{
 						MarkdownDescription: "Owner kind (user, group, etc.)",
 						Optional:            true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplace(),
+						},
 					},
 					"id": schema.StringAttribute{
 						MarkdownDescription: "Owner identifier",
 						Optional:            true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplace(),
+						},
 					},
 				},
 			},
@@ -118,21 +132,36 @@ func (r *ConjurAuthenticatorResource) Schema(ctx context.Context, req resource.S
 					"audience": schema.StringAttribute{
 						MarkdownDescription: "JWT audience",
 						Optional:            true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplace(),
+						},
 					},
 					"jwks_uri": schema.StringAttribute{
 						MarkdownDescription: "JWKS URI",
 						Optional:            true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplace(),
+						},
 					},
 					"issuer": schema.StringAttribute{
 						Optional: true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplace(),
+						},
 					},
 					"ca_cert": schema.StringAttribute{
 						MarkdownDescription: "CA certificate",
 						Optional:            true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplace(),
+						},
 					},
 					"public_keys": schema.StringAttribute{
 						MarkdownDescription: "Public keys",
 						Optional:            true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplace(),
+						},
 					},
 					"identity": schema.SingleNestedAttribute{
 						MarkdownDescription: "Identity configuration",
@@ -141,20 +170,32 @@ func (r *ConjurAuthenticatorResource) Schema(ctx context.Context, req resource.S
 							"identity_path": schema.StringAttribute{
 								MarkdownDescription: "Identity path",
 								Optional:            true,
+								PlanModifiers: []planmodifier.String{
+									stringplanmodifier.RequiresReplace(),
+								},
 							},
 							"token_app_property": schema.StringAttribute{
 								MarkdownDescription: "Token app property",
 								Optional:            true,
+								PlanModifiers: []planmodifier.String{
+									stringplanmodifier.RequiresReplace(),
+								},
 							},
 							"claim_aliases": schema.MapAttribute{
 								MarkdownDescription: "Claim aliases mapping",
 								Optional:            true,
 								ElementType:         types.StringType,
+								PlanModifiers: []planmodifier.Map{
+									mapplanmodifier.RequiresReplace(),
+								},
 							},
 							"enforced_claims": schema.ListAttribute{
 								MarkdownDescription: "List of enforced claims",
 								Optional:            true,
 								ElementType:         types.StringType,
+								PlanModifiers: []planmodifier.List{
+									listplanmodifier.RequiresReplace(),
+								},
 							},
 						},
 					},
@@ -195,9 +236,16 @@ func (r *ConjurAuthenticatorResource) Create(ctx context.Context, req resource.C
 		return
 	}
 
-	_, err = r.client.V2().CreateAuthenticator(newAuthenticator)
+	authenticatorResp, err := r.client.V2().CreateAuthenticator(newAuthenticator)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create authenticator, got error: %s", err))
+		return
+	}
+
+	// Parse the actual API response into the state (including computed attributes)
+	err = r.parseAuthenticatorResponse(authenticatorResp, &data)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Parsing Authenticator Response", fmt.Sprintf("Could not parse authenticator response: %s", err))
 		return
 	}
 
@@ -221,7 +269,7 @@ func (r *ConjurAuthenticatorResource) Read(ctx context.Context, req resource.Rea
 
 	err = r.parseAuthenticatorResponse(authenticatorResponse, &data)
 	if err != nil {
-		resp.Diagnostics.AddError("Error Parsing Authenticator Payload", fmt.Sprintf("Could not parse authenticator payload: %s", err))
+		resp.Diagnostics.AddError("Error Parsing Authenticator Response", fmt.Sprintf("Could not parse authenticator response: %s", err))
 		return
 	}
 
@@ -304,10 +352,11 @@ func (r *ConjurAuthenticatorResource) buildAuthenticatorPayload(data *ConjurAuth
 	if boolPtr := valueBoolPtr(data.Enabled); boolPtr != nil {
 		authenticator.Enabled = boolPtr
 	}
-	if data.Owner != nil {
+
+	if !data.Owner.IsNull() && !data.Owner.IsUnknown() {
 		authenticator.Owner = &conjurapi.AuthOwner{
-			Kind: data.Owner.Kind.ValueString(),
-			ID:   data.Owner.ID.ValueString(),
+			Kind: data.Owner.Attributes()["kind"].(types.String).ValueString(),
+			ID:   data.Owner.Attributes()["id"].(types.String).ValueString(),
 		}
 	}
 
@@ -378,12 +427,19 @@ func (r *ConjurAuthenticatorResource) parseAuthenticatorResponse(authenticator *
 	data.Enabled = boolOrNull(authenticator.Enabled)
 
 	if authenticator.Owner != nil {
-		data.Owner = &ConjurAuthenticatorOwnerModel{
-			Kind: types.StringValue(authenticator.Owner.Kind),
-			ID:   types.StringValue(authenticator.Owner.ID),
+		ownerAttrs := map[string]attr.Value{
+			"kind": types.StringValue(authenticator.Owner.Kind),
+			"id":   types.StringValue(authenticator.Owner.ID),
 		}
+		data.Owner = types.ObjectValueMust(map[string]attr.Type{
+			"kind": types.StringType,
+			"id":   types.StringType,
+		}, ownerAttrs)
 	} else {
-		data.Owner = nil
+		data.Owner = types.ObjectNull(map[string]attr.Type{
+			"kind": types.StringType,
+			"id":   types.StringType,
+		})
 	}
 
 	if authenticatorData, err := parseDataFromMap(authenticator.Data); err != nil {

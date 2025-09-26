@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 ## [0.8.0] - 2025-09-22
 ### Added
+- Support for Conjur permissions via the conjur_permission resource
 - Support for Conjur V2 Workloads API via the conjur_host resource
 - Support for Conjur V2 Authenticators API via the conjur_authenticator resource
 - Support for Conjur Groups via the conjur_group resource

@@ -15,7 +15,7 @@ terraform {
 }
 
 provider "conjur" {
-  # Login and api_key are passed thorugh environmental variables
+  # Login and api_key are passed through environmental variables
   appliance_url = var.conjur_appliance_url
   account       = var.conjur_account
   authn_type    = var.conjur_authn_type
@@ -39,23 +39,7 @@ resource "conjur_authenticator" "jwt_authenticator" {
       enforced_claims = ["sub","email"],
     },
     ca_cert = "-----BEGIN CERTIFICATE-----",
-    public_keys = <<EOT
-{
-  "type": "jwks",
-  "value": {
-    "keys": [
-      {
-        "use": "sig",
-        "kty": "RSA",
-        "kid": "F8...",
-        "alg": "RS256",
-        "n": "8158...",
-        "e": "AQAB"
-      }
-    ]
-  }
-}
-EOT
+    public_keys = "{\"type\":\"jwks\",\"value\":{\"keys\":[{\"alg\":\"RS256\",\"e\":\"AQAB\",\"kid\":\"F8...\",\"kty\":\"RSA\",\"n\":\"8158...\",\"use\":\"sig\"}]}}"
   }
   annotations = {
     note = "Enable JWT login for CI runner in TF",

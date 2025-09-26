@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/cyberark/conjur-api-go/conjurapi"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,7 +20,7 @@ func TestConjurAuthenticatorResource_buildAuthenticatorPayload(t *testing.T) {
 			Name:        types.StringValue("test-auth"),
 			Subtype:     types.StringNull(),
 			Enabled:     types.BoolNull(),
-			Owner:       nil,
+			Owner:       types.ObjectNull(map[string]attr.Type{}),
 			Data:        nil,
 			Annotations: nil,
 		}
@@ -40,16 +41,20 @@ func TestConjurAuthenticatorResource_buildAuthenticatorPayload(t *testing.T) {
 	t.Run("All authenticator fields", func(t *testing.T) {
 		enabled := true
 		subtype := "github"
+		ownerAttrs := map[string]attr.Value{
+			"kind": types.StringValue("group"),
+			"id":   types.StringValue("admin-group"),
+		}
 
 		data := &ConjurAuthenticatorResourceModel{
 			Type:    types.StringValue("jwt"),
 			Name:    types.StringValue("test-auth"),
 			Subtype: types.StringValue("github"),
 			Enabled: types.BoolValue(true),
-			Owner: &ConjurAuthenticatorOwnerModel{
-				Kind: types.StringValue("group"),
-				ID:   types.StringValue("admin-group"),
-			},
+			Owner: types.ObjectValueMust(map[string]attr.Type{
+				"kind": types.StringType,
+				"id":   types.StringType,
+			}, ownerAttrs),
 			Data: &ConjurAuthenticatorDataModel{
 				Audience:   types.StringValue("test-audience"),
 				JwksURI:    types.StringValue("https://example.com/jwks"),
@@ -132,7 +137,7 @@ func TestConjurAuthenticatorResource_buildAuthenticatorPayload(t *testing.T) {
 			Name:        types.StringValue("test-auth"),
 			Subtype:     types.StringUnknown(),
 			Enabled:     types.BoolUnknown(),
-			Owner:       nil,
+			Owner:       types.ObjectNull(map[string]attr.Type{}),
 			Data:        nil,
 			Annotations: nil,
 		}
@@ -236,7 +241,7 @@ func TestConjurAuthenticatorResource_parseAuthenticatorResponse(t *testing.T) {
 		assert.Equal(t, "test-auth", data.Name.ValueString())
 		assert.True(t, data.Subtype.IsNull())
 		assert.True(t, data.Enabled.IsNull())
-		assert.Nil(t, data.Owner)
+		assert.True(t, data.Owner.IsNull())
 		assert.Nil(t, data.Data)
 		assert.Nil(t, data.Annotations)
 	})
@@ -294,8 +299,8 @@ func TestConjurAuthenticatorResource_parseAuthenticatorResponse(t *testing.T) {
 
 		// Check Owner
 		require.NotNil(t, data.Owner)
-		assert.Equal(t, "group", data.Owner.Kind.ValueString())
-		assert.Equal(t, "admin-group", data.Owner.ID.ValueString())
+		assert.Equal(t, "group", data.Owner.Attributes()["kind"].(types.String).ValueString())
+		assert.Equal(t, "admin-group", data.Owner.Attributes()["id"].(types.String).ValueString())
 
 		// Check Data
 		require.NotNil(t, data.Data)

@@ -22,22 +22,21 @@ provider "conjur" {
   ssl_cert      = var.conjur_ssl_cert
 }
 
-resource "conjur_host" "test_app" {
-  name = var.conjur_host_name
-  branch = "data/terraform/test"
-  annotations = {
-    note = "UPDATED workload provisioned by Terraform",
-    key2 = "value2"
+// Try to remove a permission
+resource "conjur_permission" "imported" {
+  role = {
+    name     = "test-workload"
+    kind   = "host"
+    branch = "data/terraform/test"
   }
-  restricted_to = ["1.2.4.5", "10.20.30.10"]
-  authn_descriptors = [
-    {
-      type = "api_key"
-    }
-  ]
+  resource = {
+    name     = "workload-secret"
+    kind   = "variable"
+    branch = "data/terraform/test"
+  }
+  privileges = ["read"]
 }
 
 output "update_status" {
-  value = conjur_host.test_app.annotations.note == "UPDATED workload provisioned by Terraform" ? "success" : "fail"
+  value = toset(conjur_permission.imported.privileges) == toset(["read"]) ? "success" : "fail"
 }
-

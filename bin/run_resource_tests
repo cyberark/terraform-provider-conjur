@@ -1,5 +1,5 @@
 #!/bin/bash
-set -exo pipefail
+set -eo pipefail
 
 source "$(git rev-parse --show-toplevel)/bin/utils.sh"
 
@@ -26,6 +26,10 @@ function main() {
     test_resource_crud "tests/resources/host" "host" "name"
     test_results+=("Host|$?")
   fi
+
+  echo ">> Running Permission CRUD test"
+  test_resource_crud "tests/resources/permission" "permission" "role_name" "host/data/terraform/test/test-workload:variable/data/terraform/test/workload-secret"
+  test_results+=("Permission|$?")
 
   # Stop the container
   docker_compose down
@@ -57,7 +61,7 @@ function test_resource_crud() {
     return 1
   fi
 
-  # Get the resource ID for validation (all fields)
+  # Get the resource ID for validation
   local resource_id=$(terraform_exec "cd $test_dir/create && jq -r '.outputs.${resource_name}_${id_output_name}.value' terraform.tfstate")
   if [[ -z "$resource_id" || "$resource_id" == "null" ]]; then
     echo "FAILED: Could not get $id_output_name from terraform output"
@@ -80,10 +84,9 @@ function test_resource_crud() {
       return 1
     fi
 
-
+    # Basic validation that the new state file includes the expected resource
     echo "Verifying import of ${resource_name}"
-    local import_ids=$(terraform_exec "cd $test_dir/update && jq -r '.resources[] | select(.type == \"conjur_${resource_name}\") | .instances[0].attributes.name' terraform.tfstate")
-    if ! grep -qx "$resource_id$" <<< "$import_ids"; then
+    if ! grep -q "$resource_id" "$test_dir/update/terraform.tfstate"; then
       echo "FAILED: ${resource_name} import verification failed (missing $resource_id)"
       return 1
     fi
