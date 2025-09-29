@@ -3,7 +3,7 @@ module github.com/cyberark/terraform-provider-conjur
 go 1.24.1
 
 require (
-	github.com/cyberark/conjur-api-go v0.13.5
+	github.com/cyberark/conjur-api-go v0.13.6
 	github.com/doodlesbykumbi/conjur-policy-go v0.0.0-20241022093904-5fc5921aee96
 	github.com/hashicorp/terraform-plugin-framework v1.14.1
 	github.com/hashicorp/terraform-plugin-go v0.26.0
@@ -36,7 +36,6 @@ require (
 	github.com/cloudflare/circl v1.3.7 // indirect
 	github.com/danieljoos/wincred v1.2.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/doodlesbykumbi/conjur-policy-go v0.0.0-20241022093904-5fc5921aee96 // indirect
 	github.com/fatih/color v1.16.0 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
