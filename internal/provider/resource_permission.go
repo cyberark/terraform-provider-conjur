@@ -22,8 +22,11 @@ import (
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
-var _ resource.Resource = &ConjurPermissionResource{}
-var _ resource.ResourceWithImportState = &ConjurPermissionResource{}
+var (
+	_ resource.Resource                = &ConjurPermissionResource{}
+	_ resource.ResourceWithConfigure   = &ConjurPermissionResource{}
+	_ resource.ResourceWithImportState = &ConjurPermissionResource{}
+)
 
 func NewConjurPermissionResource() resource.Resource {
 	return &ConjurPermissionResource{}

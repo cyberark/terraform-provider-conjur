@@ -16,7 +16,10 @@ import (
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
-var _ resource.Resource = &ConjurHostResource{}
+var (
+	_ resource.Resource              = &ConjurHostResource{}
+	_ resource.ResourceWithConfigure = &ConjurHostResource{}
+)
 
 func NewConjurHostResource() resource.Resource {
 	return &ConjurHostResource{}
