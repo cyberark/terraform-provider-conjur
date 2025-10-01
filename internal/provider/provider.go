@@ -276,10 +276,9 @@ func (p *conjurProvider) createGCPClient(config *conjurapi.Config, data *conjurP
 	// have docker, and therefore can not use the GCP metadata service to fetch tokens
 	if gcpToken := os.Getenv("GCP_TOKEN"); gcpToken != "" {
 		config.JWTContent = gcpToken
-		return conjurapi.NewClientFromJwt(*config)
 	}
 
-	return conjurapi.NewClientFromStoredGCPConfig(*config)
+	return conjurapi.NewClientFromGCPCredentials(*config, "")
 }
 
 func (p *conjurProvider) createAzureClient(config *conjurapi.Config, data *conjurProviderModel) (*conjurapi.Client, error) {
