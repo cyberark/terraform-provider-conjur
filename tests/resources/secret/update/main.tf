@@ -22,12 +22,11 @@ provider "conjur" {
   ssl_cert      = var.conjur_ssl_cert
 }
 
-# updates issuer
 resource "conjur_secret" "imported" {
   name    = var.conjur_secret_name
   branch = "/data/terraform/test"
   mime_type = "text/plain"
-  value   = "mysecretvalue"
+  value   = "myupdatedsecretvalue"
   permissions = [
     {
       subject = {

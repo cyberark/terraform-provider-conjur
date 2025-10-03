@@ -36,7 +36,7 @@ function main() {
 
     echo ">> Running Secret CRUD test"
     test_resource_crud "tests/resources/secret" "secret" "name" "data/terraform/test/$TF_VAR_conjur_secret_name"
-    test_results+=("Permission|$?")
+    test_results+=("Secret|$?")
   fi
 
   # Stop the container

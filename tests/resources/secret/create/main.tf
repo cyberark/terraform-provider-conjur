@@ -34,6 +34,13 @@ resource "conjur_secret" "test_secret" {
         id = "data/terraform/test/test-workload"
       }
       privileges = ["read", "execute"]
+    },
+    {
+      subject = {
+        kind = "host"
+        id = "data/terraform/test/another-test-workload"
+      }
+      privileges = ["read"]
     }
   ]
   annotations = {

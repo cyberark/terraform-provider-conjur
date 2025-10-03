@@ -20,6 +20,7 @@
     id: test
     body: 
     - !host test-workload
+    - !host another-test-workload
     - !variable workload-secret
 
   - !permit 

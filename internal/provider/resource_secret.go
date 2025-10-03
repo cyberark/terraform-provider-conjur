@@ -75,7 +75,7 @@ func (r *ConjurSecretResource) Schema(ctx context.Context, req resource.SchemaRe
 				},
 			},
 			"branch": schema.StringAttribute{
-				MarkdownDescription: "The policy branch of the secret",
+				MarkdownDescription: "The policy branch of the secret (must be an absolute path)",
 				Required:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -188,10 +188,19 @@ func (r *ConjurSecretResource) ValidateConfig(ctx context.Context, req resource.
 		return
 	}
 
+	// Ensure branch is an absolute path by adding a leading slash if necessary
 	if !strings.HasPrefix(data.Branch.ValueString(), "/") {
 		resp.Diagnostics.AddError(
 			"Invalid branch",
 			"Branch must be an absolute path including a leading slash (/).",
+		)
+	}
+
+	// Warn that secret value attribute is sensitive and will be stored in state
+	if !data.Value.IsNull() && !data.Value.IsUnknown() {
+		resp.Diagnostics.AddWarning(
+			"Sensitive Value in Configuration",
+			"The 'value' attribute is marked as sensitive and will be stored in the Terraform state. Ensure your state file is securely managed.",
 		)
 	}
 }
@@ -215,8 +224,8 @@ func (r *ConjurSecretResource) Create(ctx context.Context, req resource.CreateRe
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create secret, got error: %s", err))
 		return
 	}
-	// TODO hydrate state from response
-	// fmt.Println(secretResp)
+
+	// Assume permissions in the model are correct since it was just created (otherwise we would need a separate request to evaluate them)
 	r.parseSecretResponse(*secretResp, conjurapi.PermissionResponse{}, &data)
 
 	tflog.Trace(ctx, "created secret resource")
@@ -252,35 +261,25 @@ func (r *ConjurSecretResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
+	// Fetch the secret value (if accessible) to store in state
+	secretValue, err := r.client.RetrieveSecret(secretID)
+	if err != nil {
+		resp.Diagnostics.AddWarning("Unable to fetch secret value", fmt.Sprintf("Could not fetch secret value for %q: %s", secretID, err))
+	} else {
+		resp.Diagnostics.AddWarning(
+			"Sensitive Value in Configuration",
+			"The 'value' attribute is marked as sensitive and will be stored in the Terraform state. Ensure your state file is securely managed.",
+		)
+		data.Value = types.StringValue(string(secretValue))
+	}
+
 	tflog.Trace(ctx, "read secret resource")
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-// Update replaces the secret by deleting and recreating it since there's no PATCH support
+// Not supported - requires resource recreation via planmodifiers since there's no PATCH support in the API
 func (r *ConjurSecretResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data ConjurSecretResourceModel
-
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	newSecret, err := r.buildSecretPayload(&data)
-	if err != nil {
-		resp.Diagnostics.AddError("Error Building Secret Payload", fmt.Sprintf("Could not build secret payload: %s", err))
-		return
-	}
-
-	secretResp, err := r.client.V2().ReplaceStaticSecret(newSecret)
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to replace secret, got error: %s", err))
-		return
-	}
-
-	fmt.Println(secretResp)
-
-	tflog.Trace(ctx, "read secret resource")
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.AddWarning("Update Not Supported", "This resource does not support in-place updates. Please recreate the resource to apply changes.")
 }
 
 func (r *ConjurSecretResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -332,13 +331,13 @@ func (r *ConjurSecretResource) buildSecretPayload(data *ConjurSecretResourceMode
 		Branch: data.Branch.ValueString(),
 	}
 
+	// Supply optional attributes only if provided
 	if !data.MimeType.IsNull() && !data.MimeType.IsUnknown() {
 		secret.MimeType = data.MimeType.ValueString()
 	}
 	if !data.Value.IsNull() && !data.Value.IsUnknown() {
 		secret.Value = data.Value.ValueString()
 	}
-	// Map permissions if provided
 	if len(data.Permissions) > 0 {
 		permissions := make([]conjurapi.Permission, len(data.Permissions))
 		for i, v := range data.Permissions {
@@ -360,7 +359,6 @@ func (r *ConjurSecretResource) buildSecretPayload(data *ConjurSecretResourceMode
 		}
 		secret.Permissions = permissions
 	}
-	// Map owner if provided
 	if !data.Owner.IsNull() && !data.Owner.IsUnknown() {
 		owner := &conjurapi.Owner{}
 		if kindAttr, ok := data.Owner.Attributes()["kind"]; ok {
@@ -384,7 +382,6 @@ func (r *ConjurSecretResource) parseSecretResponse(secretResp conjurapi.StaticSe
 	data.MimeType = types.StringValue(secretResp.MimeType)
 
 	if len(permissionResp.Permission) > 0 {
-		fmt.Println("parsing permissions. Length = ", len(permissionResp.Permission))
 		permissions := make([]ConjurSecretPermission, len(permissionResp.Permission))
 		for i, v := range permissionResp.Permission {
 			permission := ConjurSecretPermission{}
