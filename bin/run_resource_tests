@@ -22,7 +22,7 @@ function main() {
   test_results+=("Group|$?")
 
   echo ">> Running Group Membership CRUD test"
-  test_resource_crud "tests/resources/membership" "membership" "id" "'data/terraform/consumers|host|data/terraform/test/test-workload'"
+  test_resource_crud "tests/resources/membership" "membership" "id" "data/terraform/consumers|host|data/terraform/test/test-workload"
   test_results+=("GroupMember|$?")
 
   echo ">> Running Permission CRUD test"

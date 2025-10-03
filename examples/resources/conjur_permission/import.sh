@@ -1,0 +1,1 @@
+terraform import conjur_permission.my_permission host/data/terraform/test/test-workload:variable/data/terraform/test/workload-secret

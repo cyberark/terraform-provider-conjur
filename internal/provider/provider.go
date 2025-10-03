@@ -48,7 +48,7 @@ func (p *conjurProvider) Metadata(_ context.Context, _ provider.MetadataRequest,
 
 func (p *conjurProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Fetch secrets and load, replace, update, fetch policy into Conjur Vault",
+		Description: "Fetch secrets and manage CyberArk Secrets Manager resources.",
 		Attributes: map[string]schema.Attribute{
 			"authn_type": schema.StringAttribute{
 				Optional:    true,

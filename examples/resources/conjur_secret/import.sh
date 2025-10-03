@@ -1,0 +1,1 @@
+terraform import conjur_secret.my_secret data/terraform/test/my-secret

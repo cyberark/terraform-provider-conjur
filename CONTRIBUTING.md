@@ -27,6 +27,11 @@ Where `<test_case>` is one of:
 - azure
 - gcp
 
+### Generate documentation
+
+```sh
+go generate ./tools/...
+```
 
 #### Conjur Enterprise
 Note that to run the enterprise tests, you'll need to have set up your machine
