@@ -327,6 +327,7 @@ func (p *conjurProvider) Resources(_ context.Context) []func() resource.Resource
 		NewConjurHostResource,
 		NewConjurGroupResource,
 		NewConjurPermissionResource,
+		NewConjurMembershipResource,
 	}
 }
 
