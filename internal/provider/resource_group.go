@@ -18,7 +18,10 @@ import (
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
-var _ resource.Resource = &ConjurGroupResource{}
+var (
+	_ resource.Resource              = &ConjurGroupResource{}
+	_ resource.ResourceWithConfigure = &ConjurGroupResource{}
+)
 
 func NewConjurGroupResource() resource.Resource {
 	return &ConjurGroupResource{}
