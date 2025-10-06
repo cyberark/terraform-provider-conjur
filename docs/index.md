@@ -1,25 +1,25 @@
-# Conjur Provider
+# CyberArk Secrets Manager Provider
 
-Terraform provider for [Conjur](https://www.conjur.org).
+Terraform provider for [CyberArk Secrets Manager](https://www.conjur.org).
 
 [![GitHub release](https://img.shields.io/github/release/cyberark/terraform-provider-conjur.svg)](https://github.com/cyberark/terraform-provider-conjur/releases/latest)
 
 [![Maintainability](https://api.codeclimate.com/v1/badges/e9fc0a2de573aa189a3c/maintainability)](https://codeclimate.com/github/cyberark/terraform-provider-conjur/maintainability)
 
-The provider manages authentication with Conjur, allowing Terraform to fetch and use secrets stored in Conjur. The provider includes the following features and benefits:
+The provider manages authentication with CyberArk Secrets Manager, allowing Terraform to fetch and use secrets stored in CyberArk Secrets Manager. The provider includes the following features and benefits:
 
 - Simple setup in the Terraform manifest.
 
-- The provider authenticates to Conjur.
+- The provider authenticates to CyberArk Secrets Manager.
 
-- Conjur policy controls access to requested Conjur variables.
+- CyberArk Secrets Manager policy controls access to requested variables.
 
 - A provider method fetches variable values and makes them available for use elsewhere in the manifest.
 
 - The Terraform sensitive flag may be used against any fetched secret value to keep the value from appearing in logs and on-screen.
 
 For more details, see the "Authentication" section
-[on this page](https://docs.conjur.org/Latest/en/Content/Integrations/terraform.htm).
+[on this page](https://docs.cyberark.com/conjur-open-source/latest/en/content/integrations/terraform.htm).
 
 ## Example Usage
 
@@ -44,7 +44,7 @@ No other configuration is necessary in `main.tf`:
 ```terraform
 # main.tf
 
-# Configure the Conjur provider using the required_providers stanza
+# Configure the CyberArk Secrets Manager provider using the required_providers stanza
 # required with Terraform 0.13 and beyond. You may optionally use version
 # directive to prevent breaking changes occurring unannounced.
 terraform {
@@ -121,7 +121,7 @@ output "dbpass_output" {
   value = "${data.conjur_secret.dbpass.value}"
 
   # Must mark this output value as sensitive for Terraform v0.15+,
-  # because it's derived from a Conjur variable value that is declared
+  # because it's derived from a CyberArk Secrets Manager variable value that is declared
   # as sensitive.
   sensitive = true
 }
@@ -129,7 +129,7 @@ output "dbpass_output" {
 
 Secrets like `data.conjur_secret.dbpass.value` can be used in any Terraform resources.
 
-View an example Terraform manifest and Conjur policies in the
+View an example Terraform manifest and CyberArk Secrets Manager policies in the
 [test/](test/) directory in this project.
 
 ---
@@ -140,7 +140,7 @@ If this Terraform provider does not fit your needs, you can also use
 [summon](https://github.com/cyberark/summon) with the
 [summon-conjur](https://github.com/cyberark/summon-conjur) provider
 to provide secrets to Terraform via environment variables.
-The user running `terraform` must already be authenticated with Conjur.
+The user running `terraform` must already be authenticated with CyberArk Secrets Manager.
 
 Terraform's [`TF_VAR_name` syntax](https://www.terraform.io/docs/configuration/environment-variables.html#tf_var_name)
 allows a user to set Terraform variables via environment variables.
