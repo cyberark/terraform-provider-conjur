@@ -7,3 +7,4 @@ config:
     - "README.md"
     - "test/https_config/conjur.key"
     - "bin/test"
+    - "templates/index.md.tmpl"

@@ -38,7 +38,7 @@ func (d *secretDataSource) Metadata(_ context.Context, req datasource.MetadataRe
 
 func (d *secretDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Secret from Conjur Vault",
+		Description: "Secret from CyberArk Secrets Manager",
 		Attributes: map[string]schema.Attribute{
 			"name": schema.StringAttribute{
 				Required:    true,

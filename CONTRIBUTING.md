@@ -27,18 +27,20 @@ Where `<test_case>` is one of:
 - azure
 - gcp
 
-### Generate documentation
-
-```sh
-go generate ./tools/...
-```
-
 #### Conjur Enterprise
 Note that to run the enterprise tests, you'll need to have set up your machine
 to access our [internal registry](https://github.com/conjurinc/docs/blob/master/reference/docker_registry.md#docker-registry-v2), and you must be logged in.
 
 ```sh
 ./bin/test --target enterprise --test-case <test_case>
+```
+
+### Generate documentation
+
+Any changes to resource/provider schemas, HCL examples, or import behavior should be reflected in the documentation. To regenerate the docs, run:
+
+```sh
+go generate ./tools/...
 ```
 
 ## Contributing

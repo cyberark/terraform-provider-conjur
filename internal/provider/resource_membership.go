@@ -44,7 +44,7 @@ func (r *conjurMembershipResource) Metadata(_ context.Context, req resource.Meta
 
 func (r *conjurMembershipResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Conjur membership resource",
+		MarkdownDescription: "CyberArk Secrets Manager membership resource",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
