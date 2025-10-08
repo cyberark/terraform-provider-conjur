@@ -15,7 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-const groupMemberIDSeparator = "|"
+const groupMemberIDSeparator = ":"
 
 var (
 	_ resource.Resource                = &conjurMembershipResource{}
@@ -252,7 +252,7 @@ func validateKind(kind string) error {
 func splitGroupMemberID(id string) (string, string, string, error) {
 	parts := strings.Split(id, groupMemberIDSeparator)
 	if len(parts) != 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
-		return "", "", "", fmt.Errorf("expected 'group_id|member_kind|member_id'")
+		return "", "", "", fmt.Errorf("expected 'group_id:member_kind:member_id'")
 	}
 	return parts[0], parts[1], parts[2], nil
 }

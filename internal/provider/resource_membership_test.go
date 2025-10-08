@@ -70,7 +70,7 @@ func TestValidateKind(t *testing.T) {
 
 func TestSplitGroupMemberID(t *testing.T) {
 	t.Run("Valid id", func(t *testing.T) {
-		id := "data/test/test-users|host|data/test/bob"
+		id := "data/test/test-users:host:data/test/bob"
 		group, kind, member, err := splitGroupMemberID(id)
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
@@ -88,8 +88,8 @@ func TestSplitGroupMemberID(t *testing.T) {
 
 	t.Run("Invalid ids", func(t *testing.T) {
 		cases := []string{
-			"", "only|two", "group", "group|user|id|extra",
-			"||", "|user|id", "group||id", "group|user|",
+			"", "only:two", "group", "group:user:id:extra",
+			"::", ":user:id", "group::id", "group:user:",
 		}
 		for _, id := range cases {
 			if _, _, _, err := splitGroupMemberID(id); err == nil {
