@@ -1,0 +1,1 @@
+terraform import conjur_branch.my_branch data/test/my-branch

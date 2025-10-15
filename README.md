@@ -1164,6 +1164,18 @@ The Terraform Secret Manager Provider currently supports API key authentication 
 
 By adding support for AWS IAM roles, Azure, and GCP authentication, the risk is reduced by using short-lived tokens instead of static API keys, eliminating the need for manual key rotations. These cloud platforms can generate access tokens for more secure authentication with the Secret Manager. The existing API key-based authentication will still be available and continue to function.
 
+## Resource Management
+
+This provider can manage the following Secrets Manager resource types:
+
+* `conjur_authenticator` - Manage the lifecycle of an authenticator ([example usage](docs/resources/authenticator.md))
+* `conjur_branch` - Manage the lifecycle of a policy branch ([example usage](docs/resources/branch.md))
+* `conjur_group` - Manage the lifecycle of a group ([example usage](docs/resources/group.md))
+* `conjur_host` - Manage the lifecycle of a host/workload ([example usage](docs/resources/host.md))
+* `conjur_membership` - Manage role memberships ([example usage](docs/resources/membership.md))
+* `conjur_permission` - Manage permissions for a role on a resource ([example usage](docs/resources/permission.md))
+* `conjur_secret` - Manage the lifecycle of a secret variable ([example usage](docs/resources/secret.md))
+
 ## Contributing
 
 We welcome contributions of all kinds to this repository. For instructions on how to get started and descriptions of our development workflows, please see our [contributing

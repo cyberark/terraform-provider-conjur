@@ -15,7 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-const groupMemberIDSeparator = "|"
+const groupMemberIDSeparator = ":"
 
 var (
 	_ resource.Resource                = &conjurMembershipResource{}
@@ -44,7 +44,7 @@ func (r *conjurMembershipResource) Metadata(_ context.Context, req resource.Meta
 
 func (r *conjurMembershipResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Conjur membership resource",
+		MarkdownDescription: "CyberArk Secrets Manager membership resource",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
@@ -252,7 +252,7 @@ func validateKind(kind string) error {
 func splitGroupMemberID(id string) (string, string, string, error) {
 	parts := strings.Split(id, groupMemberIDSeparator)
 	if len(parts) != 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
-		return "", "", "", fmt.Errorf("expected 'group_id|member_kind|member_id'")
+		return "", "", "", fmt.Errorf("expected 'group_id:member_kind:member_id'")
 	}
 	return parts[0], parts[1], parts[2], nil
 }

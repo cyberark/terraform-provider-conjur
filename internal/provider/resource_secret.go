@@ -64,7 +64,7 @@ func (r *ConjurSecretResource) Metadata(ctx context.Context, req resource.Metada
 
 func (r *ConjurSecretResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Conjur secret resource",
+		MarkdownDescription: "CyberArk Secrets Manager secret resource",
 
 		Attributes: map[string]schema.Attribute{
 			"name": schema.StringAttribute{

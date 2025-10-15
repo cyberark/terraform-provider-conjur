@@ -1,0 +1,1 @@
+terraform import conjur_authenticator.my_authenticator jwt:my-authenticator-name

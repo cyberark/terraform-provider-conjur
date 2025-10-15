@@ -69,7 +69,7 @@ func (r *ConjurAuthenticatorResource) Metadata(ctx context.Context, req resource
 
 func (r *ConjurAuthenticatorResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Conjur authenticator resource",
+		MarkdownDescription: "CyberArk Secrets Manager authenticator resource",
 
 		Attributes: map[string]schema.Attribute{
 			"type": schema.StringAttribute{

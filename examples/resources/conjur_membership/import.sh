@@ -1,0 +1,1 @@
+terraform import conjur_membership.my_membership data/terraform/my-group:host:data/terraform/test/my-workload

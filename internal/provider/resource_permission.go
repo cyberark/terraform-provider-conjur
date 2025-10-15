@@ -64,7 +64,7 @@ func (r *ConjurPermissionResource) Metadata(ctx context.Context, req resource.Me
 
 func (r *ConjurPermissionResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Conjur permission resource",
+		MarkdownDescription: "CyberArk Secrets Manager permission resource",
 		Attributes: map[string]schema.Attribute{
 			"role": schema.SingleNestedAttribute{
 				Required: true,

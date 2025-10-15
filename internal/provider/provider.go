@@ -48,47 +48,47 @@ func (p *conjurProvider) Metadata(_ context.Context, _ provider.MetadataRequest,
 
 func (p *conjurProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Fetch secrets and load, replace, update, fetch policy into Conjur Vault",
+		Description: "Fetch secrets and manage CyberArk Secrets Manager resources.",
 		Attributes: map[string]schema.Attribute{
 			"authn_type": schema.StringAttribute{
 				Optional:    true,
-				Description: "Conjur Authentication Type",
+				Description: "CyberArk Secrets Manager Authentication Type",
 			},
 			"appliance_url": schema.StringAttribute{
 				Optional:    true,
-				Description: "Conjur endpoint URL",
+				Description: "CyberArk Secrets Manager endpoint URL",
 			},
 			"account": schema.StringAttribute{
 				Optional:    true,
-				Description: "Conjur account",
+				Description: "CyberArk Secrets Manager account",
 			},
 			"login": schema.StringAttribute{
 				Optional:    true,
-				Description: "Conjur login",
+				Description: "CyberArk Secrets Manager login",
 			},
 			"host_id": schema.StringAttribute{
 				Optional:    true,
-				Description: "Conjur host id",
+				Description: "CyberArk Secrets Manager host ID",
 			},
 			"service_id": schema.StringAttribute{
 				Optional:    true,
-				Description: "Conjur service id",
+				Description: "CyberArk Secrets Manager service ID",
 			},
 			"client_id": schema.StringAttribute{
 				Optional:    true,
-				Description: "Azure client id for user assigned managed identity",
+				Description: "Azure client ID for user assigned managed identity",
 			},
 			"api_key": schema.StringAttribute{
 				Optional:    true,
-				Description: "Conjur API key",
+				Description: "CyberArk Secrets Manager API key",
 			},
 			"ssl_cert": schema.StringAttribute{
 				Optional:    true,
-				Description: "Content of Conjur public SSL certificate",
+				Description: "Content of CyberArk Secrets Manager public SSL certificate",
 			},
 			"ssl_cert_path": schema.StringAttribute{
 				Optional:    true,
-				Description: "Path to Conjur public SSL certificate",
+				Description: "Path to CyberArk Secrets Manager public SSL certificate",
 			},
 			"authn_jwt_token": schema.StringAttribute{
 				Optional:    true,

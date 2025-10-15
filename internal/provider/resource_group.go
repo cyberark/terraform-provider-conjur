@@ -51,7 +51,7 @@ func (r *ConjurGroupResource) Metadata(ctx context.Context, req resource.Metadat
 
 func (r *ConjurGroupResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Conjur Group resource. This resource creates a group in Conjur using policy. Note that this is a write-only resource - import and exact state tracking are not supported due to API limitations.",
+		MarkdownDescription: "CyberArk Secrets Manager Group resource. This resource creates a group in Conjur using policy. Note that this is a write-only resource - import and exact state tracking are not supported due to API limitations.",
 
 		Attributes: map[string]schema.Attribute{
 			"name": schema.StringAttribute{

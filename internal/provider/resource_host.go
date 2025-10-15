@@ -62,7 +62,7 @@ func (r *ConjurHostResource) Metadata(ctx context.Context, req resource.Metadata
 
 func (r *ConjurHostResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Conjur host resource",
+		MarkdownDescription: "CyberArk Secrets Manager host resource",
 
 		Attributes: map[string]schema.Attribute{
 			"name": schema.StringAttribute{
