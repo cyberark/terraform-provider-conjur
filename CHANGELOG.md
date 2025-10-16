@@ -5,7 +5,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-## [0.8.0] - 2025-09-22
+## [0.8.0] - 2025-10-16
+### Changed
+- Updated documentation to align with Conjur Enterprise name change to Secrets Manager. (CNJR-10995)
 ### Added
 - Support for Conjur permissions via the conjur_permission resource
 - Support for Conjur V2 Workloads API via the conjur_host resource
@@ -132,6 +134,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Use https://github.com/cyberark/conjur-api-go to read configuration.
 
 [Unreleased]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.6.9...HEAD
+[0.8.0]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.7.1...v0.8.0
+[0.7.1]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.7.0...v0.7.1
+[0.7.0]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.6.11...v0.7.0
+[0.6.11]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.6.10...v0.6.11
+[0.6.10]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.6.9...v0.6.10
 [0.6.9]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.6.8...v0.6.9
 [0.6.8]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.6.7...v0.6.8
 [0.6.7]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.6.6...v0.6.7
