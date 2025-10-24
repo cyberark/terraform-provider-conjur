@@ -3,18 +3,18 @@
 page_title: "conjur_certificate_issue Data Source - CyberArk Secrets Manager"
 subcategory: ""
 description: |-
-  Issue a certificate using a Conjur certificate issuer.
+  Issue a certificate using a Secrets Manager certificate issuer.
 ---
 
 # conjur_certificate_issue (Data Source)
 
-Issue a certificate using a Conjur certificate issuer.
+Issue a certificate using a Secrets Manager certificate issuer.
 
 ## Example Usage
 
 ```terraform
 data "conjur_certificate_issue" "my_cert" {
-  # The name of the issuer registered in Conjur Cloud
+  # The name of the issuer registered in Secrets Manager
   issuer_name = "my-cert-issuer"
 
   common_name   = "db.internal.example.com"
@@ -60,7 +60,7 @@ output "issued_chain" {
 ### Required
 
 - `common_name` (String) Common Name for the issued certificate.
-- `issuer_name` (String) The name of the Conjur issuer to use.
+- `issuer_name` (String) The name of the Secrets Manager issuer to use.
 
 ### Optional
 

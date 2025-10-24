@@ -49,11 +49,11 @@ func (d *certificateSignDataSource) Metadata(_ context.Context, req datasource.M
 
 func (d *certificateSignDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Sign a certificate signing request (CSR) using a Conjur certificate issuer.",
+		MarkdownDescription: "Sign a certificate signing request (CSR) using a Secrets Manager certificate issuer.",
 		Attributes: map[string]schema.Attribute{
 			"issuer_name": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: "The name of the Conjur issuer to use for signing.",
+				MarkdownDescription: "The name of the Secrets Manager issuer to use for signing.",
 			},
 			"csr": schema.StringAttribute{
 				Required:            true,
@@ -115,7 +115,7 @@ func (d *certificateSignDataSource) Read(ctx context.Context, req datasource.Rea
 		TTL:  data.TTL.ValueString(),
 	}
 
-	tflog.Info(ctx, "Signing CSR via Conjur", map[string]interface{}{
+	tflog.Info(ctx, "Signing CSR via Secrets Manager issuer", map[string]interface{}{
 		"issuer_name": data.IssuerName.ValueString(),
 	})
 

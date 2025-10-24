@@ -240,7 +240,7 @@ func (r *ConjurSecretResource) Read(ctx context.Context, req resource.ReadReques
 	secretResp, err := r.client.V2().GetStaticSecretDetails(secretID)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error reading Conjur secret",
+			"Error reading Secrets Manager secret",
 			fmt.Sprintf("Unable to check if secret %q exists: %s", secretID, err),
 		)
 		return
@@ -249,7 +249,7 @@ func (r *ConjurSecretResource) Read(ctx context.Context, req resource.ReadReques
 	permissionResp, err := r.client.V2().GetStaticSecretPermissions(secretID)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error reading Conjur secret permissions",
+			"Error reading Secrets Manager secret permissions",
 			fmt.Sprintf("Unable to check if secret %q permissions exist: %s", secretID, err),
 		)
 		return

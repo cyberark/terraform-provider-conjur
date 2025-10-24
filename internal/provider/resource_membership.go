@@ -52,7 +52,7 @@ func (r *conjurMembershipResource) Schema(_ context.Context, _ resource.SchemaRe
 			},
 			"group_id": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: "Conjur group role ID, e.g. 'data/test/test-users'",
+				MarkdownDescription: "Secrets Manager group role ID, e.g. 'data/test/test-users'",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -92,11 +92,6 @@ func (r *conjurMembershipResource) Configure(_ context.Context, req resource.Con
 }
 
 func (r *conjurMembershipResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	if r.client == nil {
-		resp.Diagnostics.AddError("Client not configured", "Conjur client is not available")
-		return
-	}
-
 	var data membershipResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -124,11 +119,6 @@ func (r *conjurMembershipResource) Create(ctx context.Context, req resource.Crea
 }
 
 func (r *conjurMembershipResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	if r.client == nil {
-		resp.Diagnostics.AddError("Client not configured", "Conjur client is not available")
-		return
-	}
-
 	var data membershipResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -141,12 +131,6 @@ func (r *conjurMembershipResource) Read(ctx context.Context, req resource.ReadRe
 	}
 
 	account := r.client.GetConfig().Account
-	if account == "" {
-		resp.Diagnostics.AddError("Conjur account missing", "Provider client has no account configured")
-		resp.State.RemoveResource(ctx)
-		return
-	}
-
 	fqMember := fmt.Sprintf("%s:%s:%s", account, data.MemberKind.ValueString(), data.MemberID.ValueString())
 	fqGroup := fmt.Sprintf("%s:group:%s", account, data.GroupID.ValueString())
 
@@ -201,11 +185,6 @@ func (r *conjurMembershipResource) Update(ctx context.Context, req resource.Upda
 }
 
 func (r *conjurMembershipResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	if r.client == nil {
-		resp.Diagnostics.AddError("Client not configured", "Conjur client is not available")
-		return
-	}
-
 	var data membershipResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {

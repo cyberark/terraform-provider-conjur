@@ -3,18 +3,18 @@
 page_title: "conjur_certificate_sign Data Source - CyberArk Secrets Manager"
 subcategory: ""
 description: |-
-  Sign a certificate signing request (CSR) using a Conjur certificate issuer.
+  Sign a certificate signing request (CSR) using a Secrets Manager certificate issuer.
 ---
 
 # conjur_certificate_sign (Data Source)
 
-Sign a certificate signing request (CSR) using a Conjur certificate issuer.
+Sign a certificate signing request (CSR) using a Secrets Manager certificate issuer.
 
 ## Example Usage
 
 ```terraform
 data "conjur_certificate_sign" "my_cert" {
-  # The name of the issuer registered in Conjur Cloud
+  # The name of the issuer registered in Secrets Manager
   issuer_name = "my-cert-issuer"
 
   # CSR can be read from file or inline heredoc
@@ -44,7 +44,7 @@ output "signing_chain" {
 ### Required
 
 - `csr` (String, Sensitive) PEM-encoded Certificate Signing Request to be signed.
-- `issuer_name` (String) The name of the Conjur issuer to use for signing.
+- `issuer_name` (String) The name of the Secrets Manager issuer to use for signing.
 
 ### Optional
 

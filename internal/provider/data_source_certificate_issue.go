@@ -62,11 +62,11 @@ func (d *certificateIssueDataSource) Metadata(_ context.Context, req datasource.
 
 func (d *certificateIssueDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Issue a certificate using a Conjur certificate issuer.",
+		MarkdownDescription: "Issue a certificate using a Secrets Manager certificate issuer.",
 		Attributes: map[string]schema.Attribute{
 			"issuer_name": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: "The name of the Conjur issuer to use.",
+				MarkdownDescription: "The name of the Secrets Manager issuer to use.",
 			},
 			"common_name": schema.StringAttribute{
 				Required:            true,

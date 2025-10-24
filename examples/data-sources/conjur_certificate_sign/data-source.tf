@@ -1,5 +1,5 @@
 data "conjur_certificate_sign" "my_cert" {
-  # The name of the issuer registered in Conjur Cloud
+  # The name of the issuer registered in Secrets Manager
   issuer_name = "my-cert-issuer"
 
   # CSR can be read from file or inline heredoc
