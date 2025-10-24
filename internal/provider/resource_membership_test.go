@@ -1,12 +1,33 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
 
-	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	tf_resource "github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
+
+func TestConjurMembershipResource_Schema(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	ds := NewConjurMembershipResource()
+
+	schemaRequest := resource.SchemaRequest{}
+	schemaResponse := &resource.SchemaResponse{}
+
+	ds.Schema(ctx, schemaRequest, schemaResponse)
+	if schemaResponse.Diagnostics.HasError() {
+		t.Fatalf("Schema diagnostics had errors: %+v", schemaResponse.Diagnostics)
+	}
+
+	if diagnostics := schemaResponse.Schema.ValidateImplementation(ctx); diagnostics.HasError() {
+		t.Fatalf("Schema validation failed: %+v", diagnostics)
+	}
+}
 
 func testGroupMemberConfig() string {
 	return fmt.Sprintf(`
@@ -25,13 +46,13 @@ resource "conjur_membership" "test" {
 }
 
 func TestAPIGroupMemberResource_CreateDestroy(t *testing.T) {
-	resource.Test(t, resource.TestCase{
+	tf_resource.Test(t, tf_resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
+		Steps: []tf_resource.TestStep{
 			{
 				Config: testGroupMemberConfig(),
-				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr(
+				Check: tf_resource.ComposeTestCheckFunc(
+					tf_resource.TestCheckResourceAttr(
 						"conjur_membership.test",
 						"id",
 						os.Getenv("TF_CONJUR_GROUP_ID")+groupMemberIDSeparator+os.Getenv("TF_CONJUR_MEMBER_KIND")+groupMemberIDSeparator+os.Getenv("TF_CONJUR_MEMBER_ID"),

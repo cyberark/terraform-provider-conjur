@@ -13,7 +13,7 @@ Secret from CyberArk Secrets Manager
 ## Example Usage
 
 ```terraform
-data "conjur_secret" "cloud_dbpass" {
+data "conjur_secret" "my_secret" {
   name = data/test/var-name
 }
 ```
