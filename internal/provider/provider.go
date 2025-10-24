@@ -317,6 +317,8 @@ func (p *conjurProvider) createAPIKeyClient(config *conjurapi.Config, data *conj
 func (p *conjurProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		NewSecretDataSource,
+		NewCertificateIssueDataSource,
+		NewCertificateSignDataSource,
 	}
 }
 
