@@ -32,121 +32,100 @@ func TestCertificateSignDataSource_Schema(t *testing.T) {
 
 // Mock V2 client
 type mockV2Client struct {
-	CertSignFunc func(issuerName string, sign conjurapi.Sign) (*conjurapi.CertificateResponse, error)
+	Response *conjurapi.CertificateResponse
+	Err      error
 }
 
-func (m *mockV2Client) CertificateSign(issuerName string, sign conjurapi.Sign) (*conjurapi.CertificateResponse, error) {
-	return m.CertSignFunc(issuerName, sign)
+func (m *mockV2Client) CertificateSign(_ string, _ conjurapi.Sign) (*conjurapi.CertificateResponse, error) {
+	return m.Response, m.Err
 }
 
 // Mock main client
-type mockClient struct {
-	V2Func func() certificateSignV2Client
+type mockSignClient struct {
+	V2Client certificateSignV2Client
 }
 
-func (m *mockClient) V2() certificateSignV2Client {
-	return m.V2Func()
+func (m *mockSignClient) V2() certificateSignV2Client {
+	return m.V2Client
 }
 
 func TestCertificateSignDataSource_Read_Success(t *testing.T) {
-	mockClient := &mockClient{
-		V2Func: func() certificateSignV2Client {
-			return &mockV2Client{
-				CertSignFunc: func(issuerName string, sign conjurapi.Sign) (*conjurapi.CertificateResponse, error) {
-					return &conjurapi.CertificateResponse{
-						Certificate: "signed-cert",
-						PrivateKey:  "",
-						Chain:       []string{"root-cert"},
-					}, nil
-				},
-			}
+	issuer := "my-issuer"
+	csr := "my-csr"
+	zone := "my-zone"
+	ttl := "PT24H"
+	mockClient := &mockSignClient{
+		V2Client: &mockV2Client{
+			Response: &conjurapi.CertificateResponse{
+				Certificate: "signed-cert",
+				PrivateKey:  "",
+				Chain:       []string{"root-cert"},
+			},
+			Err: nil,
 		},
 	}
 
-	model := certificateSignDataSourceModel{
-		IssuerName: types.StringValue("my-issuer"),
-		Csr:        types.StringValue("my-csr"),
-		Zone:       types.StringValue("my-zone"),
-		TTL:        types.StringValue("24h"),
-	}
+	resp, data := invokeSign(t, mockClient, issuer, csr, zone, ttl)
 
-	resp := &datasource.ReadResponse{}
-	dsRead := func() {
-		signReq := conjurapi.Sign{
-			Csr:  model.Csr.ValueString(),
-			Zone: model.Zone.ValueString(),
-			TTL:  model.TTL.ValueString(),
-		}
-
-		signResp, err := mockClient.V2().CertificateSign(model.IssuerName.ValueString(), signReq)
-		if err != nil {
-			resp.Diagnostics.AddError("Error signing certificate", err.Error())
-			return
-		}
-
-		model.Certificate = types.StringValue(signResp.Certificate)
-		model.PrivateKey = types.StringValue(signResp.PrivateKey)
-		model.Chain = make([]types.String, len(signResp.Chain))
-		for i, c := range signResp.Chain {
-			model.Chain[i] = types.StringValue(c)
-		}
-	}
-
-	dsRead()
-
-	assert.Equal(t, "signed-cert", model.Certificate.ValueString())
-	assert.Equal(t, "", model.PrivateKey.ValueString())
-	assert.Len(t, model.Chain, 1)
-	assert.Equal(t, "root-cert", model.Chain[0].ValueString())
+	assert.Empty(t, resp.Diagnostics)
+	assert.Equal(t, "signed-cert", data.Certificate.ValueString())
+	assert.Equal(t, "", data.PrivateKey.ValueString())
+	assert.Len(t, data.Chain, 1)
+	assert.Equal(t, "root-cert", data.Chain[0].ValueString())
 }
 
 func TestCertificateSignDataSource_Read_Error(t *testing.T) {
-	mockClient := &mockClient{
-		V2Func: func() certificateSignV2Client {
-			return &mockV2Client{
-				CertSignFunc: func(issuerName string, sign conjurapi.Sign) (*conjurapi.CertificateResponse, error) {
-					return nil, fmt.Errorf("signing failed")
-				},
-			}
+	issuer := "my-issuer"
+	csr := "my-csr"
+	zone := "my-zone"
+	ttl := "PT24H"
+	mockClient := &mockSignClient{
+		V2Client: &mockV2Client{
+			Response: nil,
+			Err:      fmt.Errorf("signing failed"),
 		},
 	}
 
-	model := certificateSignDataSourceModel{
-		IssuerName: types.StringValue("my-issuer"),
-		Csr:        types.StringValue("my-csr"),
-		Zone:       types.StringValue("my-zone"),
-		TTL:        types.StringValue("24h"),
-	}
-
-	resp := &datasource.ReadResponse{}
-	dsRead := func() {
-		signReq := conjurapi.Sign{
-			Csr:  model.Csr.ValueString(),
-			Zone: model.Zone.ValueString(),
-			TTL:  model.TTL.ValueString(),
-		}
-
-		signResp, err := mockClient.V2().CertificateSign(model.IssuerName.ValueString(), signReq)
-		if err != nil {
-			resp.Diagnostics.AddError("Error signing certificate", err.Error())
-			return
-		}
-
-		model.Certificate = types.StringValue(signResp.Certificate)
-		model.PrivateKey = types.StringValue(signResp.PrivateKey)
-		model.Chain = make([]types.String, len(signResp.Chain))
-		for i, c := range signResp.Chain {
-			model.Chain[i] = types.StringValue(c)
-		}
-	}
-
-	dsRead()
+	resp, data := invokeSign(t, mockClient, issuer, csr, zone, ttl)
 
 	// Assertions
 	assert.Len(t, resp.Diagnostics, 1)
 	assert.Equal(t, "Error signing certificate", resp.Diagnostics[0].Summary())
 	assert.Equal(t, "signing failed", resp.Diagnostics[0].Detail())
-	assert.Equal(t, "", model.Certificate.ValueString())
-	assert.Equal(t, "", model.PrivateKey.ValueString())
-	assert.Len(t, model.Chain, 0)
+	assert.Equal(t, "", data.Certificate.ValueString())
+	assert.Equal(t, "", data.PrivateKey.ValueString())
+	assert.Len(t, data.Chain, 0)
+}
+
+// Helper to invoke the sign (READ) method using the mocked client and test inputs
+func invokeSign(t *testing.T, client *mockSignClient, issuer, csr, zone, ttl string) (datasource.ReadResponse, certificateSignDataSourceModel) {
+	data := certificateSignDataSourceModel{
+		IssuerName: types.StringValue(issuer),
+		Csr:        types.StringValue(csr),
+		Zone:       types.StringValue(zone),
+		TTL:        types.StringValue(ttl),
+	}
+
+	resp := datasource.ReadResponse{}
+
+	signReq := conjurapi.Sign{
+		Csr:  csr,
+		Zone: zone,
+		TTL:  ttl,
+	}
+
+	signResp, err := client.V2().CertificateSign(issuer, signReq)
+	if err != nil {
+		resp.Diagnostics.AddError("Error signing certificate", err.Error())
+		return resp, data
+	}
+
+	data.Certificate = types.StringValue(signResp.Certificate)
+	data.PrivateKey = types.StringValue(signResp.PrivateKey)
+	data.Chain = make([]types.String, len(signResp.Chain))
+	for i, c := range signResp.Chain {
+		data.Chain[i] = types.StringValue(c)
+	}
+
+	return resp, data
 }
