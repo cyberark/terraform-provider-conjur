@@ -464,7 +464,7 @@ func splitConjurID(fullID string) (kind, branch, name string, err error) {
 	segments := strings.Split(fullID, "/")
 	if len(segments) < 2 {
 		// At minimum we expect kind + name
-		return "", "", "", fmt.Errorf("invalid Conjur ID: %s. Expected at least kind/name", fullID)
+		return "", "", "", fmt.Errorf("invalid Secrets Manager ID: %s. Expected at least kind/name", fullID)
 	}
 
 	kind = segments[0]

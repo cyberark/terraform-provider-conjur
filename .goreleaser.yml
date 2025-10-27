@@ -30,7 +30,7 @@ checksum:
   name_template: "{{.ProjectName}}_{{.Env.CONJUR_PLUGIN_VERSION}}_SHA256SUMS"
 
 brews:
-  - description: Terraform provider for CyberArk Conjur
+  - description: Terraform provider for CyberArk Secrets Manager
     homepage: https://github.com/cyberark/terraform-provider-conjur
     url_template: https://github.com/cyberark/terraform-provider-conjur/releases/download/v{{.Env.CONJUR_PLUGIN_VERSION}}/{{.ProjectName}}_{{.Env.CONJUR_PLUGIN_VERSION}}_{{.Os}}_{{.Arch}}.zip
     caveats: |

@@ -25,7 +25,7 @@ resource "conjur_membership" "my_group_membership" {
 
 ### Required
 
-- `group_id` (String) Conjur group role ID, e.g. 'data/test/test-users'
+- `group_id` (String) Secrets Manager group role ID, e.g. 'data/test/test-users'
 - `member_id` (String) Member role ID, e.g. 'data/test/bob'
 - `member_kind` (String) Kind of the member: 'user', 'host', or 'group'
 

@@ -212,7 +212,7 @@ func (r *ConjurHostResource) Read(ctx context.Context, req resource.ReadRequest,
 	exists, err := r.client.RoleExists(hostID)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Error reading Conjur host",
+			"Error reading Secrets Manager host",
 			fmt.Sprintf("Unable to check if host %q exists: %s", hostID, err),
 		)
 		return
@@ -220,7 +220,7 @@ func (r *ConjurHostResource) Read(ctx context.Context, req resource.ReadRequest,
 
 	// Remove the host if it has been removed from Conjur (or is inaccessible to the provider)
 	if !exists {
-		resp.Diagnostics.AddWarning("Host Not Found", fmt.Sprintf("The host %q was not found in Conjur and will be removed from the state. If you did not expect this, please check your Conjur instance to ensure the host exists and can be managed by the provider identity.", hostID))
+		resp.Diagnostics.AddWarning("Host Not Found", fmt.Sprintf("The host %q was not found in Secrets Manager and will be removed from the state. If you did not expect this, please check your Secrets Manager instance to ensure the host exists and can be managed by the provider identity.", hostID))
 		resp.State.RemoveResource(ctx)
 		return
 	}
