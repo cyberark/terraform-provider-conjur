@@ -2,10 +2,7 @@
 
 // 'product-pipelines-shared-library' draws from DevOps/product-pipelines-shared-library repository.
 // 'conjur-enterprise-sharedlib' draws from Conjur-Enterprise/jenkins-pipeline-library repository.
-// Point to a branch of a shared library by appending @my-branch-name to the library name
-// TODO: Revert to main sharedlib branch once Go dependency replacement is merged or conjur-api-go
-// has been released with V2 API support
-@Library(['product-pipelines-shared-library', 'conjur-enterprise-sharedlib@main-go-deps-replace']) _
+@Library(['product-pipelines-shared-library', 'conjur-enterprise-sharedlib']) _
 
   // Automated release, promotion and dependencies
 properties([
