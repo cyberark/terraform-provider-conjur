@@ -30,3 +30,4 @@ services:
       - ./ssl_cert:/terraform-provider-conjur/ssl_cert
       - $PWD/conf/https_config:/conf/https_config
       - ./output:/terraform-provider-conjur/output
+      - ./docs:/terraform-provider-conjur/docs

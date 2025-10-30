@@ -2,14 +2,20 @@
 
 [![GitHub release](https://img.shields.io/github/release/cyberark/terraform-provider-conjur.svg)](https://github.com/cyberark/terraform-provider-conjur/releases/latest)
 
-The provider manages authentication with CyberArk Secrets Manager, allowing Terraform to fetch and use secrets stored in CyberArk Secrets Manager.
+This provider manages authentication with CyberArk Secrets Manager, allowing Terraform to access and manage various Secrets Manager resources.
+
+The provider can access the following Secrets Manager resources as data sources:
+- [conjur_secret](./data-sources/secret.md)
+- [conjur_certificate_issue](./data-sources/certificate_issue.md) (requires Secrets Manager Saas with Certificate Manager integration)
+- [conjur_certificate_sign](./data-sources/certificate_sign.md) (requires Secrets Manager Saas with Certificate Manager integration)
+
 The provider can also manage the following Secrets Manager resources:
 - [conjur_authenticator](./resources/authenticator.md)
 - [conjur_branch](./resources/branch.md)
-- [conjur_host](./resources/host.md)
+- [conjur_host](./resources/host.md) (SaaS only)
 - [conjur_variable](./resources/variable.md)
 - [conjur_group](./resources/group.md)
-- [conjur_secret](./resources/secret.md)
+- [conjur_secret](./resources/secret.md) (SaaS only)
 
 ## Example Usage
 
