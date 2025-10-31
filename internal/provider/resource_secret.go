@@ -399,7 +399,11 @@ func (r *ConjurSecretResource) buildSecretPayload(data *ConjurSecretResourceMode
 func (r *ConjurSecretResource) parseSecretResponse(secretResp conjurapi.StaticSecretResponse, permissionResp conjurapi.PermissionResponse, data *ConjurSecretResourceModel) error {
 	data.Name = types.StringValue(secretResp.Name)
 	data.Branch = types.StringValue(secretResp.Branch)
-	data.MimeType = types.StringValue(secretResp.MimeType)
+	if secretResp.MimeType == "" {
+		data.MimeType = types.StringNull()
+	} else {
+		data.MimeType = types.StringValue(secretResp.MimeType)
+	}
 
 	if len(permissionResp.Permission) > 0 {
 		permissions := make([]ConjurSecretPermission, len(permissionResp.Permission))
@@ -440,7 +444,11 @@ func (r *ConjurSecretResource) parseSecretResponse(secretResp conjurapi.StaticSe
 			"id":   types.StringType,
 		})
 	}
-	data.Annotations = secretResp.Annotations
+
+	if len(secretResp.Annotations) != 0 {
+		data.Annotations = secretResp.Annotations
+	}
+
 	return nil
 }
 
