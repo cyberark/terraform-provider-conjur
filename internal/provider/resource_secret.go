@@ -124,14 +124,14 @@ func (r *ConjurSecretResource) Schema(ctx context.Context, req resource.SchemaRe
 							Attributes: map[string]schema.Attribute{
 								"id": schema.StringAttribute{
 									MarkdownDescription: "Subject identifier",
-									Required:            true,
+									Optional:            true,
 									PlanModifiers: []planmodifier.String{
 										stringplanmodifier.RequiresReplace(),
 									},
 								},
 								"kind": schema.StringAttribute{
 									MarkdownDescription: "Subject kind (user, group, host, etc.)",
-									Required:            true,
+									Optional:            true,
 									PlanModifiers: []planmodifier.String{
 										stringplanmodifier.RequiresReplace(),
 									},
@@ -243,16 +243,18 @@ func (r *ConjurSecretResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	permissionResp, err := r.client.V2().GetStaticSecretPermissions(secretID)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading Secrets Manager secret permissions",
-			fmt.Sprintf("Unable to check if secret %q permissions exist: %s", secretID, err),
-		)
-		return
-	}
+	// TODO: Computing this in Read when permissions have been applied via a different resource, i.e. conjur_permissions or in
+	// Secrets Manager directly causes there be a diff on permissions even if they are unchanged, resulting in unnecessary updates.
+	// permissionResp, err := r.client.V2().GetStaticSecretPermissions(secretID)
+	// if err != nil {
+	// 	resp.Diagnostics.AddError(
+	// 		"Error reading Secrets Manager secret permissions",
+	// 		fmt.Sprintf("Unable to check if secret %q permissions exist: %s", secretID, err),
+	// 	)
+	// 	return
+	// }
 
-	err = r.parseSecretResponse(*secretResp, *permissionResp, &data)
+	err = r.parseSecretResponse(*secretResp, conjurapi.PermissionResponse{}, &data)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Parsing Secret Response", fmt.Sprintf("Could not parse secret response: %s", err))
 		return
