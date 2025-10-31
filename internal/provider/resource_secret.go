@@ -92,9 +92,6 @@ func (r *ConjurSecretResource) Schema(ctx context.Context, req resource.SchemaRe
 				MarkdownDescription: "The secret value",
 				Optional:            true,
 				Sensitive:           true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
 			},
 			"owner": schema.SingleNestedAttribute{
 				MarkdownDescription: "Owner of the secret",
@@ -262,7 +259,7 @@ func (r *ConjurSecretResource) Read(ctx context.Context, req resource.ReadReques
 	}
 
 	// Fetch the secret value (if accessible) to store in state
-	secretValue, err := r.client.RetrieveSecret(secretID)
+	secretValue, err := r.client.RetrieveSecret(strings.TrimPrefix(secretID, "/"))
 	if err != nil {
 		resp.Diagnostics.AddWarning("Unable to fetch secret value", fmt.Sprintf("Could not fetch secret value for %q: %s", secretID, err))
 	} else {
@@ -277,9 +274,30 @@ func (r *ConjurSecretResource) Read(ctx context.Context, req resource.ReadReques
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-// Not supported - requires resource recreation via planmodifiers since there's no PATCH support in the API
+// Only supports rotating the secret value
 func (r *ConjurSecretResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	resp.Diagnostics.AddWarning("Update Not Supported", "This resource does not support in-place updates. Please recreate the resource to apply changes.")
+	var data ConjurSecretResourceModel
+
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	secretID := fmt.Sprintf("%s/%s", data.Branch.ValueString(), data.Name.ValueString())
+
+	// Update the secret value
+	err := r.client.AddSecret(strings.TrimPrefix(secretID, "/"), data.Value.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddWarning("Unable to set secret value", fmt.Sprintf("Could not update secret value for %q: %s", secretID, err))
+	} else {
+		resp.Diagnostics.AddWarning(
+			"Sensitive Value in Configuration",
+			"The 'value' attribute is marked as sensitive and will be stored in the Terraform state. Ensure your state file is securely managed.",
+		)
+	}
+
+	tflog.Trace(ctx, "updated secret resource")
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *ConjurSecretResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
