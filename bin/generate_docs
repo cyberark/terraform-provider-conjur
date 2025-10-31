@@ -1,0 +1,9 @@
+#!/bin/bash
+set -eo pipefail
+
+docker compose -f docker-compose.test.yml build
+docker compose -f docker-compose.test.yml run -T conjur_test bash -c \
+    "set -x; \
+    go mod tidy; \
+    go get github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs; \
+    go generate ./tools/..."

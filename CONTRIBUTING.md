@@ -40,7 +40,7 @@ to access our [internal registry](https://github.com/conjurinc/docs/blob/master/
 Any changes to resource/provider schemas, HCL examples, or import behavior should be reflected in the documentation. To regenerate the docs, run:
 
 ```sh
-go generate ./tools/...
+./bin/generate_docs
 ```
 
 ## Contributing

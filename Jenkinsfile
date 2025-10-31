@@ -95,6 +95,9 @@ pipeline {
           INFRAPOOL_EXECUTORV2_AGENT_0.agentPut from: "go.*", to: "${WORKSPACE}"
           INFRAPOOL_AZURE_EXECUTORV2_AGENT_0.agentPut from: "vendor", to: "${WORKSPACE}"
           INFRAPOOL_AZURE_EXECUTORV2_AGENT_0.agentPut from: "go.*", to: "${WORKSPACE}"
+
+          // Add GOMODCACHE directory to infrapool allowing automated release to generate SBOMs
+          INFRAPOOL_EXECUTORV2_AGENT_0.agentPut from: "/root/go", to: "/var/lib/jenkins/"
         }
       }
     }
