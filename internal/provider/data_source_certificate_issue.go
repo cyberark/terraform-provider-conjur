@@ -18,16 +18,20 @@ var (
 )
 
 // Interfaces for easier mocking in tests
-type certificateIssueClient interface {
-	V2() certificateIssueV2Client
-}
-
-type certificateIssueV2Client interface {
+type certificateIssuer interface {
 	CertificateIssue(issuerName string, issue conjurapi.Issue) (*conjurapi.CertificateResponse, error)
 }
 
+type conjurAPIWrapper struct {
+	client *conjurapi.Client
+}
+
+func (c *conjurAPIWrapper) CertificateIssue(issuerName string, issue conjurapi.Issue) (*conjurapi.CertificateResponse, error) {
+	return c.client.V2().CertificateIssue(issuerName, issue)
+}
+
 type certificateIssueDataSource struct {
-	client certificateIssueClient
+	client certificateIssuer
 }
 
 func NewCertificateIssueDataSource() datasource.DataSource {
@@ -117,15 +121,15 @@ func (d *certificateIssueDataSource) Configure(ctx context.Context, req datasour
 	if req.ProviderData == nil {
 		return
 	}
-	client, ok := req.ProviderData.(certificateIssueClient)
+	client, ok := req.ProviderData.(*conjurapi.Client)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Provider Data Type",
-			fmt.Sprintf("Expected *conjurapi.Client, got: %T", req.ProviderData),
+			fmt.Sprintf("Expected *conjurapi.certificateIssueClient, got: %T", req.ProviderData),
 		)
 		return
 	}
-	d.client = client
+	d.client = &conjurAPIWrapper{client}
 }
 
 func (d *certificateIssueDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -173,7 +177,7 @@ func (d *certificateIssueDataSource) Read(ctx context.Context, req datasource.Re
 		"common_name": data.CommonName.ValueString(),
 	})
 
-	respObj, err := d.client.V2().CertificateIssue(data.IssuerName.ValueString(), reqBody)
+	respObj, err := d.client.CertificateIssue(data.IssuerName.ValueString(), reqBody)
 	if err != nil {
 		resp.Diagnostics.AddError("Error issuing certificate", err.Error())
 		return
