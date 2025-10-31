@@ -77,7 +77,7 @@ Optional:
 <a id="nestedatt--permissions--subject"></a>
 ### Nested Schema for `permissions.subject`
 
-Required:
+Optional:
 
 - `id` (String) Subject identifier
 - `kind` (String) Subject kind (user, group, host, etc.)
