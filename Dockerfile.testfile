@@ -1,4 +1,4 @@
-FROM golang:1.24-alpine
+FROM golang:1.25-alpine
 
 COPY ssl_cert/*  /usr/local/share/ca-certificates/
 
@@ -14,7 +14,7 @@ RUN apk add --no-cache curl \
                libc-dev \
                openssl && \
     go install github.com/jstemmer/go-junit-report@latest && \
-    go install github.com/axw/gocov/gocov@latest && \
+    go install github.com/afunix/gocov/gocov@latest && \
     go install github.com/AlekSi/gocov-xml@latest && \
     go install github.com/wadey/gocovmerge@latest
 

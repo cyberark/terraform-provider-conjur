@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changed
 - Updated documentation to align with Conjur Enterprise name change to Secrets Manager. (CNJR-10995)
+- Update Go to 1.25 (CONJSE-2067)
 
 ### Added
 - Support for Conjur certificate signing/issuance as a datasource
