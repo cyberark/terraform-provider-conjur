@@ -40,12 +40,12 @@ func (m *mockV2IssueClient) CertificateIssue(_ string, _ conjurapi.Issue) (*conj
 	return m.Response, m.Err
 }
 
-// Mock main client implementing certificateIssueClient
+// Mock main client implementing certificateIssuer
 type mockIssueClient struct {
-	V2Client certificateIssueV2Client
+	V2Client certificateIssuer
 }
 
-func (m *mockIssueClient) V2() certificateIssueV2Client {
+func (m *mockIssueClient) V2() certificateIssuer {
 	return m.V2Client
 }
 func TestCertificateIssueDataSource_Read_Success(t *testing.T) {
@@ -94,7 +94,7 @@ func TestCertificateIssueDataSource_Read_Error(t *testing.T) {
 
 // Helper to invoke the issue (READ) method using the mocked client and test inputs
 func invokeIssue(t *testing.T, mockClient *mockIssueClient, issuer, cn string) (datasource.ReadResponse, certificateIssueDataSourceModel) {
-	ds := &certificateIssueDataSource{client: mockClient}
+	ds := &certificateIssueDataSource{client: mockClient.V2Client}
 
 	data := certificateIssueDataSourceModel{
 		IssuerName: types.StringValue(issuer),
@@ -109,7 +109,7 @@ func invokeIssue(t *testing.T, mockClient *mockIssueClient, issuer, cn string) (
 		},
 	}
 
-	respObj, err := ds.client.V2().CertificateIssue(issuer, reqBody)
+	respObj, err := ds.client.CertificateIssue(issuer, reqBody)
 	if err != nil {
 		resp.Diagnostics.AddError("Error issuing certificate", err.Error())
 		return resp, data

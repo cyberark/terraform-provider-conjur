@@ -92,9 +92,6 @@ func (r *ConjurSecretResource) Schema(ctx context.Context, req resource.SchemaRe
 				MarkdownDescription: "The secret value",
 				Optional:            true,
 				Sensitive:           true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
 			},
 			"owner": schema.SingleNestedAttribute{
 				MarkdownDescription: "Owner of the secret",
@@ -127,14 +124,14 @@ func (r *ConjurSecretResource) Schema(ctx context.Context, req resource.SchemaRe
 							Attributes: map[string]schema.Attribute{
 								"id": schema.StringAttribute{
 									MarkdownDescription: "Subject identifier",
-									Required:            true,
+									Optional:            true,
 									PlanModifiers: []planmodifier.String{
 										stringplanmodifier.RequiresReplace(),
 									},
 								},
 								"kind": schema.StringAttribute{
 									MarkdownDescription: "Subject kind (user, group, host, etc.)",
-									Required:            true,
+									Optional:            true,
 									PlanModifiers: []planmodifier.String{
 										stringplanmodifier.RequiresReplace(),
 									},
@@ -246,23 +243,25 @@ func (r *ConjurSecretResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	permissionResp, err := r.client.V2().GetStaticSecretPermissions(secretID)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error reading Secrets Manager secret permissions",
-			fmt.Sprintf("Unable to check if secret %q permissions exist: %s", secretID, err),
-		)
-		return
-	}
+	// TODO: Computing this in Read when permissions have been applied via a different resource, i.e. conjur_permissions or in
+	// Secrets Manager directly causes there be a diff on permissions even if they are unchanged, resulting in unnecessary updates.
+	// permissionResp, err := r.client.V2().GetStaticSecretPermissions(secretID)
+	// if err != nil {
+	// 	resp.Diagnostics.AddError(
+	// 		"Error reading Secrets Manager secret permissions",
+	// 		fmt.Sprintf("Unable to check if secret %q permissions exist: %s", secretID, err),
+	// 	)
+	// 	return
+	// }
 
-	err = r.parseSecretResponse(*secretResp, *permissionResp, &data)
+	err = r.parseSecretResponse(*secretResp, conjurapi.PermissionResponse{}, &data)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Parsing Secret Response", fmt.Sprintf("Could not parse secret response: %s", err))
 		return
 	}
 
 	// Fetch the secret value (if accessible) to store in state
-	secretValue, err := r.client.RetrieveSecret(secretID)
+	secretValue, err := r.client.RetrieveSecret(strings.TrimPrefix(secretID, "/"))
 	if err != nil {
 		resp.Diagnostics.AddWarning("Unable to fetch secret value", fmt.Sprintf("Could not fetch secret value for %q: %s", secretID, err))
 	} else {
@@ -277,9 +276,30 @@ func (r *ConjurSecretResource) Read(ctx context.Context, req resource.ReadReques
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-// Not supported - requires resource recreation via planmodifiers since there's no PATCH support in the API
+// Only supports rotating the secret value
 func (r *ConjurSecretResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	resp.Diagnostics.AddWarning("Update Not Supported", "This resource does not support in-place updates. Please recreate the resource to apply changes.")
+	var data ConjurSecretResourceModel
+
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	secretID := fmt.Sprintf("%s/%s", data.Branch.ValueString(), data.Name.ValueString())
+
+	// Update the secret value
+	err := r.client.AddSecret(strings.TrimPrefix(secretID, "/"), data.Value.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddWarning("Unable to set secret value", fmt.Sprintf("Could not update secret value for %q: %s", secretID, err))
+	} else {
+		resp.Diagnostics.AddWarning(
+			"Sensitive Value in Configuration",
+			"The 'value' attribute is marked as sensitive and will be stored in the Terraform state. Ensure your state file is securely managed.",
+		)
+	}
+
+	tflog.Trace(ctx, "updated secret resource")
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *ConjurSecretResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -379,7 +399,11 @@ func (r *ConjurSecretResource) buildSecretPayload(data *ConjurSecretResourceMode
 func (r *ConjurSecretResource) parseSecretResponse(secretResp conjurapi.StaticSecretResponse, permissionResp conjurapi.PermissionResponse, data *ConjurSecretResourceModel) error {
 	data.Name = types.StringValue(secretResp.Name)
 	data.Branch = types.StringValue(secretResp.Branch)
-	data.MimeType = types.StringValue(secretResp.MimeType)
+	if secretResp.MimeType == "" {
+		data.MimeType = types.StringNull()
+	} else {
+		data.MimeType = types.StringValue(secretResp.MimeType)
+	}
 
 	if len(permissionResp.Permission) > 0 {
 		permissions := make([]ConjurSecretPermission, len(permissionResp.Permission))
@@ -420,7 +444,11 @@ func (r *ConjurSecretResource) parseSecretResponse(secretResp conjurapi.StaticSe
 			"id":   types.StringType,
 		})
 	}
-	data.Annotations = secretResp.Annotations
+
+	if len(secretResp.Annotations) != 0 {
+		data.Annotations = secretResp.Annotations
+	}
+
 	return nil
 }
 

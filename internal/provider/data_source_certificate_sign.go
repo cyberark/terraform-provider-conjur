@@ -12,24 +12,26 @@ import (
 	"github.com/cyberark/conjur-api-go/conjurapi"
 )
 
-// Interfaces for easier mocking in tests
-type certificateSignClient interface {
-	V2() certificateSignV2Client
-}
+var (
+	_ datasource.DataSource              = &certificateSignDataSource{}
+	_ datasource.DataSourceWithConfigure = &certificateSignDataSource{}
+)
 
-type certificateSignV2Client interface {
+// Interfaces for easier mocking in tests
+type certificateSigner interface {
 	CertificateSign(issuerName string, sign conjurapi.Sign) (*conjurapi.CertificateResponse, error)
 }
 
-// Ensure the datasource implements the Terraform interface
-var _ datasource.DataSource = &certificateSignDataSource{}
+func (c *conjurAPIWrapper) CertificateSign(issuerName string, sign conjurapi.Sign) (*conjurapi.CertificateResponse, error) {
+	return c.client.V2().CertificateSign(issuerName, sign)
+}
 
 func NewCertificateSignDataSource() datasource.DataSource {
 	return &certificateSignDataSource{}
 }
 
 type certificateSignDataSource struct {
-	client certificateSignClient
+	client certificateSigner
 }
 
 type certificateSignDataSourceModel struct {
@@ -90,7 +92,7 @@ func (d *certificateSignDataSource) Configure(ctx context.Context, req datasourc
 	if req.ProviderData == nil {
 		return
 	}
-	client, ok := req.ProviderData.(certificateSignClient)
+	client, ok := req.ProviderData.(*conjurapi.Client)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Provider Data Type",
@@ -99,7 +101,7 @@ func (d *certificateSignDataSource) Configure(ctx context.Context, req datasourc
 		return
 	}
 
-	d.client = client
+	d.client = &conjurAPIWrapper{client}
 }
 
 func (d *certificateSignDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -119,7 +121,7 @@ func (d *certificateSignDataSource) Read(ctx context.Context, req datasource.Rea
 		"issuer_name": data.IssuerName.ValueString(),
 	})
 
-	signResp, err := d.client.V2().CertificateSign(data.IssuerName.ValueString(), signReq)
+	signResp, err := d.client.CertificateSign(data.IssuerName.ValueString(), signReq)
 	if err != nil {
 		resp.Diagnostics.AddError("Error signing certificate", err.Error())
 		return

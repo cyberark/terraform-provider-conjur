@@ -13,9 +13,10 @@ The provider can also manage the following Secrets Manager resources:
 - [conjur_authenticator](./resources/authenticator.md)
 - [conjur_branch](./resources/branch.md)
 - [conjur_host](./resources/host.md) (SaaS only)
-- [conjur_variable](./resources/variable.md)
 - [conjur_group](./resources/group.md)
 - [conjur_secret](./resources/secret.md) (SaaS only)
+- [conjur_membership](./resources/membership.md)
+- [conjur_permission](./resources/permission.md)
 
 ## Example Usage
 

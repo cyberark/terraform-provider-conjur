@@ -30,22 +30,22 @@ func TestCertificateSignDataSource_Schema(t *testing.T) {
 	}
 }
 
-// Mock V2 client
-type mockV2Client struct {
+// Mock V2 client for signing certificates
+type mockV2SignClient struct {
 	Response *conjurapi.CertificateResponse
 	Err      error
 }
 
-func (m *mockV2Client) CertificateSign(_ string, _ conjurapi.Sign) (*conjurapi.CertificateResponse, error) {
+func (m *mockV2SignClient) CertificateSign(_ string, _ conjurapi.Sign) (*conjurapi.CertificateResponse, error) {
 	return m.Response, m.Err
 }
 
-// Mock main client
+// Mock main client implementing certificateSigner
 type mockSignClient struct {
-	V2Client certificateSignV2Client
+	V2Client certificateSigner
 }
 
-func (m *mockSignClient) V2() certificateSignV2Client {
+func (m *mockSignClient) V2() certificateSigner {
 	return m.V2Client
 }
 
@@ -55,7 +55,7 @@ func TestCertificateSignDataSource_Read_Success(t *testing.T) {
 	zone := "my-zone"
 	ttl := "PT24H"
 	mockClient := &mockSignClient{
-		V2Client: &mockV2Client{
+		V2Client: &mockV2SignClient{
 			Response: &conjurapi.CertificateResponse{
 				Certificate: "signed-cert",
 				PrivateKey:  "",
@@ -80,7 +80,7 @@ func TestCertificateSignDataSource_Read_Error(t *testing.T) {
 	zone := "my-zone"
 	ttl := "PT24H"
 	mockClient := &mockSignClient{
-		V2Client: &mockV2Client{
+		V2Client: &mockV2SignClient{
 			Response: nil,
 			Err:      fmt.Errorf("signing failed"),
 		},
@@ -98,7 +98,9 @@ func TestCertificateSignDataSource_Read_Error(t *testing.T) {
 }
 
 // Helper to invoke the sign (READ) method using the mocked client and test inputs
-func invokeSign(t *testing.T, client *mockSignClient, issuer, csr, zone, ttl string) (datasource.ReadResponse, certificateSignDataSourceModel) {
+func invokeSign(t *testing.T, mockClient *mockSignClient, issuer, csr, zone, ttl string) (datasource.ReadResponse, certificateSignDataSourceModel) {
+	ds := &certificateSignDataSource{client: mockClient.V2Client}
+
 	data := certificateSignDataSourceModel{
 		IssuerName: types.StringValue(issuer),
 		Csr:        types.StringValue(csr),
@@ -114,7 +116,7 @@ func invokeSign(t *testing.T, client *mockSignClient, issuer, csr, zone, ttl str
 		TTL:  ttl,
 	}
 
-	signResp, err := client.V2().CertificateSign(issuer, signReq)
+	signResp, err := ds.client.CertificateSign(issuer, signReq)
 	if err != nil {
 		resp.Diagnostics.AddError("Error signing certificate", err.Error())
 		return resp, data

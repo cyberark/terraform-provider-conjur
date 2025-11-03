@@ -115,6 +115,7 @@ func (r *ConjurAuthenticatorResource) Schema(ctx context.Context, req resource.S
 					"kind": schema.StringAttribute{
 						MarkdownDescription: "Owner kind (user, group, etc.)",
 						Optional:            true,
+						Computed:            true,
 						PlanModifiers: []planmodifier.String{
 							stringplanmodifier.RequiresReplace(),
 						},
@@ -122,6 +123,7 @@ func (r *ConjurAuthenticatorResource) Schema(ctx context.Context, req resource.S
 					"id": schema.StringAttribute{
 						MarkdownDescription: "Owner identifier",
 						Optional:            true,
+						Computed:            true,
 						PlanModifiers: []planmodifier.String{
 							stringplanmodifier.RequiresReplace(),
 						},
@@ -286,24 +288,24 @@ func (r *ConjurAuthenticatorResource) Update(ctx context.Context, req resource.U
 
 	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
-
-	authenticator, err := r.buildAuthenticatorPayload(&data)
-	if err != nil {
-		resp.Diagnostics.AddError("Error Building Authenticator Payload", fmt.Sprintf("Could not build authenticator payload: %s", err))
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	err = r.client.V2().DeleteAuthenticator(authenticator.Type, authenticator.Name)
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete existing authenticator for update, got error: %s", err))
+	// Read the stated data into the model
+	var state ConjurAuthenticatorResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	_, err = r.client.V2().CreateAuthenticator(authenticator)
+	// Enable/disable the authenticator
+	err := r.client.EnableAuthenticator(data.Type.ValueString(), data.Name.ValueString(), data.Enabled.ValueBool())
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create authenticator, got error: %s", err))
-		return
+		resp.Diagnostics.AddWarning("Unable to update the authenticator", fmt.Sprintf("Could not update authenticator for %q: %s", data.Name.ValueString(), err))
 	}
+
+	data.Owner = state.Owner // Owner may be set in state via the API response, but not reflected in HCL data so we set it manually
 
 	tflog.Trace(ctx, "updated authenticator resource")
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
