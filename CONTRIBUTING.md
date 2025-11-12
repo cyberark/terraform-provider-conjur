@@ -13,6 +13,23 @@ on your system.
 ./bin/build
 ```
 
+### Regenerate code and mocks:
+
+If you've made changes to interfaces or need to regenerate code, run:
+
+```sh
+./bin/regenerate.sh
+```
+
+This script will:
+- Run `go generate` to regenerate code from `//go:generate` directives (e.g., API client interfaces)
+- Generate mock implementations for testing using mockery
+
+**When to run this script:**
+- After modifying or adding Go interfaces that require mocks for testing
+- After changing the Conjur API client interface usage
+- When mock files are out of sync with their corresponding interfaces
+
 ### Run integration tests:
 
 #### Conjur OSS

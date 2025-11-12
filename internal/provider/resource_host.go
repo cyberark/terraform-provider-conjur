@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/cyberark/conjur-api-go/conjurapi"
+	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
@@ -27,7 +28,7 @@ func NewConjurHostResource() resource.Resource {
 
 // ConjurHostResource defines the resource implementation.
 type ConjurHostResource struct {
-	client *conjurapi.Client
+	client api.ClientV2
 }
 
 // ConjurHostResourceModel describes the resource data model.
@@ -167,11 +168,11 @@ func (r *ConjurHostResource) Configure(ctx context.Context, req resource.Configu
 		return
 	}
 
-	client, ok := req.ProviderData.(*conjurapi.Client)
+	client, ok := req.ProviderData.(api.ClientV2)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected *ConjurClient, got: %T", req.ProviderData),
+			fmt.Sprintf("Expected api.ClientV2, got: %T", req.ProviderData),
 		)
 		return
 	}
@@ -193,7 +194,7 @@ func (r *ConjurHostResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	_, err = r.client.V2().CreateWorkload(*newHost)
+	_, err = r.client.CreateWorkload(*newHost)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create host, got error: %s", err))
 		return
@@ -245,7 +246,7 @@ func (r *ConjurHostResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
-	_, err := r.client.V2().DeleteWorkload(fmt.Sprintf("%s/%s", data.Branch.ValueString(), data.Name.ValueString()))
+	_, err := r.client.DeleteWorkload(fmt.Sprintf("%s/%s", data.Branch.ValueString(), data.Name.ValueString()))
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete host, got error: %s", err))
 		return

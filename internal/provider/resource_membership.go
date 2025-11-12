@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/cyberark/conjur-api-go/conjurapi"
+	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -24,7 +25,7 @@ var (
 )
 
 type conjurMembershipResource struct {
-	client *conjurapi.Client
+	client api.ClientV2
 }
 
 type membershipResourceModel struct {
@@ -79,15 +80,14 @@ func (r *conjurMembershipResource) Configure(_ context.Context, req resource.Con
 	if req.ProviderData == nil {
 		return
 	}
-	client, ok := req.ProviderData.(*conjurapi.Client)
+	client, ok := req.ProviderData.(api.ClientV2)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected *ConjurClient, got: %T", req.ProviderData),
+			fmt.Sprintf("Expected api.ClientV2, got: %T", req.ProviderData),
 		)
 		return
 	}
-
 	r.client = client
 }
 
@@ -108,7 +108,7 @@ func (r *conjurMembershipResource) Create(ctx context.Context, req resource.Crea
 		Kind: data.MemberKind.ValueString(),
 	}
 
-	if _, err := r.client.V2().AddGroupMember(data.GroupID.ValueString(), member); err != nil {
+	if _, err := r.client.AddGroupMember(data.GroupID.ValueString(), member); err != nil {
 		resp.Diagnostics.AddError("Failed to add group member", err.Error())
 		return
 	}
@@ -197,7 +197,7 @@ func (r *conjurMembershipResource) Delete(ctx context.Context, req resource.Dele
 		Kind: data.MemberKind.ValueString(),
 	}
 
-	if _, err := r.client.V2().RemoveGroupMember(groupID, member); err != nil {
+	if _, err := r.client.RemoveGroupMember(groupID, member); err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to remove group member, got error: %s", err))
 		return
 	}

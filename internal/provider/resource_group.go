@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cyberark/conjur-api-go/conjurapi"
+	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api"
 	"github.com/cyberark/terraform-provider-conjur/internal/policy"
 	"github.com/doodlesbykumbi/conjur-policy-go/pkg/conjurpolicy"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -29,7 +29,7 @@ func NewConjurGroupResource() resource.Resource {
 
 // ConjurGroupResource defines the resource implementation.
 type ConjurGroupResource struct {
-	client *conjurapi.Client
+	client api.ClientV2
 }
 
 // ConjurGroupResourceModel describes the resource data model.
@@ -104,16 +104,14 @@ func (r *ConjurGroupResource) Configure(ctx context.Context, req resource.Config
 	if req.ProviderData == nil {
 		return
 	}
-
-	client, ok := req.ProviderData.(*conjurapi.Client)
+	client, ok := req.ProviderData.(api.ClientV2)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected *conjurapi.Client, got: %T", req.ProviderData),
+			fmt.Sprintf("Expected api.ClientV2, got: %T", req.ProviderData),
 		)
 		return
 	}
-
 	r.client = client
 }
 

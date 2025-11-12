@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/cyberark/conjur-api-go/conjurapi"
+	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api"
 	"github.com/cyberark/terraform-provider-conjur/internal/policy"
 	"github.com/doodlesbykumbi/conjur-policy-go/pkg/conjurpolicy"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -35,7 +36,7 @@ func NewConjurSecretResource() resource.Resource {
 
 // ConjurSecretResource defines the resource implementation.
 type ConjurSecretResource struct {
-	client *conjurapi.Client
+	client api.ClientV2
 }
 
 type ConjurSecretResourceModel struct {
@@ -165,16 +166,14 @@ func (r *ConjurSecretResource) Configure(ctx context.Context, req resource.Confi
 	if req.ProviderData == nil {
 		return
 	}
-
-	client, ok := req.ProviderData.(*conjurapi.Client)
+	client, ok := req.ProviderData.(api.ClientV2)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected *ConjurClient, got: %T", req.ProviderData),
+			fmt.Sprintf("Expected api.ClientV2, got: %T", req.ProviderData),
 		)
 		return
 	}
-
 	r.client = client
 }
 
@@ -216,7 +215,7 @@ func (r *ConjurSecretResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	secretResp, err := r.client.V2().CreateStaticSecret(newSecret)
+	secretResp, err := r.client.CreateStaticSecret(newSecret)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create secret, got error: %s", err))
 		return
@@ -234,7 +233,7 @@ func (r *ConjurSecretResource) Read(ctx context.Context, req resource.ReadReques
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
 	secretID := fmt.Sprintf("%s/%s", data.Branch.ValueString(), data.Name.ValueString())
-	secretResp, err := r.client.V2().GetStaticSecretDetails(secretID)
+	secretResp, err := r.client.GetStaticSecretDetails(secretID)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading Secrets Manager secret",
@@ -245,7 +244,7 @@ func (r *ConjurSecretResource) Read(ctx context.Context, req resource.ReadReques
 
 	// TODO: Computing this in Read when permissions have been applied via a different resource, i.e. conjur_permissions or in
 	// Secrets Manager directly causes there be a diff on permissions even if they are unchanged, resulting in unnecessary updates.
-	// permissionResp, err := r.client.V2().GetStaticSecretPermissions(secretID)
+	// permissionResp, err := r.client.GetStaticSecretPermissions(secretID)
 	// if err != nil {
 	// 	resp.Diagnostics.AddError(
 	// 		"Error reading Secrets Manager secret permissions",

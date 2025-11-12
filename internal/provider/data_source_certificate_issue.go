@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/cyberark/conjur-api-go/conjurapi"
+	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -23,7 +24,7 @@ type certificateIssuer interface {
 }
 
 type conjurAPIWrapper struct {
-	client *conjurapi.Client
+	client api.ClientV2
 }
 
 func (c *conjurAPIWrapper) CertificateIssue(issuerName string, issue conjurapi.Issue) (*conjurapi.CertificateResponse, error) {
@@ -121,7 +122,7 @@ func (d *certificateIssueDataSource) Configure(ctx context.Context, req datasour
 	if req.ProviderData == nil {
 		return
 	}
-	client, ok := req.ProviderData.(*conjurapi.Client)
+	client, ok := req.ProviderData.(api.ClientV2)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Provider Data Type",

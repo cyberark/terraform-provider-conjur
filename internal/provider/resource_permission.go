@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/cyberark/conjur-api-go/conjurapi"
+	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -34,7 +34,7 @@ func NewConjurPermissionResource() resource.Resource {
 
 // ConjurPermissionResource defines the resource implementation.
 type ConjurPermissionResource struct {
-	client *conjurapi.Client
+	client api.ClientV2
 }
 
 // ConjurPermissionResourceModel describes the resource data model.
@@ -125,16 +125,14 @@ func (r *ConjurPermissionResource) Configure(ctx context.Context, req resource.C
 	if req.ProviderData == nil {
 		return
 	}
-
-	client, ok := req.ProviderData.(*conjurapi.Client)
+	client, ok := req.ProviderData.(api.ClientV2)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected *ConjurClient, got: %T", req.ProviderData),
+			fmt.Sprintf("Expected api.ClientV2, got: %T", req.ProviderData),
 		)
 		return
 	}
-
 	r.client = client
 }
 

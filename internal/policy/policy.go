@@ -6,11 +6,12 @@ import (
 	"strings"
 
 	"github.com/cyberark/conjur-api-go/conjurapi"
+	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // applyPolicy applies a policy to Conjur using PATCH mode
-func ApplyPolicy(client *conjurapi.Client, policy, branch string) error {
+func ApplyPolicy(client api.ClientV2, policy, branch string) error {
 	policyResponse, err := client.LoadPolicy(conjurapi.PolicyModePatch, branch, strings.NewReader(policy))
 	if err != nil {
 		return fmt.Errorf("failed to load policy: %w", err)

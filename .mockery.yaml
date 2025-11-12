@@ -1,0 +1,16 @@
+force-file-write: true
+packages:
+  github.com/cyberark/terraform-provider-conjur/internal/conjur:
+    config:
+      all: true
+      filename: "{{.InterfaceName}}.go"
+      dir: "{{.InterfaceDir}}/mocks"
+      structname: "{{.Mock}}{{.InterfaceName}}"
+      pkgname: "mocks"
+  github.com/cyberark/terraform-provider-conjur/internal/conjur/api:
+    config:
+      all: true
+      filename: "{{.InterfaceName}}.go"
+      dir: "{{.InterfaceDir}}/mocks"
+      structname: "{{.Mock}}{{.InterfaceName}}"
+      pkgname: "mocks"

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/cyberark/conjur-api-go/conjurapi"
+	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -22,7 +22,7 @@ func NewSecretDataSource() datasource.DataSource {
 }
 
 type secretDataSource struct {
-	client *conjurapi.Client
+	client api.ClientV2
 }
 
 type secretDataSourceModel struct {
@@ -62,17 +62,14 @@ func (d *secretDataSource) Configure(_ context.Context, req datasource.Configure
 	if req.ProviderData == nil {
 		return
 	}
-
-	client, ok := req.ProviderData.(*conjurapi.Client)
-
+	client, ok := req.ProviderData.(api.ClientV2)
 	if !ok {
 		resp.Diagnostics.AddError(
-			"Unexpected Data Source Configure Type",
-			fmt.Sprintf("Expected *conjurapi.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			"Unexpected Resource Configure Type",
+			fmt.Sprintf("Expected api.ClientV2, got: %T", req.ProviderData),
 		)
 		return
 	}
-
 	d.client = client
 }
 
