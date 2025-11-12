@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -23,7 +24,7 @@ type certificateSigner interface {
 }
 
 func (c *conjurAPIWrapper) CertificateSign(issuerName string, sign conjurapi.Sign) (*conjurapi.CertificateResponse, error) {
-	return c.client.V2().CertificateSign(issuerName, sign)
+	return c.client.CertificateSign(issuerName, sign)
 }
 
 func NewCertificateSignDataSource() datasource.DataSource {
@@ -92,7 +93,7 @@ func (d *certificateSignDataSource) Configure(ctx context.Context, req datasourc
 	if req.ProviderData == nil {
 		return
 	}
-	client, ok := req.ProviderData.(*conjurapi.Client)
+	client, ok := req.ProviderData.(api.ClientV2)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Provider Data Type",

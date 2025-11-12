@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/cyberark/conjur-api-go/conjurapi"
+	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -33,7 +34,7 @@ func NewConjurAuthenticatorResource() resource.Resource {
 
 // ConjurAuthenticatorResource defines the resource implementation.
 type ConjurAuthenticatorResource struct {
-	client *conjurapi.Client
+	client api.ClientV2
 }
 
 // ConjurAuthenticatorResourceModel describes the resource data model.
@@ -214,16 +215,14 @@ func (r *ConjurAuthenticatorResource) Configure(ctx context.Context, req resourc
 	if req.ProviderData == nil {
 		return
 	}
-
-	client, ok := req.ProviderData.(*conjurapi.Client)
+	client, ok := req.ProviderData.(api.ClientV2)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected *ConjurClient, got: %T", req.ProviderData),
+			fmt.Sprintf("Expected api.ClientV2, got: %T", req.ProviderData),
 		)
 		return
 	}
-
 	r.client = client
 }
 
@@ -241,7 +240,7 @@ func (r *ConjurAuthenticatorResource) Create(ctx context.Context, req resource.C
 		return
 	}
 
-	authenticatorResp, err := r.client.V2().CreateAuthenticator(newAuthenticator)
+	authenticatorResp, err := r.client.CreateAuthenticator(newAuthenticator)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create authenticator, got error: %s", err))
 		return
@@ -266,7 +265,7 @@ func (r *ConjurAuthenticatorResource) Read(ctx context.Context, req resource.Rea
 		return
 	}
 
-	authenticatorResponse, err := r.client.V2().GetAuthenticator(data.Type.ValueString(), data.Name.ValueString())
+	authenticatorResponse, err := r.client.GetAuthenticator(data.Type.ValueString(), data.Name.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read authenticator, got error: %s", err))
 		return
@@ -319,7 +318,7 @@ func (r *ConjurAuthenticatorResource) Delete(ctx context.Context, req resource.D
 		return
 	}
 
-	err := r.client.V2().DeleteAuthenticator(data.Type.ValueString(), data.Name.ValueString())
+	err := r.client.DeleteAuthenticator(data.Type.ValueString(), data.Name.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete authenticator, got error: %s", err))
 		return

@@ -1,0 +1,19 @@
+FROM golang:1.24-alpine
+
+# Install bash, git, sed, and build tools
+RUN apk add --no-cache bash git curl build-base sed
+
+# Install Go tools used by go generate and mockery
+RUN go install github.com/vektra/mockery/v3@latest \
+    && go install github.com/dmarkham/enumer@latest \
+    && go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest \
+    && go install golang.org/x/tools/cmd/goimports@latest   \
+    && go install github.com/rjeczalik/interfaces/cmd/interfacer@latest
+
+# Add Go binaries to path
+ENV PATH="/go/bin:$PATH"
+
+WORKDIR /app
+COPY . .
+
+CMD ["bash"]
