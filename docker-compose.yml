@@ -37,6 +37,7 @@ services:
       TF_VAR_conjur_host_name:
       TF_VAR_conjur_group_name:
       TF_VAR_conjur_secret_name:
+      TF_VAR_conjur_policy_branch_name:
       GCP_TOKEN: "${GCP_TOKEN:-}"
     working_dir: /src
     volumes:

@@ -29,6 +29,11 @@ function main() {
   test_resource_crud "tests/resources/permission" "permission" "role_name" "host/data/terraform/test/test-workload:variable/data/terraform/test/workload-secret"
   test_results+=("Permission|$?")
 
+  echo ">> Running Policy Branch CRUD test"
+  test_resource_crud "tests/resources/policy_branch" "policy_branch" "full_id" "data/terraform/$TF_VAR_conjur_policy_branch_name"
+  test_results+=("PolicyBranch|$?")
+
+
   if [[ "$TARGET" == "cloud" ]]; then
     echo ">> Running Host CRUD test"
     test_resource_crud "tests/resources/host" "host" "name"
@@ -137,6 +142,7 @@ function generate_random_values() {
   export TF_VAR_conjur_host_name="tf-host-$rand_suffix"
   export TF_VAR_conjur_group_name="tf-group-$rand_suffix"
   export TF_VAR_conjur_secret_name="tf-secret-$rand_suffix"
+  export TF_VAR_conjur_policy_branch_name="tf-branch-$rand_suffix"
 }
 
 function cleanup_terraform() {
