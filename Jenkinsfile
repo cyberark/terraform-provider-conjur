@@ -120,27 +120,41 @@ pipeline {
       }
     }
 
-    stage('Run Code Coverage'){
-      steps {
-        script {
-          INFRAPOOL_EXECUTORV2_AGENT_0.agentUnstash name: 'token-out'
-          INFRAPOOL_EXECUTORV2_AGENT_0.agentSh 'summon ./bin/codecoverage.sh'
-          INFRAPOOL_EXECUTORV2_AGENT_0.agentStash name: 'xml-out1', includes: 'output/tests/*'
-          INFRAPOOL_AZURE_EXECUTORV2_AGENT_0.agentSh 'summon ./bin/codecoverage.sh TestAzureSecretDataSource'
-          INFRAPOOL_AZURE_EXECUTORV2_AGENT_0.agentStash name: 'xml-out2', includes: 'output/azure/*'
-        } 
+    stage('Unit tests and coverage') {
+      stages {
+        stage('Run tests') {
+          steps {
+            script {
+              INFRAPOOL_EXECUTORV2_AGENT_0.agentUnstash name: 'token-out'
+              INFRAPOOL_EXECUTORV2_AGENT_0.agentSh 'summon ./bin/codecoverage.sh'
+              INFRAPOOL_EXECUTORV2_AGENT_0.agentStash name: 'xml-out1', includes: 'output/tests/*'
+              
+              INFRAPOOL_AZURE_EXECUTORV2_AGENT_0.agentSh 'summon ./bin/codecoverage.sh TestAzureSecretDataSource'
+              INFRAPOOL_AZURE_EXECUTORV2_AGENT_0.agentStash name: 'xml-out2', includes: 'output/azure/*'
+            } 
+          }
+        }
+
+        stage('Generate coverage XML') {
+          steps {
+            script {
+              INFRAPOOL_EXECUTORV2_AGENT_0.agentUnstash name: 'xml-out1'
+              INFRAPOOL_EXECUTORV2_AGENT_0.agentUnstash name: 'xml-out2'
+              INFRAPOOL_EXECUTORV2_AGENT_0.agentSh './bin/generate_xml.sh'
+              INFRAPOOL_EXECUTORV2_AGENT_0.agentStash name: 'output-xml', includes: 'output/*.xml'
+            } 
+          }
+        }
       }
-    }
-
-    stage('Generate code coverage xml'){
-      steps {
-        script {
-          INFRAPOOL_EXECUTORV2_AGENT_0.agentUnstash name: 'xml-out1'
-          INFRAPOOL_EXECUTORV2_AGENT_0.agentUnstash name: 'xml-out2'
-          INFRAPOOL_EXECUTORV2_AGENT_0.agentSh './bin/generate_xml.sh'
-          INFRAPOOL_EXECUTORV2_AGENT_0.agentStash name: 'output-xml', includes: 'output/*.xml'
-
-        } 
+      post {
+        always {
+          script {
+            unstash 'output-xml'
+            junit 'output/junit.xml'
+            cobertura autoUpdateHealth: false, autoUpdateStability: false, coberturaReportFile: 'output/coverage.xml', conditionalCoverageTargets: '30, 0, 0', failUnhealthy: false, failUnstable: false, lineCoverageTargets: '30, 0, 0', maxNumberOfBuilds: 0, methodCoverageTargets: '30, 0, 0', onlyStable: false, sourceEncoding: 'ASCII', zoomCoverageChart: false
+            codacy action: 'reportCoverage', filePath: "output/coverage.xml"
+          }
+        }
       }
     }
     
@@ -339,10 +353,6 @@ pipeline {
   
   post {
     always {
-      unstash 'output-xml'
-      junit 'output/junit.xml'
-      cobertura autoUpdateHealth: false, autoUpdateStability: false, coberturaReportFile: 'output/coverage.xml', conditionalCoverageTargets: '30, 0, 0', failUnhealthy: false, failUnstable: false, lineCoverageTargets: '30, 0, 0', maxNumberOfBuilds: 0, methodCoverageTargets: '30, 0, 0', onlyStable: false, sourceEncoding: 'ASCII', zoomCoverageChart: false
-      codacy action: 'reportCoverage', filePath: "output/coverage.xml"
       releaseInfraPoolAgent(".infrapool/release_agents") 
       // Resolve ownership issue before running infra post hook
       sh 'git config --global --add safe.directory ${PWD}'
