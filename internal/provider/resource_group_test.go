@@ -53,7 +53,7 @@ func TestConjurGroupResource_generateGroupPolicy(t *testing.T) {
 		data := &ConjurGroupResourceModel{
 			Name:   types.StringValue("test-group"),
 			Branch: types.StringValue("data/production"),
-			Owner: &ConjurGroupOwnerModel{
+			Owner: &ConjurOwnerModel{
 				Kind: types.StringValue("group"),
 				ID:   types.StringValue("jenkins-admins"),
 			},

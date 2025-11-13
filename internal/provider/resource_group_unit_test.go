@@ -60,7 +60,7 @@ func TestGroupResource_Create(t *testing.T) {
 			data: ConjurGroupResourceModel{
 				Name:   types.StringValue("admins"),
 				Branch: types.StringValue("data/production"),
-				Owner: &ConjurGroupOwnerModel{
+				Owner: &ConjurOwnerModel{
 					Kind: types.StringValue("user"),
 					ID:   types.StringValue("admin"),
 				},
@@ -97,7 +97,7 @@ func TestGroupResource_Create(t *testing.T) {
 			data: ConjurGroupResourceModel{
 				Name:   types.StringValue("security-team"),
 				Branch: types.StringValue("data/groups"),
-				Owner: &ConjurGroupOwnerModel{
+				Owner: &ConjurOwnerModel{
 					Kind: types.StringValue("group"),
 					ID:   types.StringValue("managers"),
 				},
@@ -220,7 +220,7 @@ func TestGroupResource_Read(t *testing.T) {
 			data: ConjurGroupResourceModel{
 				Name:   types.StringValue("security"),
 				Branch: types.StringValue("data/groups"),
-				Owner: &ConjurGroupOwnerModel{
+				Owner: &ConjurOwnerModel{
 					Kind: types.StringValue("user"),
 					ID:   types.StringValue("admin"),
 				},

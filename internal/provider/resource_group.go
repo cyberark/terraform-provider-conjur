@@ -34,13 +34,13 @@ type ConjurGroupResource struct {
 
 // ConjurGroupResourceModel describes the resource data model.
 type ConjurGroupResourceModel struct {
-	Name        types.String           `tfsdk:"name"`
-	Branch      types.String           `tfsdk:"branch"`
-	Owner       *ConjurGroupOwnerModel `tfsdk:"owner"`
-	Annotations map[string]string      `tfsdk:"annotations"`
+	Name        types.String      `tfsdk:"name"`
+	Branch      types.String      `tfsdk:"branch"`
+	Owner       *ConjurOwnerModel `tfsdk:"owner"`
+	Annotations map[string]string `tfsdk:"annotations"`
 }
 
-type ConjurGroupOwnerModel struct {
+type ConjurOwnerModel struct {
 	Kind types.String `tfsdk:"kind"`
 	ID   types.String `tfsdk:"id"`
 }

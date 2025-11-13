@@ -1,0 +1,1 @@
+terraform import conjur_policy_branch.my_branch data/terraform/my-policy-branch
