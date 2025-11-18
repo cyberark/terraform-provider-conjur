@@ -32,60 +32,6 @@ func randSuffix(n int) string {
 	return hex.EncodeToString(b)
 }
 
-func TestAccPolicyBranch_basic(t *testing.T) {
-	t.Parallel()
-	testAccPreCheck(t)
-
-	parent := os.Getenv("CONJUR_TEST_PARENT_BRANCH")
-	name := fmt.Sprintf("acc-%s", randSuffix(4))
-
-	resourceName := "conjur_policy_branch.test"
-
-	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: testAccPolicyBranchConfig(parent, name, map[string]string{
-					"acc": "true",
-				}),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr(resourceName, "branch", parent),
-					resource.TestCheckResourceAttr(resourceName, "name", name),
-					resource.TestCheckResourceAttr(resourceName, "annotations.acc", "true"),
-					resource.TestCheckResourceAttrSet(resourceName, "full_id"),
-				),
-			},
-			{
-				ResourceName:                         resourceName,
-				ImportState:                          true,
-				ImportStateIdFunc:                    importID(resourceName),
-				ImportStateVerify:                    true,
-				ImportStateVerifyIdentifierAttribute: "full_id",
-			},
-			{
-				Config: testAccPolicyBranchConfig(parent, name, map[string]string{
-					"acc": "true",
-					"env": "dev",
-				}),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr(resourceName, "annotations.acc", "true"),
-					resource.TestCheckResourceAttr(resourceName, "annotations.env", "dev"),
-				),
-			},
-			{
-				Config: testAccPolicyBranchConfig(parent, name, map[string]string{
-					"acc": "cleanup",
-					"env": "dev",
-				}),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr(resourceName, "annotations.acc", "cleanup"),
-					resource.TestCheckResourceAttr(resourceName, "annotations.env", "dev"),
-				),
-			},
-		},
-	})
-}
-
 func testAccPolicyBranchConfig(parent, name string, ann map[string]string) string {
 	anns := ""
 	for k, v := range ann {

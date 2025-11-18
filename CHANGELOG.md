@@ -6,15 +6,17 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
-## [0.8.0] - 2025-10-16
+## [0.8.0] - 2025-11-14
 
 ### Changed
 - Updated documentation to align with Conjur Enterprise name change to Secrets Manager. (CNJR-10995)
 - Update Go to 1.25 (CONJSE-2067)
 
 ### Added
-- Support for Conjur certificate signing/issuance as a datasource
-- Support for Conjur permissions via the conjur_permission resource
+- Support for Conjur Branches via the conjur_policy_branch resource
+- Support for Conjur Memberships via the conjur_membership resource
+- Support for Conjur Certificate signing/issuance as a datasource
+- Support for Conjur Permissions via the conjur_permission resource
 - Support for Conjur V2 Workloads API via the conjur_host resource
 - Support for Conjur V2 Authenticators API via the conjur_authenticator resource
 - Support for Conjur Groups via the conjur_group resource
@@ -157,7 +159,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Initial release
 - Use https://github.com/cyberark/conjur-api-go to read configuration.
 
-[Unreleased]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.6.9...HEAD
+[Unreleased]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.8.0...HEAD
 [0.8.0]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/cyberark/terraform-provider-conjur/compare/v0.6.11...v0.7.0

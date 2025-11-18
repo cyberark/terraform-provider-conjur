@@ -3,6 +3,9 @@
 docker compose -f docker-compose.test.yml build
 docker compose -f docker-compose.test.yml run -T \
   conjur_test bash -c "set -o pipefail; \
+    echo 'Removing mocks package from coverage profile...'; \
+    grep -v "/mocks" output/tests/c.out > output/tests/coverage.tmp && mv output/tests/coverage.tmp output/tests/c.out
+    grep -v "/mocks" output/azure/c.out > output/azure/coverage.tmp && mv output/azure/coverage.tmp output/azure/c.out; \
     echo 'Merging coverage profiles...'; \
     gocovmerge output/tests/c.out output/azure/c.out > output/combined-c.out; \
     echo 'Coverage profile merged into output/combined-c.out.'; \

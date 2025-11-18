@@ -34,6 +34,7 @@ function main() {
   test_results+=("PolicyBranch|$?")
 
 
+  # Workloads API and Static Secrets API are only available in Secrets Manager SaaS (currently)
   if [[ "$TARGET" == "cloud" ]]; then
     echo ">> Running Host CRUD test"
     test_resource_crud "tests/resources/host" "host" "name"

@@ -1,4 +1,4 @@
-FROM golang:1.24-alpine
+FROM golang:1.25-alpine
 
 # Install bash, git, sed, and build tools
 RUN apk add --no-cache bash git curl build-base sed

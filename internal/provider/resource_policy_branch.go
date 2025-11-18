@@ -149,7 +149,7 @@ func (r *ConjurPolicyBranchResource) Create(ctx context.Context, req resource.Cr
 		}
 	}
 
-	created, err := r.client.V2().CreateBranch(payload)
+	created, err := r.client.CreateBranch(payload)
 	if err != nil {
 		tflog.Error(ctx, fmt.Sprintf("CreateBranch failed: %s", err))
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create policy branch: %s", err))
@@ -186,7 +186,7 @@ func (r *ConjurPolicyBranchResource) Read(ctx context.Context, req resource.Read
 
 	tflog.Debug(ctx, fmt.Sprintf("Reading branch: parent=%q, leaf=%q, fullID=%q", parent, leaf, fullID))
 
-	br, err := r.client.V2().ReadBranch(fullID)
+	br, err := r.client.ReadBranch(fullID)
 	if isNotFoundErr(err) {
 		resp.State.RemoveResource(ctx)
 		return
@@ -235,7 +235,7 @@ func (r *ConjurPolicyBranchResource) Delete(ctx context.Context, req resource.De
 
 	tflog.Debug(ctx, fmt.Sprintf("Deleting branch: parent=%q, leaf=%q, fullID=%q", parent, leaf, fullID))
 
-	if _, err := r.client.V2().DeleteBranch(fullID); err != nil {
+	if _, err := r.client.DeleteBranch(fullID); err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete policy branch %q: %s", fullID, err))
 	}
 

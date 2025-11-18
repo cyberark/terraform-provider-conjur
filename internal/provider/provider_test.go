@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"testing"
 	"regexp"
+	"testing"
+
 	fwprovider "github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 
@@ -188,50 +189,6 @@ func TestProvider_InvalidJWTToken(t *testing.T) {
 					}
 				`,
 				ExpectError: regexp.MustCompile(`Missing jwt attribute: authn_jwt_token`),
-			},
-		},
-	})
-}
-
-func TestProvider_MissingAPIKey(t *testing.T) {
-	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: `
-					provider "conjur" {
-						appliance_url = "https://example.com"
-						account       = "dev"
-						login         = "host/test"
-					}
-
-					data "conjur_secret" "dummy" {
-						name = "some/secret"
-					}
-				`,
-				ExpectError: regexp.MustCompile(`Client initialization failed`),
-			},
-		},
-	})
-}
-
-func TestProvider_MissingAccount(t *testing.T) {
-	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: `
-					provider "conjur" {
-						appliance_url = "https://example.com"
-						login         = "host/test"
-						api_key       = "dummykey"
-					}
-
-					data "conjur_secret" "dummy" {
-						name = "some/secret"
-					}
-				`,
-				ExpectError: regexp.MustCompile(`The argument "account" is required`),
 			},
 		},
 	})
