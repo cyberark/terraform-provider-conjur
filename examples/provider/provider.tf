@@ -1,7 +1,7 @@
 terraform {
   required_providers {
     conjur = {
-      source  = "terraform.example.com/cyberark/conjur"
+      source  = "cyberark/conjur"
     }
   }
 }
