@@ -25,7 +25,7 @@ The provider can also manage the following Secrets Manager resources:
 terraform {
   required_providers {
     conjur = {
-      source  = "terraform.example.com/cyberark/conjur"
+      source  = "cyberark/conjur"
     }
   }
 }
