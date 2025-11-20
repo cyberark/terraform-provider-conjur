@@ -238,10 +238,12 @@ func (r *ConjurSecretResource) Read(ctx context.Context, req resource.ReadReques
 	if err != nil {
 		resp.Diagnostics.AddWarning("Unable to fetch secret value", fmt.Sprintf("Could not fetch secret value for %q: %s", secretID, err))
 	} else {
-		resp.Diagnostics.AddWarning(
-			"Sensitive Value in Configuration",
-			"The 'value' attribute is marked as sensitive and will be stored in the Terraform state. Ensure your state file is securely managed.",
-		)
+		if string(secretValue) != "" {
+			resp.Diagnostics.AddWarning(
+				"Sensitive Value in Configuration",
+				"The 'value' attribute is marked as sensitive and will be stored in the Terraform state. Ensure your state file is securely managed.",
+			)
+		}
 		data.Value = types.StringValue(string(secretValue))
 	}
 
