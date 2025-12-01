@@ -16,7 +16,8 @@ builds:
   goarch:
   - amd64
   - arm64
-  ldflags: []
+  ldflags:
+    - "-X github.com/cyberark/terraform-provider-conjur/internal/provider.IntegrationVersion={{.Env.CONJUR_PLUGIN_VERSION}}"
 
 archives:
   - id: conjur-terraform-release-archive

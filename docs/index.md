@@ -80,6 +80,25 @@ provider "conjur" {}
 - `ssl_cert` (String) Content of CyberArk Secrets Manager public SSL certificate
 - `ssl_cert_path` (String) Path to CyberArk Secrets Manager public SSL certificate
 
+## Best Practices
+When working with resources it is important to consider relationships which may affect the ability of the provider to manage many
+resources simultaneously.  
+
+Consider the following limitations:
+- Nothing may be added to a branch before it is created or after it has been destroyed (error: `422 Unprocessable Entity`)
+- Referenced role(s) and resource(s) must exist prior to applying memberships/permissions (error: `422 Unprocessable Entity`)
+- Secrets Manager does not support simultaneous policy loading under the same branch (error: `409 Conflict`)
+
+There are a few options to mitigate potential issues with concurrent resource management:  
+- Use explicit dependencies to define resource creation order via `depends_on` attribute
+    - For example, a conjur_group_membership resource depends on the conjur_host and conjur_group resources being created first
+- Use implicit dependencies by referencing resource attributes
+    - For example, reference a conjur_host and a conjur_group `name` attribute when creating a conjur_group_membership definition
+- Use Terraform's concurrency control flag `-parallelism=1` flag when running `terraform` CLI commands
+    - This ensures Terraform only makes one API call at a time. Note: there may still be issues with the order of requests with
+      this method alone.
+- If all else fails, simply re-running `terraform apply` multiple times can iteratively resolve issues as resources are created
+
 ## Alternate Workflow with Summon
 
 If this Terraform provider does not fit your needs, you can also use

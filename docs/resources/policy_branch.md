@@ -15,7 +15,7 @@ CyberArk Secrets Manager Policy Branch resource
 ```terraform
 resource "conjur_policy_branch" "my_branch" {
   branch = "data/terraform"
-  name   = var.conjur_policy_branch_name
+  name   = "my-branch-name"
 
   annotations = {
     test = "true"
