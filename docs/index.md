@@ -99,6 +99,49 @@ There are a few options to mitigate potential issues with concurrent resource ma
       this method alone.
 - If all else fails, simply re-running `terraform apply` multiple times can iteratively resolve issues as resources are created
 
+Similarly, there are considerations to be made when working with existing resources:
+- Terraform-managed resources which are modified outside Terraform (for example, via CLI/API requests or loading policy) can cause state-drift.
+  The provider will attempt to reconcile the state, but this may not always be possible.
+- Replacing or deleting a policy branch will also delete all resources under that branch. This could cause unexpected behavior if other systems
+  use the branch, or other Terraform-managed resources still depend on the branch.
+- Replacing or deleting any role or resource referenced by a membership/permission will also delete the membership or permission. This could
+  cause unexpected behavior if other systems use the role or resource, or other Terraform-managed resources still depend on the role or resource.
+- Always run `terraform plan` before `terraform apply` and carefully review the changes that will be applied. In many cases, Secrets Manager
+  resources may not support in-place updates, in which case they will be replaced. As mentioned, replacing a resource can result in losing other
+  relationships and should only be done with caution.
+
+## Security and Configuration
+The privileges required to use supported resources and data sources are listed below:
+
+| Resource                  | Required Privileges                                       |
+|---------------------------|-----------------------------------------------------------|
+| conjur_policy_branch      | create/update on the parent policy                        |
+| conjur_host               | create/update on the parent policy                        |
+| conjur_group              | create/update on the parent policy                        |
+| conjur_secret             | create/update on the parent policy                        |
+| conjur_membership         | update on the parent policy of the group                  |
+| conjur_permission         | create/update on the parent policy of the resource        |
+| conjur_authenticator      | create/update on the `conjur/authn-<authn-type>` policy   |
+
+**Note:** The 'read' privilege is required on managed resources to allow the provider to retrieve the current state and import existing resources.
+It is usually granted implicitly assuming the above required privileges have been granted.
+
+| Data Source               | Required Privileges                  |
+|---------------------------|--------------------------------------|
+| conjur_secret             | execute on the secret                |
+| conjur_certificate_issue  | execute on the certificate issuer    |
+| conjur_certificate_sign   | execute on the certificate issuer    |
+
+It is recommended to review your use case carefully and adjust the privileges of the provider's host identity to adhere to least-privilege security
+principles. This is especially important in environments where other users or systems may have access to the same Secrets Manager resources and
+branches. An over-privileged provider could grant access to resources that should not be accessible, modify or delete resources that should not be
+modified, or have access to unnecessary secrets - all of which create security risks.
+
+We recommend the following best practices to mitigate security risks and privilege sprawl:
+- Consider creating a dedicated policy branch owned by the Terraform provider's host identity under which all Terraform-managed resources are created.
+- If using the conjur_secret data source or resource, the `value` attribute is sensitive will be excluded from any logs and CLI output. However it is
+  still stored in the Terraform state file. Ensure your sensitive data and state files are securely managed [per Terraform's recommendations](https://www.terraform.io/docs/state/sensitive-data.html).
+
 ## Alternate Workflow with Summon
 
 If this Terraform provider does not fit your needs, you can also use
