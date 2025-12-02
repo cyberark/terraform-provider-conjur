@@ -1,6 +1,6 @@
 resource "conjur_authenticator" "jwt_authenticator" {
   type    = "jwt"
-  name    = var.conjur_authenticator_name
+  name    = "my-service-id"
   enabled = true
   data = {
     audience = "conjur-cloud",

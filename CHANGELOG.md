@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [0.8.1] - 2025-12-01
+
+### Changed
+- Updated documentation for resource management. (CNJR-11683)
+
 ## [0.8.0] - 2025-11-14
 
 ### Changed

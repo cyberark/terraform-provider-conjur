@@ -17,6 +17,10 @@ import (
 	"github.com/cyberark/conjur-api-go/conjurapi/authn"
 )
 
+// IntegrationVersion is injected at build time via ldflags.
+// Defaults for local builds so `go build` still works.
+var IntegrationVersion = "0.0.1"
+
 var (
 	_ provider.Provider                   = &conjurProvider{}
 	_ provider.ProviderWithValidateConfig = &conjurProvider{}
@@ -212,7 +216,7 @@ func (p *conjurProvider) buildConjurConfig(data *conjurProviderModel) (*conjurap
 
 	config.SetIntegrationName("TerraformSecretsManager")
 	config.SetIntegrationType("cybr-secretsmanager-go-sdk")
-	config.SetIntegrationVersion("0.6.12")
+	config.SetIntegrationVersion(IntegrationVersion)
 	config.SetVendorName("HashiCorp")
 
 	// Apply configuration overrides if specified in the Terraform provider block
