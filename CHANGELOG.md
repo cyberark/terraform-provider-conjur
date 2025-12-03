@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [0.8.1] - 2025-12-02
 
 ### Changed
+- Updated conjur-api-go to v0.13.11.
 - Updated documentation for resource management and security best practices. (CNJR-11683)
 
 ## [0.8.0] - 2025-11-14
