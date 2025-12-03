@@ -14,7 +14,7 @@ Secret from CyberArk Secrets Manager
 
 ```terraform
 data "conjur_secret" "my_secret" {
-  name = data/test/var-name
+  name = "data/test/var-name"
 }
 ```
 
