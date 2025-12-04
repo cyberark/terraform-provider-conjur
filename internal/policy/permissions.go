@@ -8,6 +8,12 @@ type Permit struct {
 	Privileges []string `yaml:"privileges,flow"`
 }
 
+type Deny struct {
+	Resource   Variable `yaml:"resource"`
+	Role       Host     `yaml:"role"`
+	Privileges []string `yaml:"privileges,flow"`
+}
+
 func (p Permit) MarshalYAML() (interface{}, error) {
 	type alias Permit
 	node := &yaml.Node{}
@@ -25,6 +31,26 @@ func (p *Permit) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		return err
 	}
 	*p = Permit(a)
+	return nil
+}
+
+func (p Deny) MarshalYAML() (interface{}, error) {
+	type alias Deny
+	node := &yaml.Node{}
+	if err := node.Encode(alias(p)); err != nil {
+		return nil, err
+	}
+	node.Tag = "!deny"
+	return node, nil
+}
+
+func (p *Deny) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	type alias Deny
+	var a alias
+	if err := unmarshal(&a); err != nil {
+		return err
+	}
+	*p = Deny(a)
 	return nil
 }
 
