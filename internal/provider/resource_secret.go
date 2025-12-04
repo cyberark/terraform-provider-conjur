@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"strings"
@@ -126,15 +127,15 @@ func (r *ConjurSecretResource) Schema(ctx context.Context, req resource.SchemaRe
 								"id": schema.StringAttribute{
 									MarkdownDescription: "Subject identifier",
 									Optional:            true,
-									PlanModifiers: []planmodifier.String{
-										stringplanmodifier.RequiresReplace(),
+									PlanModifiers:       []planmodifier.String{
+										//stringplanmodifier.RequiresReplace(),
 									},
 								},
 								"kind": schema.StringAttribute{
 									MarkdownDescription: "Subject kind (user, group, host, etc.)",
 									Optional:            true,
-									PlanModifiers: []planmodifier.String{
-										stringplanmodifier.RequiresReplace(),
+									PlanModifiers:       []planmodifier.String{
+										//stringplanmodifier.RequiresReplace(),
 									},
 								},
 							},
@@ -215,9 +216,25 @@ func (r *ConjurSecretResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
+	perms, err := r.buildPermissions(newSecret.Name, data.Permissions)
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error building Permissions policy %s", err))
+		return
+	}
+	permsYml, err := yaml.Marshal(perms)
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error marshalling Permissions policy %s", err))
+		return
+	}
+
 	secretResp, err := r.client.CreateStaticSecret(newSecret)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create secret, got error: %s", err))
+		return
+	}
+	_, err = r.client.LoadPolicy(conjurapi.PolicyModePut, strings.TrimLeft(newSecret.Branch, "/"), bytes.NewReader(permsYml))
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to set permissions: %s, %s", string(permsYml), err))
 		return
 	}
 
@@ -244,14 +261,37 @@ func (r *ConjurSecretResource) Read(ctx context.Context, req resource.ReadReques
 
 	// TODO: Computing this in Read when permissions have been applied via a different resource, i.e. conjur_permissions or in
 	// Secrets Manager directly causes there be a diff on permissions even if they are unchanged, resulting in unnecessary updates.
-	// permissionResp, err := r.client.GetStaticSecretPermissions(secretID)
-	// if err != nil {
-	// 	resp.Diagnostics.AddError(
-	// 		"Error reading Secrets Manager secret permissions",
-	// 		fmt.Sprintf("Unable to check if secret %q permissions exist: %s", secretID, err),
-	// 	)
-	// 	return
-	// }
+	permissionResp, err := r.client.GetStaticSecretPermissions(secretID)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading Secrets Manager secret permissions",
+			fmt.Sprintf("Unable to check if secret %q permissions exist: %s", secretID, err),
+		)
+		return
+	}
+	perms := []ConjurSecretPermission{}
+	for _, p := range permissionResp.Permission {
+		kind := p.Subject.Kind
+		// because obviously.
+		if kind == "workload" {
+			kind = "host"
+		}
+		sub := ConjurSecretSubject{
+			Id:   types.StringValue(p.Subject.Id),
+			Kind: types.StringValue(kind),
+		}
+		privs := []attr.Value{}
+		for _, v := range p.Privileges {
+			privs = append(privs, types.StringValue(v))
+		}
+		pvs, diags := types.ListValue(types.StringType, privs)
+		resp.Diagnostics.Append(diags...)
+		perms = append(perms, ConjurSecretPermission{
+			Subject:    sub,
+			Privileges: pvs,
+		})
+	}
+	data.Permissions = perms
 
 	err = r.parseSecretResponse(*secretResp, conjurapi.PermissionResponse{}, &data)
 	if err != nil {
@@ -288,8 +328,19 @@ func (r *ConjurSecretResource) Update(ctx context.Context, req resource.UpdateRe
 
 	secretID := fmt.Sprintf("%s/%s", data.Branch.ValueString(), data.Name.ValueString())
 
+	perms, err := r.buildPermissions(data.Name.ValueString(), data.Permissions)
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error building Permissions policy %s", err))
+		return
+	}
+	permsYml, err := yaml.Marshal(perms)
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error marshalling Permissions policy %s", err))
+		return
+	}
+
 	// Update the secret value
-	err := r.client.AddSecret(strings.TrimPrefix(secretID, "/"), data.Value.ValueString())
+	err = r.client.AddSecret(strings.TrimPrefix(secretID, "/"), data.Value.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddWarning("Unable to set secret value", fmt.Sprintf("Could not update secret value for %q: %s", secretID, err))
 	} else {
@@ -297,6 +348,11 @@ func (r *ConjurSecretResource) Update(ctx context.Context, req resource.UpdateRe
 			"Sensitive Value in Configuration",
 			"The 'value' attribute is marked as sensitive and will be stored in the Terraform state. Ensure your state file is securely managed.",
 		)
+	}
+	_, err = r.client.LoadPolicy(conjurapi.PolicyModePut, strings.TrimLeft(data.Branch.ValueString(), "/"), bytes.NewReader(permsYml))
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to set permissions: %s, %s", string(permsYml), err))
+		return
 	}
 
 	tflog.Trace(ctx, "updated secret resource")
@@ -344,6 +400,24 @@ func (r *ConjurSecretResource) ImportState(ctx context.Context, req resource.Imp
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("branch"), branch)...)
 }
 
+func (r *ConjurSecretResource) buildPermissions(name string, perms []ConjurSecretPermission) ([]policy.Permit, error) {
+	permits := []policy.Permit{}
+	for _, v := range perms {
+		privs := []string{}
+		for _, vv := range v.Privileges.Elements() {
+			privs = append(privs, vv.(types.String).ValueString())
+		}
+		p := policy.Permit{
+			Resource:   policy.Variable(name),
+			Role:       policy.Host(v.Subject.Id.ValueString()),
+			Privileges: privs,
+		}
+		permits = append(permits, p)
+	}
+
+	return permits, nil
+}
+
 // buildSecretPayload maps the resource model to an API payload
 func (r *ConjurSecretResource) buildSecretPayload(data *ConjurSecretResourceModel) (conjurapi.StaticSecret, error) {
 	// Initialize with required fields
@@ -359,27 +433,29 @@ func (r *ConjurSecretResource) buildSecretPayload(data *ConjurSecretResourceMode
 	if !data.Value.IsNull() && !data.Value.IsUnknown() {
 		secret.Value = data.Value.ValueString()
 	}
-	if len(data.Permissions) > 0 {
-		permissions := make([]conjurapi.Permission, len(data.Permissions))
-		for i, v := range data.Permissions {
-			permission := conjurapi.Permission{}
-			if v.Subject.Id.ValueString() != "" && v.Subject.Kind.ValueString() != "" {
-				permission.Subject = conjurapi.Subject{
-					Id:   v.Subject.Id.ValueString(),
-					Kind: v.Subject.Kind.ValueString(),
+	/*
+		if len(data.Permissions) > 0 {
+			permissions := make([]conjurapi.Permission, len(data.Permissions))
+			for i, v := range data.Permissions {
+				permission := conjurapi.Permission{}
+				if v.Subject.Id.ValueString() != "" && v.Subject.Kind.ValueString() != "" {
+					permission.Subject = conjurapi.Subject{
+						Id:   v.Subject.Id.ValueString(),
+						Kind: v.Subject.Kind.ValueString(),
+					}
 				}
-			}
-			if len(v.Privileges.Elements()) > 0 {
-				privileges := make([]string, len(v.Privileges.Elements()))
-				for j, p := range v.Privileges.Elements() {
-					privileges[j] = p.(types.String).ValueString()
+				if len(v.Privileges.Elements()) > 0 {
+					privileges := make([]string, len(v.Privileges.Elements()))
+					for j, p := range v.Privileges.Elements() {
+						privileges[j] = p.(types.String).ValueString()
+					}
+					permission.Privileges = privileges
 				}
-				permission.Privileges = privileges
+				permissions[i] = permission
 			}
-			permissions[i] = permission
+			secret.Permissions = permissions
 		}
-		secret.Permissions = permissions
-	}
+	*/
 	if !data.Owner.IsNull() && !data.Owner.IsUnknown() {
 		owner := &conjurapi.Owner{}
 		if kindAttr, ok := data.Owner.Attributes()["kind"]; ok {
