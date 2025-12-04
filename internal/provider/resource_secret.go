@@ -232,7 +232,7 @@ func (r *ConjurSecretResource) Create(ctx context.Context, req resource.CreateRe
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create secret, got error: %s", err))
 		return
 	}
-	_, err = r.client.LoadPolicy(conjurapi.PolicyModePut, strings.TrimLeft(newSecret.Branch, "/"), bytes.NewReader(permsYml))
+	_, err = r.client.LoadPolicy(conjurapi.PolicyModePost, strings.TrimLeft(newSecret.Branch, "/"), bytes.NewReader(permsYml))
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to set permissions: %s, %s", string(permsYml), err))
 		return
@@ -277,7 +277,7 @@ func (r *ConjurSecretResource) Read(ctx context.Context, req resource.ReadReques
 			kind = "host"
 		}
 		sub := ConjurSecretSubject{
-			Id:   types.StringValue(p.Subject.Id),
+			Id:   types.StringValue("/" + p.Subject.Id),
 			Kind: types.StringValue(kind),
 		}
 		privs := []attr.Value{}
@@ -319,9 +319,10 @@ func (r *ConjurSecretResource) Read(ctx context.Context, req resource.ReadReques
 
 // Only supports rotating the secret value
 func (r *ConjurSecretResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data ConjurSecretResourceModel
+	var state, data ConjurSecretResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -333,12 +334,34 @@ func (r *ConjurSecretResource) Update(ctx context.Context, req resource.UpdateRe
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error building Permissions policy %s", err))
 		return
 	}
+	removed, err := diffRemovedGrouped(state.Permissions, data.Permissions)
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error building Permissions policy %s", err))
+		return
+	}
+	denys := []policy.Deny{}
+	for k, v := range removed {
+		d := policy.Deny{
+			Resource:   policy.Variable(data.Name.ValueString()),
+			Role:       policy.Host(k.Id.ValueString()),
+			Privileges: v,
+		}
+		denys = append(denys, d)
+	}
+
 	permsYml, err := yaml.Marshal(perms)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error marshalling Permissions policy %s", err))
 		return
 	}
-
+	if len(denys) > 0 {
+		denysYml, err := yaml.Marshal(denys)
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error marshalling Permissions policy %s", err))
+			return
+		}
+		permsYml = append(permsYml, denysYml...)
+	}
 	// Update the secret value
 	err = r.client.AddSecret(strings.TrimPrefix(secretID, "/"), data.Value.ValueString())
 	if err != nil {
@@ -349,7 +372,7 @@ func (r *ConjurSecretResource) Update(ctx context.Context, req resource.UpdateRe
 			"The 'value' attribute is marked as sensitive and will be stored in the Terraform state. Ensure your state file is securely managed.",
 		)
 	}
-	_, err = r.client.LoadPolicy(conjurapi.PolicyModePut, strings.TrimLeft(data.Branch.ValueString(), "/"), bytes.NewReader(permsYml))
+	_, err = r.client.LoadPolicy(conjurapi.PolicyModePatch, strings.TrimLeft(data.Branch.ValueString(), "/"), bytes.NewReader(permsYml))
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to set permissions: %s, %s", string(permsYml), err))
 		return
@@ -545,4 +568,72 @@ func (r *ConjurSecretResource) generateSecretDeletionPolicy(data *ConjurSecretRe
 	}
 
 	return string(yamlBytes), nil
+}
+
+type RemovedPermissions map[ConjurSecretSubject][]string
+
+func diffRemovedGrouped(state []ConjurSecretPermission, plan []ConjurSecretPermission) (RemovedPermissions, error) {
+
+	stateMap, err := permissionsToMap(state)
+	if err != nil {
+		return nil, err
+	}
+
+	planMap, err := permissionsToMap(plan)
+	if err != nil {
+		return nil, err
+	}
+
+	removed := RemovedPermissions{}
+
+	// Look for privileges that existed in state but not in plan
+	for subjKey, statePrivs := range stateMap {
+		planPrivs := planMap[subjKey]
+
+		kind, id := parseSubjectKey(subjKey)
+		subject := ConjurSecretSubject{
+			Kind: types.StringValue(kind),
+			Id:   types.StringValue(id),
+		}
+
+		for priv, _ := range statePrivs {
+			if _, exists := planPrivs[priv]; !exists { // removed
+				removed[subject] = append(removed[subject], priv)
+			}
+		}
+	}
+
+	return removed, nil
+}
+
+func subjectKey(s ConjurSecretSubject) string {
+	return fmt.Sprintf("%s|%s", s.Kind.ValueString(), s.Id.ValueString())
+}
+
+func parseSubjectKey(s string) (string, string) {
+	parts := strings.SplitN(s, "|", 2)
+	return parts[0], parts[1]
+}
+
+func permissionsToMap(perms []ConjurSecretPermission) (map[string]map[string]bool, error) {
+	out := make(map[string]map[string]bool)
+
+	for _, p := range perms {
+		key := subjectKey(p.Subject)
+
+		privs := []string{}
+		for _, vv := range p.Privileges.Elements() {
+			privs = append(privs, vv.(types.String).ValueString())
+		}
+
+		if _, ok := out[key]; !ok {
+			out[key] = make(map[string]bool)
+		}
+
+		for _, pr := range privs {
+			out[key][pr] = true
+		}
+	}
+
+	return out, nil
 }
