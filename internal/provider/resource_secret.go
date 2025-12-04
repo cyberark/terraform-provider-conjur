@@ -14,7 +14,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -52,7 +51,7 @@ type ConjurSecretResourceModel struct {
 
 type ConjurSecretPermission struct {
 	Subject    ConjurSecretSubject `tfsdk:"subject"`
-	Privileges types.List          `tfsdk:"privileges"`
+	Privileges types.Set           `tfsdk:"privileges"`
 }
 
 type ConjurSecretSubject struct {
@@ -115,7 +114,7 @@ func (r *ConjurSecretResource) Schema(ctx context.Context, req resource.SchemaRe
 					},
 				},
 			},
-			"permissions": schema.ListNestedAttribute{
+			"permissions": schema.SetNestedAttribute{
 				MarkdownDescription: "List of permissions associated with the secret",
 				Optional:            true,
 				NestedObject: schema.NestedAttributeObject{
@@ -140,13 +139,10 @@ func (r *ConjurSecretResource) Schema(ctx context.Context, req resource.SchemaRe
 								},
 							},
 						},
-						"privileges": schema.ListAttribute{
+						"privileges": schema.SetAttribute{
 							MarkdownDescription: "List of granted privileges",
 							Optional:            true,
 							ElementType:         types.StringType,
-							PlanModifiers: []planmodifier.List{
-								listplanmodifier.RequiresReplace(),
-							},
 						},
 					},
 				},
@@ -284,7 +280,7 @@ func (r *ConjurSecretResource) Read(ctx context.Context, req resource.ReadReques
 		for _, v := range p.Privileges {
 			privs = append(privs, types.StringValue(v))
 		}
-		pvs, diags := types.ListValue(types.StringType, privs)
+		pvs, diags := types.SetValue(types.StringType, privs)
 		resp.Diagnostics.Append(diags...)
 		perms = append(perms, ConjurSecretPermission{
 			Subject:    sub,
@@ -520,9 +516,9 @@ func (r *ConjurSecretResource) parseSecretResponse(secretResp conjurapi.StaticSe
 				for j, p := range v.Privileges {
 					privileges[j] = types.StringValue(p)
 				}
-				permission.Privileges = types.ListValueMust(types.StringType, privileges)
+				permission.Privileges = types.SetValueMust(types.StringType, privileges)
 			} else {
-				permission.Privileges = types.ListNull(types.StringType)
+				permission.Privileges = types.SetNull(types.StringType)
 			}
 			permissions[i] = permission
 		}
