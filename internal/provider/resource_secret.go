@@ -9,6 +9,8 @@ import (
 	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api"
 	"github.com/cyberark/terraform-provider-conjur/internal/policy"
 	"github.com/doodlesbykumbi/conjur-policy-go/pkg/conjurpolicy"
+	"github.com/hashicorp/terraform-plugin-framework-validators/resourcevalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -17,6 +19,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"gopkg.in/yaml.v3"
@@ -24,10 +27,11 @@ import (
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var (
-	_ resource.Resource                   = &ConjurSecretResource{}
-	_ resource.ResourceWithImportState    = &ConjurSecretResource{}
-	_ resource.ResourceWithConfigure      = &ConjurSecretResource{}
-	_ resource.ResourceWithValidateConfig = &ConjurSecretResource{}
+	_ resource.Resource                     = &ConjurSecretResource{}
+	_ resource.ResourceWithImportState      = &ConjurSecretResource{}
+	_ resource.ResourceWithConfigure        = &ConjurSecretResource{}
+	_ resource.ResourceWithValidateConfig   = &ConjurSecretResource{}
+	_ resource.ResourceWithConfigValidators = &ConjurSecretResource{}
 )
 
 func NewConjurSecretResource() resource.Resource {
@@ -44,6 +48,7 @@ type ConjurSecretResourceModel struct {
 	Name        types.String             `tfsdk:"name"`
 	MimeType    types.String             `tfsdk:"mime_type"`
 	Value       types.String             `tfsdk:"value"`
+	ValueWO     types.String             `tfsdk:"value_wo"`
 	Annotations map[string]string        `tfsdk:"annotations"`
 	Permissions []ConjurSecretPermission `tfsdk:"permissions"`
 }
@@ -92,6 +97,16 @@ func (r *ConjurSecretResource) Schema(ctx context.Context, req resource.SchemaRe
 				MarkdownDescription: "The secret value",
 				Optional:            true,
 				Sensitive:           true,
+				Validators: []validator.String{
+					stringvalidator.PreferWriteOnlyAttribute(
+						path.MatchRoot("value_wo"),
+					),
+				},
+			},
+			"value_wo": schema.StringAttribute{
+				MarkdownDescription: "The secret value",
+				Optional:            true,
+				WriteOnly:           true,
 			},
 			"permissions": schema.ListNestedAttribute{
 				MarkdownDescription: "List of permissions associated with the secret",
@@ -141,6 +156,19 @@ func (r *ConjurSecretResource) Schema(ctx context.Context, req resource.SchemaRe
 	}
 }
 
+func (r *ConjurSecretResource) ConfigValidators(_ context.Context) []resource.ConfigValidator {
+	return []resource.ConfigValidator{
+		resourcevalidator.PreferWriteOnlyAttribute(
+			path.MatchRoot("value"),
+			path.MatchRoot("value_wo"),
+		),
+		resourcevalidator.Conflicting(
+			path.MatchRoot("value"),
+			path.MatchRoot("value_wo"),
+		),
+	}
+}
+
 func (r *ConjurSecretResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
@@ -182,11 +210,22 @@ func (r *ConjurSecretResource) Create(ctx context.Context, req resource.CreateRe
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	var valueWO types.String
+	diags := req.Config.GetAttribute(ctx, path.Root("value_wo"), &valueWO)
+	resp.Diagnostics.Append(diags...)
 
 	newSecret, err := r.buildSecretPayload(&data)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Building Secret Payload", fmt.Sprintf("Could not build secret payload: %s", err))
 		return
+	}
+	if !data.Value.IsNull() {
+		j := `{"rw": true}`
+		diags := resp.Private.SetKey(ctx, "value_rw", []byte(j))
+		resp.Diagnostics.Append(diags...)
+	}
+	if !valueWO.IsNull() {
+		newSecret.Value = valueWO.ValueString()
 	}
 
 	secretResp, err := r.client.CreateStaticSecret(newSecret)
@@ -233,11 +272,13 @@ func (r *ConjurSecretResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
+	b, diags := req.Private.GetKey(ctx, "value_rw")
+	resp.Diagnostics.Append(diags...)
 	// Fetch the secret value (if accessible) to store in state
 	secretValue, err := r.client.RetrieveSecret(strings.TrimPrefix(secretID, "/"))
 	if err != nil {
 		resp.Diagnostics.AddWarning("Unable to fetch secret value", fmt.Sprintf("Could not fetch secret value for %q: %s", secretID, err))
-	} else {
+	} else if len(b) > 0 && string(b) == `{"rw": true}` { // Only set the secret if "value" is configured, so that we don't populate the state if we're using value_wo (or if we're not managing the value with tf at all)
 		if string(secretValue) != "" {
 			resp.Diagnostics.AddWarning(
 				"Sensitive Value in Configuration",
@@ -260,10 +301,24 @@ func (r *ConjurSecretResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
+	var valueWO types.String
+	diags := req.Config.GetAttribute(ctx, path.Root("value_wo"), &valueWO)
+	resp.Diagnostics.Append(diags...)
+
 	secretID := fmt.Sprintf("%s/%s", data.Branch.ValueString(), data.Name.ValueString())
 
+	var err error
 	// Update the secret value
-	err := r.client.AddSecret(strings.TrimPrefix(secretID, "/"), data.Value.ValueString())
+	if !valueWO.IsNull() {
+		diags := resp.Private.SetKey(ctx, "value_rw", []byte{})
+		resp.Diagnostics.Append(diags...)
+		err = r.client.AddSecret(strings.TrimPrefix(secretID, "/"), valueWO.ValueString())
+	} else if !data.Value.IsNull() {
+		j := `{"rw": true}`
+		diags := resp.Private.SetKey(ctx, "value_rw", []byte(j))
+		resp.Diagnostics.Append(diags...)
+		err = r.client.AddSecret(strings.TrimPrefix(secretID, "/"), data.Value.ValueString())
+	}
 	if err != nil {
 		resp.Diagnostics.AddWarning("Unable to set secret value", fmt.Sprintf("Could not update secret value for %q: %s", secretID, err))
 	} else {
