@@ -273,7 +273,7 @@ func (r *ConjurSecretResource) Read(ctx context.Context, req resource.ReadReques
 			kind = "host"
 		}
 		sub := ConjurSecretSubject{
-			Id:   types.StringValue("/" + p.Subject.Id),
+			Id:   types.StringValue(p.Subject.Id),
 			Kind: types.StringValue(kind),
 		}
 		privs := []attr.Value{}

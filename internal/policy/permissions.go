@@ -84,31 +84,11 @@ func (v *Variable) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-type Host string
-
-func (h Host) MarshalYAML() (interface{}, error) {
-	node := &yaml.Node{
-		Kind:  yaml.ScalarNode,
-		Tag:   "!host",
-		Value: string(h),
-	}
-	return node, nil
-}
-
-func (h *Host) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	node := &yaml.Node{}
-	if err := unmarshal(node); err != nil {
-		return err
-	}
-	*h = Host(node.Value)
-	return nil
-}
-
 func (r Role) MarshalYAML() (interface{}, error) {
 	return &yaml.Node{
 		Kind:  yaml.ScalarNode,
 		Tag:   "!" + r.Kind,
-		Value: r.Subject,
+		Value: "/" + r.Subject,
 	}, nil
 }
 
@@ -123,7 +103,7 @@ func (r *Role) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	}
 
 	r.Kind = strings.TrimPrefix(node.Tag, "!")
-	r.Subject = node.Value
+	r.Subject = strings.TrimPrefix(node.Value, "/")
 
 	return nil
 }
