@@ -3,6 +3,8 @@ package provider
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -212,6 +214,12 @@ func (r *ConjurSecretResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
+	err = r.checkPerms(data.Permissions)
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Permissions error: %s", err))
+		return
+	}
+
 	perms, err := r.buildPermissions(newSecret.Name, data.Permissions)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error building Permissions policy %s", err))
@@ -330,6 +338,13 @@ func (r *ConjurSecretResource) Update(ctx context.Context, req resource.UpdateRe
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error building Permissions policy %s", err))
 		return
 	}
+
+	err = r.checkPerms(data.Permissions)
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Permissions error: %s", err))
+		return
+	}
+
 	removed, err := diffRemovedGrouped(state.Permissions, data.Permissions)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error building Permissions policy %s", err))
@@ -632,4 +647,41 @@ func permissionsToMap(perms []ConjurSecretPermission) (map[string]map[string]boo
 	}
 
 	return out, nil
+}
+
+type WhoAmIResponse struct {
+	Username string `json:"username"`
+}
+
+func (r *ConjurSecretResource) checkPerms(perms []ConjurSecretPermission) error {
+	x, err := r.client.WhoAmI()
+	if err != nil {
+		return fmt.Errorf("Couldn't retrieve current user %s", err)
+	}
+	var wr WhoAmIResponse
+	err = json.Unmarshal(x, &wr)
+	if err != nil {
+		return fmt.Errorf("Couldn't retrieve current user %s", err)
+	}
+	kind, user, found := strings.Cut(wr.Username, "/")
+	if !found {
+		return errors.New("Invalid user from WhoAmI")
+	}
+	hasRead := false
+	for _, v := range perms {
+		if v.Subject.Kind.ValueString() == kind && v.Subject.Id.ValueString() == user {
+			privs := map[string]bool{}
+			for _, vv := range v.Privileges.Elements() {
+				privs[vv.(types.String).ValueString()] = true
+			}
+			if _, ok := privs["read"]; ok {
+				hasRead = true
+			}
+		}
+	}
+	if !hasRead {
+		return errors.New("Terraform user must be granted at least read access")
+	}
+
+	return nil
 }
