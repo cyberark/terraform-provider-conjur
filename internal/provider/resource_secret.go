@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 
@@ -17,7 +18,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -90,9 +90,6 @@ func (r *ConjurSecretResource) Schema(ctx context.Context, req resource.SchemaRe
 			"mime_type": schema.StringAttribute{
 				MarkdownDescription: "The secret mime_type",
 				Optional:            true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
 			},
 			"value": schema.StringAttribute{
 				MarkdownDescription: "The secret value",
@@ -156,9 +153,6 @@ func (r *ConjurSecretResource) Schema(ctx context.Context, req resource.SchemaRe
 				MarkdownDescription: "Key-value annotations for the secret",
 				Optional:            true,
 				ElementType:         types.StringType,
-				PlanModifiers: []planmodifier.Map{
-					mapplanmodifier.RequiresReplace(),
-				},
 			},
 		},
 	}
@@ -267,6 +261,16 @@ func (r *ConjurSecretResource) Read(ctx context.Context, req resource.ReadReques
 			fmt.Sprintf("Unable to check if secret %q exists: %s", secretID, err),
 		)
 		return
+	}
+	for k, v := range secretResp.Annotations {
+		if v == "" {
+			delete(secretResp.Annotations, k)
+		}
+	}
+	if len(secretResp.Annotations) > 0 {
+		data.Annotations = secretResp.Annotations
+	} else {
+		data.Annotations = nil
 	}
 
 	// TODO: Computing this in Read when permissions have been applied via a different resource, i.e. conjur_permissions or in
@@ -384,6 +388,33 @@ func (r *ConjurSecretResource) Update(ctx context.Context, req resource.UpdateRe
 		}
 		permsYml = append(permsYml, denysYml...)
 	}
+
+	for k, _ := range state.Annotations {
+		// Can't unset the annotation unless we own the policy branch, which we have no guarantee of
+		// Set the value to "" as the safest thing.
+		if _, exists := data.Annotations[k]; !exists {
+			if data.Annotations == nil {
+				data.Annotations = map[string]string{}
+			}
+			data.Annotations[k] = ""
+		}
+	}
+	if state.MimeType != data.MimeType {
+		if data.Annotations == nil {
+			data.Annotations = map[string]string{}
+		}
+		data.Annotations["conjur/mime_type"] = data.MimeType.ValueString()
+	}
+
+	annPol := policy.Annotations{
+		VariableID:  data.Name.ValueString(),
+		Annotations: data.Annotations,
+	}
+	annYml, err := yaml.Marshal([]policy.Annotations{annPol})
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error marshalling Annotations policy %s", err))
+		return
+	}
 	// Update the secret value
 	err = r.client.AddSecret(strings.TrimPrefix(secretID, "/"), data.Value.ValueString())
 	if err != nil {
@@ -402,6 +433,24 @@ func (r *ConjurSecretResource) Update(ctx context.Context, req resource.UpdateRe
 			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to set permissions: %s, %s", string(permsYml), err))
 			return
 		}
+	}
+	if !reflect.DeepEqual(state.Annotations, data.Annotations) {
+		policyMutex.Lock()
+		_, err = r.client.LoadPolicy(conjurapi.PolicyModePatch, strings.TrimLeft(data.Branch.ValueString(), "/"), bytes.NewReader(annYml))
+		policyMutex.Unlock()
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to set annotations: %s, %s", string(annYml), err))
+			return
+		}
+	}
+	for k, v := range data.Annotations {
+		if v == "" {
+			delete(data.Annotations, k)
+		}
+	}
+	delete(data.Annotations, "conjur/mime_type")
+	if len(data.Annotations) == 0 {
+		data.Annotations = nil
 	}
 
 	tflog.Trace(ctx, "updated secret resource")
