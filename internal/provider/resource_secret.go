@@ -44,13 +44,14 @@ type ConjurSecretResource struct {
 }
 
 type ConjurSecretResourceModel struct {
-	Branch      types.String             `tfsdk:"branch"`
-	Name        types.String             `tfsdk:"name"`
-	MimeType    types.String             `tfsdk:"mime_type"`
-	Value       types.String             `tfsdk:"value"`
-	ValueWO     types.String             `tfsdk:"value_wo"`
-	Annotations map[string]string        `tfsdk:"annotations"`
-	Permissions []ConjurSecretPermission `tfsdk:"permissions"`
+	Branch         types.String             `tfsdk:"branch"`
+	Name           types.String             `tfsdk:"name"`
+	MimeType       types.String             `tfsdk:"mime_type"`
+	Value          types.String             `tfsdk:"value"`
+	ValueWO        types.String             `tfsdk:"value_wo"`
+	ValueWOVersion types.Int32              `tfsdk:"value_wo_version"`
+	Annotations    map[string]string        `tfsdk:"annotations"`
+	Permissions    []ConjurSecretPermission `tfsdk:"permissions"`
 }
 
 type ConjurSecretPermission struct {
@@ -107,6 +108,10 @@ func (r *ConjurSecretResource) Schema(ctx context.Context, req resource.SchemaRe
 				MarkdownDescription: "The secret value",
 				Optional:            true,
 				WriteOnly:           true,
+			},
+			"value_wo_version": schema.Int32Attribute{
+				MarkdownDescription: "The secret value version. Used together with `value_wo` to trigger an update.",
+				Optional:            true,
 			},
 			"permissions": schema.ListNestedAttribute{
 				MarkdownDescription: "List of permissions associated with the secret",
