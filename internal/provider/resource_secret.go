@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/cyberark/conjur-api-go/conjurapi"
 	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api"
@@ -40,6 +41,8 @@ func NewConjurSecretResource() resource.Resource {
 type ConjurSecretResource struct {
 	client api.ClientV2
 }
+
+var policyMutex sync.Mutex
 
 type ConjurSecretResourceModel struct {
 	Branch      types.String             `tfsdk:"branch"`
@@ -236,7 +239,10 @@ func (r *ConjurSecretResource) Create(ctx context.Context, req resource.CreateRe
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create secret, got error: %s", err))
 		return
 	}
+	// TODO: Would be better to keep a map of policy mutexes, indexed by branch
+	policyMutex.Lock()
 	_, err = r.client.LoadPolicy(conjurapi.PolicyModePost, strings.TrimLeft(newSecret.Branch, "/"), bytes.NewReader(permsYml))
+	policyMutex.Unlock()
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to set permissions: %s, %s", string(permsYml), err))
 		return
@@ -345,6 +351,11 @@ func (r *ConjurSecretResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
+	added, err := diffRemovedGrouped(data.Permissions, state.Permissions)
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error building Permissions policy %s", err))
+		return
+	}
 	removed, err := diffRemovedGrouped(state.Permissions, data.Permissions)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error building Permissions policy %s", err))
@@ -383,10 +394,14 @@ func (r *ConjurSecretResource) Update(ctx context.Context, req resource.UpdateRe
 			"The 'value' attribute is marked as sensitive and will be stored in the Terraform state. Ensure your state file is securely managed.",
 		)
 	}
-	_, err = r.client.LoadPolicy(conjurapi.PolicyModePatch, strings.TrimLeft(data.Branch.ValueString(), "/"), bytes.NewReader(permsYml))
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to set permissions: %s, %s", string(permsYml), err))
-		return
+	if len(added) > 0 || len(removed) > 0 {
+		policyMutex.Lock()
+		_, err = r.client.LoadPolicy(conjurapi.PolicyModePatch, strings.TrimLeft(data.Branch.ValueString(), "/"), bytes.NewReader(permsYml))
+		policyMutex.Unlock()
+		if err != nil {
+			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to set permissions: %s, %s", string(permsYml), err))
+			return
+		}
 	}
 
 	tflog.Trace(ctx, "updated secret resource")
