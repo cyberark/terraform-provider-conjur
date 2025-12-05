@@ -339,7 +339,7 @@ func (r *ConjurSecretResource) Update(ctx context.Context, req resource.UpdateRe
 	for k, v := range removed {
 		d := policy.Deny{
 			Resource:   policy.Variable(data.Name.ValueString()),
-			Role:       policy.Host(k.Id.ValueString()),
+			Role:       policy.Role{k.Kind.ValueString(), k.Id.ValueString()},
 			Privileges: v,
 		}
 		denys = append(denys, d)
@@ -428,7 +428,7 @@ func (r *ConjurSecretResource) buildPermissions(name string, perms []ConjurSecre
 		}
 		p := policy.Permit{
 			Resource:   policy.Variable(name),
-			Role:       policy.Host(v.Subject.Id.ValueString()),
+			Role:       policy.Role{v.Subject.Kind.ValueString(), v.Subject.Id.ValueString()},
 			Privileges: privs,
 		}
 		permits = append(permits, p)

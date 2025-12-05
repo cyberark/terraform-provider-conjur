@@ -10,12 +10,12 @@ import (
 func TestPermissions(t *testing.T) {
 	p := Permit{
 		Resource:   Variable("foo/bar"),
-		Role:       Host("/data/testhost"),
+		Role:       Role{"host", "/data/testhost"},
 		Privileges: []string{"read", "execute", "update"},
 	}
 	pt := Permit{
 		Resource:   Variable("foo/baz"),
-		Role:       Host("/data/testhost"),
+		Role:       Role{"host", "/data/testhost"},
 		Privileges: []string{"read", "execute", "update"},
 	}
 	permits := []Permit{p, pt}
