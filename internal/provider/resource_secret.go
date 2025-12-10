@@ -184,13 +184,8 @@ func (r *ConjurSecretResource) ValidateConfig(ctx context.Context, req resource.
 		return
 	}
 
-	// Ensure branch is an absolute path by adding a leading slash if necessary
-	if !strings.HasPrefix(data.Branch.ValueString(), "/") {
-		resp.Diagnostics.AddError(
-			"Invalid branch",
-			"Branch must be an absolute path including a leading slash (/).",
-		)
-	}
+	ValidateBranch(data.Branch, &resp.Diagnostics, "branch")
+	ValidateNonEmpty(data.Name, &resp.Diagnostics, "Secret name")
 
 	// Warn that secret value attribute is sensitive and will be stored in state
 	if !data.Value.IsNull() && !data.Value.IsUnknown() {
@@ -315,7 +310,8 @@ func (r *ConjurSecretResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	err = policy.ApplyPolicy(r.client, deletionPolicy, strings.TrimPrefix(data.Branch.ValueString(), "/"))
+	branch := strings.TrimPrefix(data.Branch.ValueString(), "/")
+	err = policy.ApplyPolicy(r.client, deletionPolicy, branch)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to load Secret Delete policy, got error: %s", err))
 		return
@@ -452,10 +448,12 @@ func (r *ConjurSecretResource) parseSecretResponse(secretResp conjurapi.StaticSe
 }
 
 func (r *ConjurSecretResource) generateSecretDeletionPolicy(data *ConjurSecretResourceModel) (string, error) {
+	name := strings.TrimSpace(data.Name.ValueString())
+
 	delete := conjurpolicy.Delete{
 		Record: conjurpolicy.ResourceRef{
 			Kind: conjurpolicy.KindVariable,
-			Id:   data.Name.ValueString(),
+			Id:   name,
 		},
 	}
 

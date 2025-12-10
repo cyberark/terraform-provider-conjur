@@ -18,8 +18,9 @@ import (
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var (
-	_ resource.Resource              = &ConjurHostResource{}
-	_ resource.ResourceWithConfigure = &ConjurHostResource{}
+	_ resource.Resource                   = &ConjurHostResource{}
+	_ resource.ResourceWithConfigure      = &ConjurHostResource{}
+	_ resource.ResourceWithValidateConfig = &ConjurHostResource{}
 )
 
 func NewConjurHostResource() resource.Resource {
@@ -160,6 +161,25 @@ func (r *ConjurHostResource) Schema(ctx context.Context, req resource.SchemaRequ
 				},
 			},
 		},
+	}
+}
+
+func (r *ConjurHostResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var data ConjurHostResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	ValidateNonEmpty(data.Name, &resp.Diagnostics, "Host name")
+	ValidateBranch(data.Branch, &resp.Diagnostics, "branch")
+
+	// Validate authn_descriptors are not empty
+	if len(data.AuthnDescriptors) == 0 {
+		resp.Diagnostics.AddError(
+			"Invalid authn_descriptors",
+			"At least one authentication descriptor is required.",
+		)
 	}
 }
 

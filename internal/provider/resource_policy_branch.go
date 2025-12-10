@@ -21,6 +21,7 @@ import (
 var _ resource.Resource = &ConjurPolicyBranchResource{}
 var _ resource.ResourceWithConfigure = &ConjurPolicyBranchResource{}
 var _ resource.ResourceWithImportState = &ConjurPolicyBranchResource{}
+var _ resource.ResourceWithValidateConfig = &ConjurPolicyBranchResource{}
 
 func NewConjurPolicyBranchResource() resource.Resource {
 	return &ConjurPolicyBranchResource{}
@@ -99,6 +100,17 @@ func (r *ConjurPolicyBranchResource) Schema(ctx context.Context, req resource.Sc
 			},
 		},
 	}
+}
+
+func (r *ConjurPolicyBranchResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var data ConjurPolicyBranchResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	ValidateNonEmpty(data.Name, &resp.Diagnostics, "Policy branch name")
+	ValidateBranch(data.Branch, &resp.Diagnostics, "branch")
 }
 
 func (r *ConjurPolicyBranchResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {

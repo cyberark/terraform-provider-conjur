@@ -77,6 +77,7 @@ require (
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	github.com/zalando/go-keyring v0.2.6 // indirect
 	github.com/zclconf/go-cty v1.17.0 // indirect
+	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.41.0 // indirect
 	golang.org/x/mod v0.27.0 // indirect
 	golang.org/x/net v0.43.0 // indirect
@@ -88,7 +89,6 @@ require (
 	google.golang.org/genproto v0.0.0-20200904004341-0bd0a958aa1d // indirect
 	google.golang.org/grpc v1.69.4 // indirect
 	google.golang.org/protobuf v1.36.3 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
 // Automated release process replaces
