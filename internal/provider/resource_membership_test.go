@@ -44,28 +44,6 @@ resource "conjur_membership" "test" {
 	)
 }
 
-func TestValidateKind(t *testing.T) {
-	t.Run("Valid kinds", func(t *testing.T) {
-		valid := []string{"user", "host", "group"}
-		for _, kind := range valid {
-			if err := validateKind(kind); err != nil {
-				t.Fatalf("Expected no error for kind %q, got %v", kind, err)
-			}
-		}
-	})
-
-	t.Run("Invalid kinds", func(t *testing.T) {
-		invalid := []string{
-			"", "User", "service", " group", "user,host",
-		}
-		for _, kind := range invalid {
-			if err := validateKind(kind); err == nil {
-				t.Fatalf("Expected error for kind %q, got nil", kind)
-			}
-		}
-	})
-}
-
 func TestSplitGroupMemberID(t *testing.T) {
 	t.Run("Valid id", func(t *testing.T) {
 		id := "data/test/test-users:host:data/test/bob"

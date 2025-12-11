@@ -23,9 +23,10 @@ import (
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var (
-	_ resource.Resource                = &ConjurAuthenticatorResource{}
-	_ resource.ResourceWithImportState = &ConjurAuthenticatorResource{}
-	_ resource.ResourceWithConfigure   = &ConjurAuthenticatorResource{}
+	_ resource.Resource                   = &ConjurAuthenticatorResource{}
+	_ resource.ResourceWithImportState    = &ConjurAuthenticatorResource{}
+	_ resource.ResourceWithConfigure      = &ConjurAuthenticatorResource{}
+	_ resource.ResourceWithValidateConfig = &ConjurAuthenticatorResource{}
 )
 
 func NewConjurAuthenticatorResource() resource.Resource {
@@ -209,6 +210,18 @@ func (r *ConjurAuthenticatorResource) Schema(ctx context.Context, req resource.S
 			},
 		},
 	}
+}
+
+func (r *ConjurAuthenticatorResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var data ConjurAuthenticatorResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	ValidateContainedIn(data.Type, &resp.Diagnostics, "Authenticator type", []string{"jwt", "aws_iam", "certificate"}, false)
+	ValidateNonEmpty(data.Name, &resp.Diagnostics, "Authenticator name")
+	ValidateContainedIn(data.Subtype, &resp.Diagnostics, "Authenticator subtype", []string{"gitlab", "github_actions", "kubernetes", "jenkins"}, true)
 }
 
 func (r *ConjurAuthenticatorResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {

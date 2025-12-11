@@ -44,17 +44,6 @@ func TestMembershipResource_Create(t *testing.T) {
 			expectedID:    "data/test/test-users:user:data/test/bob",
 		},
 		{
-			name: "invalid member kind",
-			data: membershipResourceModel{
-				GroupID:    types.StringValue("data/test/test-users"),
-				MemberKind: types.StringValue("invalid"),
-				MemberID:   types.StringValue("data/test/bob"),
-			},
-			setupMock:     func(mockClientV2 *mocks.MockClientV2) {},
-			expectedError: true,
-			errorContains: "Invalid member_kind",
-		},
-		{
 			name: "api error on add",
 			data: membershipResourceModel{
 				GroupID:    types.StringValue("data/test/test-users"),
@@ -240,18 +229,6 @@ func TestMembershipResource_Read(t *testing.T) {
 			},
 			expectedError: false,
 			shouldRemove:  true,
-		},
-		{
-			name: "invalid member kind",
-			data: membershipResourceModel{
-				ID:         types.StringValue("data/test/test-users:invalid:data/test/eve"),
-				GroupID:    types.StringValue("data/test/test-users"),
-				MemberKind: types.StringValue("invalid"),
-				MemberID:   types.StringValue("data/test/eve"),
-			},
-			setupMock:     func(mockClient *mocks.MockClientV2) {},
-			expectedError: true,
-			shouldRemove:  false,
 		},
 		{
 			name: "empty ID gets populated",

@@ -19,9 +19,10 @@ import (
 const groupMemberIDSeparator = ":"
 
 var (
-	_ resource.Resource                = &conjurMembershipResource{}
-	_ resource.ResourceWithConfigure   = &conjurMembershipResource{}
-	_ resource.ResourceWithImportState = &conjurMembershipResource{}
+	_ resource.Resource                   = &conjurMembershipResource{}
+	_ resource.ResourceWithConfigure      = &conjurMembershipResource{}
+	_ resource.ResourceWithImportState    = &conjurMembershipResource{}
+	_ resource.ResourceWithValidateConfig = &conjurMembershipResource{}
 )
 
 type conjurMembershipResource struct {
@@ -76,6 +77,18 @@ func (r *conjurMembershipResource) Schema(_ context.Context, _ resource.SchemaRe
 	}
 }
 
+func (r *conjurMembershipResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var data membershipResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	ValidateNonEmpty(data.GroupID, &resp.Diagnostics, "group_id")
+	ValidateContainedIn(data.MemberKind, &resp.Diagnostics, "member_kind", []string{"user", "host", "group"}, false)
+	ValidateNonEmpty(data.MemberID, &resp.Diagnostics, "member_id")
+}
+
 func (r *conjurMembershipResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
@@ -98,11 +111,6 @@ func (r *conjurMembershipResource) Create(ctx context.Context, req resource.Crea
 		return
 	}
 
-	if err := validateKind(data.MemberKind.ValueString()); err != nil {
-		resp.Diagnostics.AddError("Invalid member_kind", err.Error())
-		return
-	}
-
 	member := conjurapi.GroupMember{
 		ID:   data.MemberID.ValueString(),
 		Kind: data.MemberKind.ValueString(),
@@ -122,11 +130,6 @@ func (r *conjurMembershipResource) Read(ctx context.Context, req resource.ReadRe
 	var data membershipResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	if err := validateKind(data.MemberKind.ValueString()); err != nil {
-		resp.Diagnostics.AddError("Invalid member_kind", err.Error())
 		return
 	}
 
@@ -217,15 +220,6 @@ func (r *conjurMembershipResource) ImportState(ctx context.Context, req resource
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("group_id"), groupID)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("member_kind"), kind)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("member_id"), memberID)...)
-}
-
-func validateKind(kind string) error {
-	switch kind {
-	case "user", "host", "group":
-		return nil
-	default:
-		return fmt.Errorf("must be one of: user, host, group")
-	}
 }
 
 func splitGroupMemberID(id string) (string, string, string, error) {

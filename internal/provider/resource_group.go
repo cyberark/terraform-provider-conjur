@@ -19,8 +19,9 @@ import (
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var (
-	_ resource.Resource              = &ConjurGroupResource{}
-	_ resource.ResourceWithConfigure = &ConjurGroupResource{}
+	_ resource.Resource                   = &ConjurGroupResource{}
+	_ resource.ResourceWithConfigure      = &ConjurGroupResource{}
+	_ resource.ResourceWithValidateConfig = &ConjurGroupResource{}
 )
 
 func NewConjurGroupResource() resource.Resource {
@@ -98,6 +99,17 @@ func (r *ConjurGroupResource) Schema(ctx context.Context, req resource.SchemaReq
 			},
 		},
 	}
+}
+
+func (r *ConjurGroupResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var data ConjurGroupResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	ValidateNonEmpty(data.Name, &resp.Diagnostics, "Group name")
+	ValidateBranch(data.Branch, &resp.Diagnostics, "branch")
 }
 
 func (r *ConjurGroupResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {

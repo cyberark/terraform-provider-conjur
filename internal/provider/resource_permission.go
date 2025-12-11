@@ -23,9 +23,10 @@ import (
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var (
-	_ resource.Resource                = &ConjurPermissionResource{}
-	_ resource.ResourceWithConfigure   = &ConjurPermissionResource{}
-	_ resource.ResourceWithImportState = &ConjurPermissionResource{}
+	_ resource.Resource                   = &ConjurPermissionResource{}
+	_ resource.ResourceWithConfigure      = &ConjurPermissionResource{}
+	_ resource.ResourceWithImportState    = &ConjurPermissionResource{}
+	_ resource.ResourceWithValidateConfig = &ConjurPermissionResource{}
 )
 
 func NewConjurPermissionResource() resource.Resource {
@@ -119,6 +120,27 @@ func (r *ConjurPermissionResource) Schema(ctx context.Context, req resource.Sche
 			},
 		},
 	}
+}
+
+func (r *ConjurPermissionResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var data ConjurPermissionResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Validate role
+	ValidateNonEmpty(data.Role.Name, &resp.Diagnostics, "Role name")
+	ValidateContainedIn(data.Role.Kind, &resp.Diagnostics, "Role kind", []string{"user", "group", "host", "layer", "variable", "policy"}, false)
+	ValidateBranch(data.Role.Branch, &resp.Diagnostics, "role branch")
+
+	// Validate resource
+	ValidateNonEmpty(data.Resource.Name, &resp.Diagnostics, "Resource name")
+	ValidateContainedIn(data.Resource.Kind, &resp.Diagnostics, "Resource kind", []string{"user", "group", "host", "layer", "variable", "policy"}, false)
+	ValidateBranch(data.Resource.Branch, &resp.Diagnostics, "resource branch")
+
+	// Validate privileges
+	ValidatePrivileges(data.Privileges, &resp.Diagnostics, "privileges")
 }
 
 func (r *ConjurPermissionResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -375,10 +397,7 @@ func parsePrivileges(data *ConjurPermissionResourceModel) ([]conjurpolicy.Privil
 	privList := []conjurpolicy.Privilege{}
 	for _, priv := range data.Privileges.Elements() {
 		key := priv.(types.String).ValueString()
-		privObj, exists := privilegeMap[key]
-		if !exists {
-			return nil, nil, fmt.Errorf("invalid privilege: %s", key)
-		}
+		privObj := privilegeMap[key] // Safe because ValidateConfig ensures valid privileges
 		privList = append(privList, privObj)
 	}
 
@@ -404,14 +423,9 @@ func validateKinds(data *ConjurPermissionResourceModel) (conjurpolicy.Kind, conj
 		"policy":   conjurpolicy.KindPolicy,
 	}
 
-	roleKind, ok := kindMap[data.Role.Kind.ValueString()]
-	if !ok {
-		return 0, 0, fmt.Errorf("invalid role kind: %s", data.Role.Kind.ValueString())
-	}
-	resKind, ok := kindMap[data.Resource.Kind.ValueString()]
-	if !ok {
-		return 0, 0, fmt.Errorf("invalid resource kind: %s", data.Resource.Kind.ValueString())
-	}
+	// Since ValidateConfig already validates kinds, these lookups should always succeed
+	roleKind := kindMap[data.Role.Kind.ValueString()]
+	resKind := kindMap[data.Resource.Kind.ValueString()]
 	return roleKind, resKind, nil
 }
 
