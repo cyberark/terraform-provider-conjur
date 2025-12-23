@@ -68,6 +68,7 @@ func (r *ConjurPolicyBranchResource) Schema(ctx context.Context, req resource.Sc
 				Attributes: map[string]schema.Attribute{
 					"kind": schema.StringAttribute{
 						MarkdownDescription: "Owner kind (user, group, etc.)",
+						Optional:            true,
 						Computed:            true,
 						PlanModifiers: []planmodifier.String{
 							stringplanmodifier.RequiresReplace(),
@@ -75,6 +76,7 @@ func (r *ConjurPolicyBranchResource) Schema(ctx context.Context, req resource.Sc
 					},
 					"id": schema.StringAttribute{
 						MarkdownDescription: "Owner identifier",
+						Optional:            true,
 						Computed:            true,
 						PlanModifiers: []planmodifier.String{
 							stringplanmodifier.RequiresReplace(),

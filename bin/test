@@ -339,7 +339,6 @@ function run_terraform_tests() {
 
 function validate_results() {  
   [[ ! -f "$LOCAL_SECRET_FILE" || ! -s "$LOCAL_SECRET_FILE" ]] && { echo "Error: unable to retrieve the secrets"; return 1; }
-
   actual=$(< "$LOCAL_SECRET_FILE")
   rm -f "$LOCAL_SECRET_FILE"
 

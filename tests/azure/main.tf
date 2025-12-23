@@ -36,8 +36,21 @@ output "dbpass-to-output" {
   sensitive = true
 }
 
+ephemeral "conjur_secret" "dbpass" {
+  name = var.conjur_secret_variable
+}
+
 resource "local_file" "dbpass-to-file" {
   content         = data.conjur_secret.dbpass.value
   filename        = "${path.module}/../dbpass"
   file_permission = "0664"
+
+  # Verify that the ephemeral secret matches the regular data source
+  # Using a precondition to assert equality - this will fail if condition is false
+  lifecycle {
+    precondition {
+      condition     = ephemeral.conjur_secret.dbpass.value == data.conjur_secret.dbpass.value
+      error_message = "Ephemeral secret value does not match regular data source value"
+    }
+  }
 }

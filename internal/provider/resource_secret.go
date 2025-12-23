@@ -43,7 +43,6 @@ type ConjurSecretResourceModel struct {
 	Branch      types.String             `tfsdk:"branch"`
 	Name        types.String             `tfsdk:"name"`
 	MimeType    types.String             `tfsdk:"mime_type"`
-	Owner       types.Object             `tfsdk:"owner"`
 	Value       types.String             `tfsdk:"value"`
 	Annotations map[string]string        `tfsdk:"annotations"`
 	Permissions []ConjurSecretPermission `tfsdk:"permissions"`
@@ -93,26 +92,6 @@ func (r *ConjurSecretResource) Schema(ctx context.Context, req resource.SchemaRe
 				MarkdownDescription: "The secret value",
 				Optional:            true,
 				Sensitive:           true,
-			},
-			"owner": schema.SingleNestedAttribute{
-				MarkdownDescription: "Owner of the secret",
-				Optional:            true,
-				Attributes: map[string]schema.Attribute{
-					"kind": schema.StringAttribute{
-						MarkdownDescription: "Owner kind (user, group, etc.)",
-						Optional:            true,
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.RequiresReplace(),
-						},
-					},
-					"id": schema.StringAttribute{
-						MarkdownDescription: "Owner identifier",
-						Optional:            true,
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.RequiresReplace(),
-						},
-					},
-				},
 			},
 			"permissions": schema.ListNestedAttribute{
 				MarkdownDescription: "List of permissions associated with the secret",
@@ -374,16 +353,7 @@ func (r *ConjurSecretResource) buildSecretPayload(data *ConjurSecretResourceMode
 		}
 		secret.Permissions = permissions
 	}
-	if !data.Owner.IsNull() && !data.Owner.IsUnknown() {
-		owner := &conjurapi.Owner{}
-		if kindAttr, ok := data.Owner.Attributes()["kind"]; ok {
-			owner.Kind = kindAttr.(types.String).ValueString()
-		}
-		if idAttr, ok := data.Owner.Attributes()["id"]; ok {
-			owner.Id = idAttr.(types.String).ValueString()
-		}
-		secret.Owner = owner
-	}
+
 	if len(data.Annotations) > 0 {
 		secret.Annotations = data.Annotations
 	}
@@ -422,22 +392,6 @@ func (r *ConjurSecretResource) parseSecretResponse(secretResp conjurapi.StaticSe
 			permissions[i] = permission
 		}
 		data.Permissions = permissions
-	}
-
-	if secretResp.Owner != nil {
-		ownerAttrs := map[string]attr.Value{
-			"kind": types.StringValue(secretResp.Owner.Kind),
-			"id":   types.StringValue(secretResp.Owner.Id),
-		}
-		data.Owner = types.ObjectValueMust(map[string]attr.Type{
-			"kind": types.StringType,
-			"id":   types.StringType,
-		}, ownerAttrs)
-	} else {
-		data.Owner = types.ObjectNull(map[string]attr.Type{
-			"kind": types.StringType,
-			"id":   types.StringType,
-		})
 	}
 
 	if len(secretResp.Annotations) != 0 {

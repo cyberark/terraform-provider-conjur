@@ -13,30 +13,30 @@ import (
 )
 
 var (
-	_ datasource.DataSource              = &secretDataSource{}
-	_ datasource.DataSourceWithConfigure = &secretDataSource{}
+	_ datasource.DataSource              = &SecretDataSource{}
+	_ datasource.DataSourceWithConfigure = &SecretDataSource{}
 )
 
 func NewSecretDataSource() datasource.DataSource {
-	return &secretDataSource{}
+	return &SecretDataSource{}
 }
 
-type secretDataSource struct {
+type SecretDataSource struct {
 	client api.ClientV2
 }
 
-type secretDataSourceModel struct {
+type SecretDataSourceModel struct {
 	Name    types.String `tfsdk:"name"`
-	Version types.String `tfsdk:"version"`
+	Version types.Int64  `tfsdk:"version"`
 	Value   types.String `tfsdk:"value"`
 }
 
 // Metadata returns the resource type name.
-func (d *secretDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+func (d *SecretDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_secret"
 }
 
-func (d *secretDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+func (d *SecretDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Secret from CyberArk Secrets Manager",
 		Attributes: map[string]schema.Attribute{
@@ -44,7 +44,7 @@ func (d *secretDataSource) Schema(_ context.Context, _ datasource.SchemaRequest,
 				Required:    true,
 				Description: "name (path) of the secret",
 			},
-			"version": schema.StringAttribute{
+			"version": schema.Int64Attribute{
 				Optional:    true,
 				Description: "version of the secret",
 			},
@@ -58,7 +58,7 @@ func (d *secretDataSource) Schema(_ context.Context, _ datasource.SchemaRequest,
 }
 
 // Configure adds the provider configured client to this datasource.
-func (d *secretDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+func (d *SecretDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -73,9 +73,8 @@ func (d *secretDataSource) Configure(_ context.Context, req datasource.Configure
 	d.client = client
 }
 
-// Return token
-func (d *secretDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var data secretDataSourceModel
+func (d *SecretDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	var data SecretDataSourceModel
 
 	// Read Terraform configuration data into the model
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
@@ -83,11 +82,20 @@ func (d *secretDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		return
 	}
 
-	name := data.Name.ValueString()
-	version := data.Version.ValueString()
-	log.Printf("[DEBUG] Getting secret for name=%q version=%q", name, version)
+	nameStr := data.Name.ValueString()
+	log.Printf("[DEBUG] Getting secret for name=%q", nameStr)
 
-	secretValue, err := d.client.RetrieveSecret(name)
+	var secretValue []byte
+	var err error
+
+	if !data.Version.IsNull() {
+		versionInt := int(data.Version.ValueInt64())
+		log.Printf("[DEBUG] Using version %d", versionInt)
+		secretValue, err = d.client.RetrieveSecretWithVersion(nameStr, versionInt)
+	} else {
+		secretValue, err = d.client.RetrieveSecret(nameStr)
+	}
+
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to retrieve secret", err.Error())
 		return

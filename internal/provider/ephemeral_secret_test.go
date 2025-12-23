@@ -3,21 +3,68 @@ package provider
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api/mocks"
-	"github.com/hashicorp/terraform-plugin-framework/datasource"
-	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	fwdatasource "github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/ephemeral"
+	"github.com/hashicorp/terraform-plugin-framework/ephemeral/schema"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestSecretDataSource_Read(t *testing.T) {
+func TestEmphemeralSecretDataSourceSchema(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	schemaRequest := fwdatasource.SchemaRequest{}
+	schemaResponse := &fwdatasource.SchemaResponse{}
+
+	// Instantiate the datasource.DataSource and call its Schema method
+	NewSecretDataSource().Schema(ctx, schemaRequest, schemaResponse)
+
+	if schemaResponse.Diagnostics.HasError() {
+		t.Fatalf("Schema method diagnostics: %+v", schemaResponse.Diagnostics)
+	}
+
+	// Validate the schema
+	diagnostics := schemaResponse.Schema.ValidateImplementation(ctx)
+
+	if diagnostics.HasError() {
+		t.Fatalf("Schema validation diagnostics: %+v", diagnostics)
+	}
+}
+
+func TestAPIEphemeralSecretDataSource(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: providerApiConfig + testRetrieveEphemeralSecret(),
+				// Verify the ephemeral resource can be created successfully
+				// Value validation is covered by unit and E2E tests
+			},
+		},
+	})
+}
+
+func testRetrieveEphemeralSecret() string {
+	return fmt.Sprintf(`
+	ephemeral "conjur_secret" "test" {
+		name = %[1]q
+    }
+	`, os.Getenv("TF_CONJUR_SECRET_VARIABLE"))
+}
+
+func TestEphemeralSecretResource_Open(t *testing.T) {
 	tests := []struct {
 		name          string
-		data          SecretDataSourceModel
+		config        EphemeralSecretResourceModel
 		setupMock     func(*mocks.MockClientV2)
 		expectedError bool
 		errorContains string
@@ -25,7 +72,7 @@ func TestSecretDataSource_Read(t *testing.T) {
 	}{
 		{
 			name: "successful secret retrieval",
-			data: SecretDataSourceModel{
+			config: EphemeralSecretResourceModel{
 				Name:    types.StringValue("db/password"),
 				Version: types.Int64Null(),
 			},
@@ -37,7 +84,7 @@ func TestSecretDataSource_Read(t *testing.T) {
 		},
 		{
 			name: "API error retrieving secret",
-			data: SecretDataSourceModel{
+			config: EphemeralSecretResourceModel{
 				Name:    types.StringValue("nonexistent/secret"),
 				Version: types.Int64Null(),
 			},
@@ -49,19 +96,19 @@ func TestSecretDataSource_Read(t *testing.T) {
 		},
 		{
 			name: "permission denied error",
-			data: SecretDataSourceModel{
+			config: EphemeralSecretResourceModel{
 				Name:    types.StringValue("restricted/secret"),
 				Version: types.Int64Null(),
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
-				mockV2.On("RetrieveSecret", "restricted/secret").Return(nil, fmt.Errorf("403 Forbidden"))
+				mockV2.On("RetrieveSecret", "restricted/secret").Return(nil, fmt.Errorf("401 Unauthorized"))
 			},
 			expectedError: true,
 			errorContains: "Failed to retrieve secret",
 		},
 		{
 			name: "secret with nested path",
-			data: SecretDataSourceModel{
+			config: EphemeralSecretResourceModel{
 				Name:    types.StringValue("prod/databases/mysql/password"),
 				Version: types.Int64Null(),
 			},
@@ -73,7 +120,7 @@ func TestSecretDataSource_Read(t *testing.T) {
 		},
 		{
 			name: "empty secret value",
-			data: SecretDataSourceModel{
+			config: EphemeralSecretResourceModel{
 				Name:    types.StringValue("empty/secret"),
 				Version: types.Int64Null(),
 			},
@@ -85,7 +132,7 @@ func TestSecretDataSource_Read(t *testing.T) {
 		},
 		{
 			name: "secret with version specified",
-			data: SecretDataSourceModel{
+			config: EphemeralSecretResourceModel{
 				Name:    types.StringValue("versioned/secret"),
 				Version: types.Int64Value(2),
 			},
@@ -97,7 +144,7 @@ func TestSecretDataSource_Read(t *testing.T) {
 		},
 		{
 			name: "secret with special characters",
-			data: SecretDataSourceModel{
+			config: EphemeralSecretResourceModel{
 				Name:    types.StringValue("app/secret-key"),
 				Version: types.Int64Null(),
 			},
@@ -109,7 +156,7 @@ func TestSecretDataSource_Read(t *testing.T) {
 		},
 		{
 			name: "secret with JSON value",
-			data: SecretDataSourceModel{
+			config: EphemeralSecretResourceModel{
 				Name:    types.StringValue("config/json"),
 				Version: types.Int64Null(),
 			},
@@ -126,19 +173,14 @@ func TestSecretDataSource_Read(t *testing.T) {
 			mockV2 := mocks.NewMockClientV2(t)
 			tt.setupMock(mockV2)
 
-			d := &SecretDataSource{
+			r := &EphemeralSecretResource{
 				client: mockV2,
 			}
 
-			testSchema := getSecretDataSourceTestSchema()
+			testSchema := getEphemeralSecretResourceTestSchema()
 
-			var versionVal tftypes.Value
-			if tt.data.Version.IsNull() {
-				versionVal = tftypes.NewValue(tftypes.Number, nil)
-			} else {
-				versionVal = tftypes.NewValue(tftypes.Number, tt.data.Version.ValueInt64())
-			}
-
+			// Build config value with all schema attributes (name, version, value)
+			// Value is computed so it will be null in the config
 			configVal := tftypes.NewValue(
 				tftypes.Object{
 					AttributeTypes: map[string]tftypes.Type{
@@ -148,20 +190,20 @@ func TestSecretDataSource_Read(t *testing.T) {
 					},
 				},
 				map[string]tftypes.Value{
-					"name":    tftypes.NewValue(tftypes.String, tt.data.Name.ValueString()),
-					"version": versionVal,
-					"value":   tftypes.NewValue(tftypes.String, nil),
+					"name":    tftypes.NewValue(tftypes.String, tt.config.Name.ValueString()),
+					"version": getVersionValue(tt.config.Version),
+					"value":   tftypes.NewValue(tftypes.String, nil), // Computed, so null in config
 				},
 			)
 
-			req := datasource.ReadRequest{
+			req := ephemeral.OpenRequest{
 				Config: tfsdk.Config{
 					Raw:    configVal,
 					Schema: testSchema,
 				},
 			}
-			resp := &datasource.ReadResponse{
-				State: tfsdk.State{
+			resp := &ephemeral.OpenResponse{
+				Result: tfsdk.EphemeralResultData{
 					Raw:    tftypes.NewValue(tftypes.Object{}, nil),
 					Schema: testSchema,
 				},
@@ -169,14 +211,14 @@ func TestSecretDataSource_Read(t *testing.T) {
 
 			ctx := context.Background()
 
-			d.Read(ctx, req, resp)
+			r.Open(ctx, req, resp)
 
 			if tt.expectedError {
 				assert.True(t, resp.Diagnostics.HasError())
 				if tt.errorContains != "" {
 					found := false
 					for _, diag := range resp.Diagnostics.Errors() {
-						if contains(diag.Summary(), tt.errorContains) || contains(diag.Detail(), tt.errorContains) {
+						if strings.Contains(diag.Summary(), tt.errorContains) || strings.Contains(diag.Detail(), tt.errorContains) {
 							found = true
 							break
 						}
@@ -185,9 +227,14 @@ func TestSecretDataSource_Read(t *testing.T) {
 				}
 			} else {
 				assert.False(t, resp.Diagnostics.HasError())
-				var result SecretDataSourceModel
-				resp.State.Get(ctx, &result)
-				assert.Equal(t, tt.data.Name.ValueString(), result.Name.ValueString())
+				var result EphemeralSecretResourceModel
+				resp.Result.Get(ctx, &result)
+				assert.Equal(t, tt.config.Name.ValueString(), result.Name.ValueString())
+				if tt.config.Version.IsNull() {
+					assert.True(t, result.Version.IsNull())
+				} else {
+					assert.Equal(t, tt.config.Version.ValueInt64(), result.Version.ValueInt64())
+				}
 				assert.Equal(t, tt.expectedValue, result.Value.ValueString())
 			}
 
@@ -196,9 +243,16 @@ func TestSecretDataSource_Read(t *testing.T) {
 	}
 }
 
-func getSecretDataSourceTestSchema() schema.Schema {
-	d := &SecretDataSource{}
-	var schemaResp datasource.SchemaResponse
-	d.Schema(context.Background(), datasource.SchemaRequest{}, &schemaResp)
+func getVersionValue(version types.Int64) tftypes.Value {
+	if version.IsNull() {
+		return tftypes.NewValue(tftypes.Number, nil)
+	}
+	return tftypes.NewValue(tftypes.Number, version.ValueInt64())
+}
+
+func getEphemeralSecretResourceTestSchema() schema.Schema {
+	r := &EphemeralSecretResource{}
+	var schemaResp ephemeral.SchemaResponse
+	r.Schema(context.Background(), ephemeral.SchemaRequest{}, &schemaResp)
 	return schemaResp.Schema
 }

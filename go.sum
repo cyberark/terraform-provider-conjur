@@ -50,8 +50,8 @@ github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDk
 github.com/cloudflare/circl v1.6.1 h1:zqIqSPIndyBh1bjLVVDHMPpVKqp8Su/V+6MeDzzQBQ0=
 github.com/cloudflare/circl v1.6.1/go.mod h1:uddAzsPgqdMAYatqJ0lsjX1oECcQLIlRpzZh3pJrofs=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
-github.com/cyberark/conjur-api-go v0.13.12 h1:UlPrnr+4zhlVvi7h/ODFBsDmxl16F1y6lcppLY2WYN8=
-github.com/cyberark/conjur-api-go v0.13.12/go.mod h1:BQmiYeA8hJmGSduF+wgfXY4Ktdky30+cevXm+tzr63k=
+github.com/cyberark/conjur-api-go v0.13.13 h1:5hsDrzY68Dme6mkYqA1USq4IMcfbJ6WADbaRBcCbai4=
+github.com/cyberark/conjur-api-go v0.13.13/go.mod h1:BQmiYeA8hJmGSduF+wgfXY4Ktdky30+cevXm+tzr63k=
 github.com/cyphar/filepath-securejoin v0.4.1 h1:JyxxyPEaktOD+GAnqIqTf9A8tHyAG22rowi7HkoSU1s=
 github.com/cyphar/filepath-securejoin v0.4.1/go.mod h1:Sdj7gXlvMcPZsbhwhQ33GguGLDGQL7h7bg04C/+u9jI=
 github.com/danieljoos/wincred v1.2.2 h1:774zMFJrqaeYCK2W57BgAem/MLi6mtSE47MB6BOJ0i0=

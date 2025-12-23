@@ -41,11 +41,12 @@ fi
 docker compose -f docker-compose.test.yml run -T \
   -e output_dir="$output_dir" \
   conjur_test bash -c "
+    set -o pipefail;
     echo \"Go version: \$(go version)\";
     TF_ACC=1 TF_LOG=debug go test -run \"^(${TESTCASE})\$\" ./internal/... -coverprofile=\"\$output_dir/c.out\" -v | tee \"\$output_dir/junit.output\";
-    exit_code=\$?;
+    exit_code=\${PIPESTATUS[0]};
     echo \"Tests finished - aggregating results...\";
     cat \"\$output_dir/junit.output\" | go-junit-report > \"\$output_dir/junit.xml\";
     gocov convert \"\$output_dir/c.out\" | gocov-xml > \"\$output_dir/coverage.xml\";
-    [ \"\$exit_code\" -eq 0 ]
+    exit \"\$exit_code\"
     "

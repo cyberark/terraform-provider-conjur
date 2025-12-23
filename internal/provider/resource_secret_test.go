@@ -55,13 +55,6 @@ func TestBuildSecretPayload(t *testing.T) {
 				Privileges: types.ListValueMust(types.StringType, privs),
 			},
 		},
-		Owner: types.ObjectValueMust(map[string]attr.Type{
-			"kind": types.StringType,
-			"id":   types.StringType,
-		}, map[string]attr.Value{
-			"kind": types.StringValue("user"),
-			"id":   types.StringValue("bob"),
-		}),
 		Annotations: map[string]string{"env": "dev"},
 	}
 
@@ -79,11 +72,6 @@ func TestBuildSecretPayload(t *testing.T) {
 	assert.Equal(t, "user", secret.Permissions[0].Subject.Kind)
 	assert.Equal(t, []string{"read", "write"}, secret.Permissions[0].Privileges)
 
-	// Owner
-	assert.NotNil(t, secret.Owner)
-	assert.Equal(t, "bob", secret.Owner.Id)
-	assert.Equal(t, "user", secret.Owner.Kind)
-
 	// Annotations
 	assert.Equal(t, map[string]string{"env": "dev"}, secret.Annotations)
 }
@@ -97,10 +85,6 @@ func TestParseSecretResponse(t *testing.T) {
 			Name:     "my-secret",
 			Branch:   "/branch",
 			MimeType: "text/plain",
-			Owner: &conjurapi.Owner{
-				Kind: "user",
-				Id:   "owner1",
-			},
 			Annotations: map[string]string{
 				"env": "prod",
 			},
@@ -133,8 +117,6 @@ func TestParseSecretResponse(t *testing.T) {
 	}
 
 	assert.ElementsMatch(t, []string{"read"}, privStrs)
-	assert.Equal(t, "user", data.Owner.Attributes()["kind"].(types.String).ValueString())
-	assert.Equal(t, "owner1", data.Owner.Attributes()["id"].(types.String).ValueString())
 	assert.Equal(t, map[string]string{"env": "prod"}, data.Annotations)
 }
 

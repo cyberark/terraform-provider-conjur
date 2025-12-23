@@ -44,7 +44,7 @@ resource "conjur_policy_branch" "my_branch" {
 <a id="nestedatt--owner"></a>
 ### Nested Schema for `owner`
 
-Read-Only:
+Optional:
 
 - `id` (String) Owner identifier
 - `kind` (String) Owner kind (user, group, etc.)
