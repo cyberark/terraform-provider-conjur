@@ -8,6 +8,7 @@ import (
 
 	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/ephemeral"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -22,8 +23,9 @@ import (
 var IntegrationVersion = "0.0.1"
 
 var (
-	_ provider.Provider                   = &conjurProvider{}
-	_ provider.ProviderWithValidateConfig = &conjurProvider{}
+	_ provider.Provider                       = &conjurProvider{}
+	_ provider.ProviderWithValidateConfig     = &conjurProvider{}
+	_ provider.ProviderWithEphemeralResources = &conjurProvider{}
 )
 
 type conjurProvider struct {
@@ -206,6 +208,7 @@ func (p *conjurProvider) Configure(ctx context.Context, req provider.ConfigureRe
 
 	resp.DataSourceData = client
 	resp.ResourceData = client
+	resp.EphemeralResourceData = client
 }
 
 func (p *conjurProvider) buildConjurConfig(data *conjurProviderModel) (*conjurapi.Config, error) {
@@ -354,6 +357,13 @@ func (p *conjurProvider) DataSources(_ context.Context) []func() datasource.Data
 		NewSecretDataSource,
 		NewCertificateIssueDataSource,
 		NewCertificateSignDataSource,
+	}
+}
+
+// EphemeralResources returns the ephemeral resources implemented in the provider.
+func (p *conjurProvider) EphemeralResources(_ context.Context) []func() ephemeral.EphemeralResource {
+	return []func() ephemeral.EphemeralResource{
+		NewEphemeralSecretResource,
 	}
 }
 

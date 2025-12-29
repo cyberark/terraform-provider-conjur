@@ -5,7 +5,7 @@
 This provider manages authentication with CyberArk Secrets Manager, allowing Terraform to access and manage various Secrets Manager resources.
 
 The provider can access the following Secrets Manager resources as data sources:
-- [conjur_secret](./data-sources/secret.md)
+- [conjur_secret](./data-sources/secret.md) (also available as [ephemeral resource](./ephemeral-resources/secret.md))
 - [conjur_certificate_issue](./data-sources/certificate_issue.md) (requires Secrets Manager Saas with Certificate Manager integration)
 - [conjur_certificate_sign](./data-sources/certificate_sign.md) (requires Secrets Manager Saas with Certificate Manager integration)
 
@@ -89,6 +89,9 @@ It is usually granted implicitly assuming the above required privileges have bee
 | conjur_secret             | execute on the secret                |
 | conjur_certificate_issue  | execute on the certificate issuer    |
 | conjur_certificate_sign   | execute on the certificate issuer    |
+
+**Note:** The `conjur_secret` data source is also available as an [ephemeral resource](./ephemeral-resources/secret.md) (`ephemeral "conjur_secret"`). 
+Ephemeral resources are not stored in Terraform state and are useful when you need secret values during operations but don't want them persisted.
 
 It is recommended to review your use case carefully and adjust the privileges of the provider's host identity to adhere to least-privilege security
 principles. This is especially important in environments where other users or systems may have access to the same Secrets Manager resources and

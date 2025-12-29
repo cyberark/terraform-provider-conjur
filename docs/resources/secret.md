@@ -53,18 +53,8 @@ resource "conjur_secret" "my_secret" {
 
 - `annotations` (Map of String) Key-value annotations for the secret
 - `mime_type` (String) The secret mime_type
-- `owner` (Attributes) Owner of the secret (see [below for nested schema](#nestedatt--owner))
 - `permissions` (Attributes List) List of permissions associated with the secret (see [below for nested schema](#nestedatt--permissions))
 - `value` (String, Sensitive) The secret value
-
-<a id="nestedatt--owner"></a>
-### Nested Schema for `owner`
-
-Optional:
-
-- `id` (String) Owner identifier
-- `kind` (String) Owner kind (user, group, etc.)
-
 
 <a id="nestedatt--permissions"></a>
 ### Nested Schema for `permissions`

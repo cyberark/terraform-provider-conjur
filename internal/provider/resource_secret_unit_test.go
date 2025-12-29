@@ -33,10 +33,6 @@ func TestSecretResource_Create(t *testing.T) {
 				Name:   types.StringValue("db-password"),
 				Branch: types.StringValue("/data/test"),
 				Value:  types.StringValue("secret123"),
-				Owner: types.ObjectNull(map[string]attr.Type{
-					"kind": types.StringType,
-					"id":   types.StringType,
-				}),
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
 				mockV2.On("CreateStaticSecret", mock.MatchedBy(func(s conjurapi.StaticSecret) bool {
@@ -51,10 +47,6 @@ func TestSecretResource_Create(t *testing.T) {
 				Name:   types.StringValue("error-secret"),
 				Branch: types.StringValue("/data/test"),
 				Value:  types.StringValue("secret123"),
-				Owner: types.ObjectNull(map[string]attr.Type{
-					"kind": types.StringType,
-					"id":   types.StringType,
-				}),
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
 				mockV2.On("CreateStaticSecret", mock.Anything).Return(nil, fmt.Errorf("permission denied"))
@@ -65,17 +57,10 @@ func TestSecretResource_Create(t *testing.T) {
 		{
 			name: "creation with all optional fields",
 			data: ConjurSecretResourceModel{
-				Name:     types.StringValue("api-key"),
-				Branch:   types.StringValue("/data/production"),
-				Value:    types.StringValue("supersecret"),
-				MimeType: types.StringValue("application/json"),
-				Owner: types.ObjectValueMust(map[string]attr.Type{
-					"kind": types.StringType,
-					"id":   types.StringType,
-				}, map[string]attr.Value{
-					"kind": types.StringValue("group"),
-					"id":   types.StringValue("admins"),
-				}),
+				Name:        types.StringValue("api-key"),
+				Branch:      types.StringValue("/data/production"),
+				Value:       types.StringValue("supersecret"),
+				MimeType:    types.StringValue("application/json"),
 				Annotations: map[string]string{"env": "prod", "team": "platform"},
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
@@ -83,8 +68,6 @@ func TestSecretResource_Create(t *testing.T) {
 					return s.Name == "api-key" &&
 						s.Branch == "/data/production" &&
 						s.MimeType == "application/json" &&
-						s.Owner != nil &&
-						s.Owner.Kind == "group" &&
 						len(s.Annotations) == 2
 				})).Return(&conjurapi.StaticSecretResponse{}, nil)
 			},
@@ -96,10 +79,6 @@ func TestSecretResource_Create(t *testing.T) {
 				Name:   types.StringValue("shared-secret"),
 				Branch: types.StringValue("/data/test"),
 				Value:  types.StringValue("secret123"),
-				Owner: types.ObjectNull(map[string]attr.Type{
-					"kind": types.StringType,
-					"id":   types.StringType,
-				}),
 				Permissions: []ConjurSecretPermission{
 					{
 						Subject: ConjurSecretSubject{
@@ -183,10 +162,6 @@ func TestSecretResource_Read(t *testing.T) {
 			data: ConjurSecretResourceModel{
 				Name:   types.StringValue("test-secret"),
 				Branch: types.StringValue("/data/test"),
-				Owner: types.ObjectNull(map[string]attr.Type{
-					"kind": types.StringType,
-					"id":   types.StringType,
-				}),
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
 				mockV2.On("GetStaticSecretDetails", "/data/test/test-secret").Return(&conjurapi.StaticSecretResponse{}, nil)
@@ -195,14 +170,11 @@ func TestSecretResource_Read(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			name: "secret exists with owner and annotations",
+			name: "secret exists with annotations",
 			data: ConjurSecretResourceModel{
-				Name:   types.StringValue("prod-secret"),
-				Branch: types.StringValue("/data/production"),
-				Owner: types.ObjectNull(map[string]attr.Type{
-					"kind": types.StringType,
-					"id":   types.StringType,
-				}),
+				Name:        types.StringValue("prod-secret"),
+				Branch:      types.StringValue("/data/production"),
+				Annotations: map[string]string{"env": "prod", "team": "platform"},
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
 				mockV2.On("GetStaticSecretDetails", "/data/production/prod-secret").Return(&conjurapi.StaticSecretResponse{}, nil)
@@ -215,10 +187,6 @@ func TestSecretResource_Read(t *testing.T) {
 			data: ConjurSecretResourceModel{
 				Name:   types.StringValue("error-secret"),
 				Branch: types.StringValue("/data/test"),
-				Owner: types.ObjectNull(map[string]attr.Type{
-					"kind": types.StringType,
-					"id":   types.StringType,
-				}),
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
 				mockV2.On("GetStaticSecretDetails", "/data/test/error-secret").Return(
@@ -232,10 +200,6 @@ func TestSecretResource_Read(t *testing.T) {
 			data: ConjurSecretResourceModel{
 				Name:   types.StringValue("restricted-secret"),
 				Branch: types.StringValue("/data/test"),
-				Owner: types.ObjectNull(map[string]attr.Type{
-					"kind": types.StringType,
-					"id":   types.StringType,
-				}),
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
 				mockV2.On("GetStaticSecretDetails", "/data/test/restricted-secret").Return(&conjurapi.StaticSecretResponse{}, nil)
@@ -308,10 +272,6 @@ func TestSecretResource_Update(t *testing.T) {
 				Name:   types.StringValue("test-secret"),
 				Branch: types.StringValue("/data/test"),
 				Value:  types.StringValue("new-secret-value"),
-				Owner: types.ObjectNull(map[string]attr.Type{
-					"kind": types.StringType,
-					"id":   types.StringType,
-				}),
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
 				mockV2.On("AddSecret", "data/test/test-secret", "new-secret-value").Return(nil)
@@ -324,10 +284,6 @@ func TestSecretResource_Update(t *testing.T) {
 				Name:   types.StringValue("error-secret"),
 				Branch: types.StringValue("/data/test"),
 				Value:  types.StringValue("new-value"),
-				Owner: types.ObjectNull(map[string]attr.Type{
-					"kind": types.StringType,
-					"id":   types.StringType,
-				}),
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
 				mockV2.On("AddSecret", "data/test/error-secret", "new-value").Return(
@@ -341,10 +297,6 @@ func TestSecretResource_Update(t *testing.T) {
 				Name:   types.StringValue("api-key"),
 				Branch: types.StringValue("/data/production/app"),
 				Value:  types.StringValue("updated-key"),
-				Owner: types.ObjectNull(map[string]attr.Type{
-					"kind": types.StringType,
-					"id":   types.StringType,
-				}),
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
 				mockV2.On("AddSecret", "data/production/app/api-key", "updated-key").Return(nil)
@@ -413,10 +365,6 @@ func TestSecretResource_Delete(t *testing.T) {
 			data: ConjurSecretResourceModel{
 				Name:   types.StringValue("test-secret"),
 				Branch: types.StringValue("/data/test"),
-				Owner: types.ObjectNull(map[string]attr.Type{
-					"kind": types.StringType,
-					"id":   types.StringType,
-				}),
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
 				mockV2.On("LoadPolicy", conjurapi.PolicyModePatch, "data/test", mock.MatchedBy(func(policy io.Reader) bool {
@@ -434,10 +382,6 @@ func TestSecretResource_Delete(t *testing.T) {
 			data: ConjurSecretResourceModel{
 				Name:   types.StringValue("error-secret"),
 				Branch: types.StringValue("/data/test"),
-				Owner: types.ObjectNull(map[string]attr.Type{
-					"kind": types.StringType,
-					"id":   types.StringType,
-				}),
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
 				mockV2.On("LoadPolicy", conjurapi.PolicyModePatch, "data/test", mock.Anything).Return(
@@ -451,10 +395,6 @@ func TestSecretResource_Delete(t *testing.T) {
 			data: ConjurSecretResourceModel{
 				Name:   types.StringValue("api-key"),
 				Branch: types.StringValue("/data/production/app"),
-				Owner: types.ObjectNull(map[string]attr.Type{
-					"kind": types.StringType,
-					"id":   types.StringType,
-				}),
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
 				mockV2.On("LoadPolicy", conjurapi.PolicyModePatch, "data/production/app", mock.MatchedBy(func(policy io.Reader) bool {
