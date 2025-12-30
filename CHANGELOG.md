@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
-## [0.8.2] - 2025-12-23
+## [0.8.2] - 2025-12-31
 
 ### Fixed
 - Use the correct API call for retrieving versioned secrets.
@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Owner attributes are now optional for branches so they can be user-provided.
 
 ### Added
+- Support for write-only secret values. (CNJR-12282)
 - Ephemeral resource for retrieving secrets from Secrets Manager. (CNJR-12281)
 - Better input validation in ValidateConfig stage.
 

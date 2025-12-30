@@ -76,7 +76,7 @@ function test_resource_crud() {
   fi
 
   # Get the resource ID for validation
-  local resource_id=$(terraform_exec "cd $test_dir/create && jq -r '.outputs.${resource_name}_${id_output_name}.value' terraform.tfstate")
+  resource_id=$(terraform_exec "cd $test_dir/create && jq -r '.outputs.${resource_name}_${id_output_name}.value' terraform.tfstate")
   if [[ -z "$resource_id" || "$resource_id" == "null" ]]; then
     echo "FAILED: Could not get $id_output_name from terraform output"
     return 1
@@ -105,6 +105,38 @@ function test_resource_crud() {
       return 1
     fi
     echo "${resource_name} import successful"
+    
+    # For secret resource, also import the write-only resource, and ensure the secret value was not stored in the state
+    if [[ "$resource_name" == "secret" ]]; then
+      echo "Step 2: Importing ${resource_name} resource with write-only attribute"
+      if ! terraform_exec "cd $test_dir/update && \
+        terraform init && \
+        terraform import conjur_${resource_name}.imported_wo $import_id-wo"; then
+        echo "FAILED: ${resource_name} write-only import command failed"
+        return 1
+      fi
+      
+      # Verify that value_wo and value is NOT retrieved/stored in TF state when import succeeds
+      echo "Verifying write-only attribute is not stored in state"
+      value_wo_in_state=$(terraform_exec "cd $test_dir/update && \
+        jq -r '.resources[] | select(.type == \"conjur_secret\" and .name == \"imported_wo\") | .instances[0].attributes.value_wo // \"null\"' terraform.tfstate")
+      value_in_state=$(terraform_exec "cd $test_dir/update && \
+        jq -r '.resources[] | select(.type == \"conjur_secret\" and .name == \"imported_wo\") | .instances[0].attributes.value // \"null\"' terraform.tfstate")
+      
+       if [[ ("$value_wo_in_state" != "null" && "$value_wo_in_state" != "") || ("$value_in_state" != "null" && "$value_in_state" != "") ]]; then
+         echo "FAILED: value_wo or value should not be stored in state (write-only attribute), but found value_wo='$value_wo_in_state', value='$value_in_state'"
+         return 1
+       fi
+      
+      # Verify name exists as a sanity check that import succeeded and the above checks are valid
+      name=$(terraform_exec "cd $test_dir/update && \
+        jq -r '.resources[] | select(.type == \"conjur_secret\" and .name == \"imported_wo\") | .instances[0].attributes.name // \"null\"' terraform.tfstate")
+      
+      if [[ "$name" == "null" || "$name" == "" ]]; then
+        echo "FAILED: name should be present in state for imported write-only $resource_name resource"
+        return 1
+      fi
+    fi
   fi
 
   # Step 3: Update the Resource
@@ -117,7 +149,7 @@ function test_resource_crud() {
   fi
 
   # Verify update was successful
-  local update_status=$(terraform_exec "cd $test_dir/update && jq -r '.outputs.update_status.value // \"fail\"' terraform.tfstate")
+  update_status=$(terraform_exec "cd $test_dir/update && jq -r '.outputs.update_status.value // \"fail\"' terraform.tfstate")
   if [[ "$update_status" != "success" ]]; then
     echo "FAILED: ${resource_name} update verification failed with status: $update_status"
     return 1
@@ -138,7 +170,7 @@ function test_resource_crud() {
 # NOTE: When adding a new TF Var here it also must be copied to the 'terraform' container
 # env variables in docker-compose.yml
 function generate_random_values() {
-  local rand_suffix=$(openssl rand -hex 6)
+  rand_suffix=$(openssl rand -hex 6)
   export TF_VAR_conjur_authenticator_name="tf-auth-$rand_suffix"
   export TF_VAR_conjur_host_name="tf-host-$rand_suffix"
   export TF_VAR_conjur_group_name="tf-group-$rand_suffix"

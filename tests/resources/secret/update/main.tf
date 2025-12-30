@@ -45,3 +45,13 @@ resource "conjur_secret" "imported" {
 output "update_status" {
   value = conjur_secret.imported.annotations.note == "UPDATED TF managed secret" ? "success" : "fail"
 }
+
+resource "conjur_secret" "imported_wo" {
+  name   = "${var.conjur_secret_name}-wo"
+  branch = "/data/terraform/test"
+  value_wo = "updated-secret-value-wo"
+  value_wo_version = 2
+  annotations = {
+    test_type = "write-only"
+  }
+}

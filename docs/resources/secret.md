@@ -51,10 +51,14 @@ resource "conjur_secret" "my_secret" {
 
 ### Optional
 
+> **NOTE**: [Write-only arguments](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments) are supported in Terraform 1.11 and later.
+
 - `annotations` (Map of String) Key-value annotations for the secret
 - `mime_type` (String) The secret mime_type
 - `permissions` (Attributes List) List of permissions associated with the secret (see [below for nested schema](#nestedatt--permissions))
 - `value` (String, Sensitive) The secret value
+- `value_wo` (String, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) The secret value
+- `value_wo_version` (Number) The secret value version. Used together with `value_wo` to trigger an update.
 
 <a id="nestedatt--permissions"></a>
 ### Nested Schema for `permissions`
