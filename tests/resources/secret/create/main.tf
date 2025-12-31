@@ -57,3 +57,15 @@ output "secret_name" {
 output "create_status" {
   value = conjur_secret.test_secret.name != "" ? "success" : "fail"
 }
+
+# Test write-only attribute: Create with value_wo and version
+# Note: value_wo is write-only and cannot be output or referenced in state.
+resource "conjur_secret" "test_wo" {
+  name            = "${var.conjur_secret_name}-wo"
+  branch          = "/data/terraform/test"
+  value_wo        = "initial-secret-value-wo"
+  value_wo_version = 1
+  annotations = {
+    test_type = "write-only"
+  }
+}

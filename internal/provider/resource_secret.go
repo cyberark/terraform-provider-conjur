@@ -9,6 +9,7 @@ import (
 	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api"
 	"github.com/cyberark/terraform-provider-conjur/internal/policy"
 	"github.com/doodlesbykumbi/conjur-policy-go/pkg/conjurpolicy"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -17,9 +18,17 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"gopkg.in/yaml.v3"
+)
+
+const (
+	// valueRWKey is the key used in private state to track whether "value" (read-write)
+	// or "value_wo" (write-only) is being used. This informs the Read method to fetch
+	// and store the secret value only when this key-value pair equals "true".
+	valueRWKey = "value_rw"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -40,12 +49,14 @@ type ConjurSecretResource struct {
 }
 
 type ConjurSecretResourceModel struct {
-	Branch      types.String             `tfsdk:"branch"`
-	Name        types.String             `tfsdk:"name"`
-	MimeType    types.String             `tfsdk:"mime_type"`
-	Value       types.String             `tfsdk:"value"`
-	Annotations map[string]string        `tfsdk:"annotations"`
-	Permissions []ConjurSecretPermission `tfsdk:"permissions"`
+	Branch         types.String             `tfsdk:"branch"`
+	Name           types.String             `tfsdk:"name"`
+	MimeType       types.String             `tfsdk:"mime_type"`
+	Value          types.String             `tfsdk:"value"`
+	ValueWO        types.String             `tfsdk:"value_wo"`
+	ValueWOVersion types.Int32              `tfsdk:"value_wo_version"`
+	Annotations    map[string]string        `tfsdk:"annotations"`
+	Permissions    []ConjurSecretPermission `tfsdk:"permissions"`
 }
 
 type ConjurSecretPermission struct {
@@ -92,6 +103,20 @@ func (r *ConjurSecretResource) Schema(ctx context.Context, req resource.SchemaRe
 				MarkdownDescription: "The secret value",
 				Optional:            true,
 				Sensitive:           true,
+				Validators: []validator.String{
+					stringvalidator.PreferWriteOnlyAttribute(
+						path.MatchRoot("value_wo"),
+					),
+				},
+			},
+			"value_wo": schema.StringAttribute{
+				MarkdownDescription: "The secret value",
+				Optional:            true,
+				WriteOnly:           true,
+			},
+			"value_wo_version": schema.Int32Attribute{
+				MarkdownDescription: "The secret value version. Used together with `value_wo` to trigger an update.",
+				Optional:            true,
 			},
 			"permissions": schema.ListNestedAttribute{
 				MarkdownDescription: "List of permissions associated with the secret",
@@ -166,12 +191,24 @@ func (r *ConjurSecretResource) ValidateConfig(ctx context.Context, req resource.
 	ValidateBranch(data.Branch, &resp.Diagnostics, "branch")
 	ValidateNonEmpty(data.Name, &resp.Diagnostics, "Secret name")
 
-	// Warn that secret value attribute is sensitive and will be stored in state
-	if !data.Value.IsNull() && !data.Value.IsUnknown() {
-		resp.Diagnostics.AddWarning(
-			"Sensitive Value in Configuration",
-			"The 'value' attribute is marked as sensitive and will be stored in the Terraform state. Ensure your state file is securely managed.",
+	// Validate that value and value_wo are mutually exclusive
+	hasValue := !data.Value.IsNull() && !data.Value.IsUnknown()
+	hasValueWO := !data.ValueWO.IsNull() && !data.ValueWO.IsUnknown()
+	if hasValue && hasValueWO {
+		resp.Diagnostics.AddError(
+			"Invalid Attribute Combination",
+			"Cannot set both 'value' and 'value_wo' attributes. Use 'value_wo' (write-only) to avoid storing the secret value in Terraform state, or use 'value' (read-write) to manage the secret value in state.",
 		)
+	}
+
+	// Validate that value_wo_version requires value_wo
+	if !data.ValueWOVersion.IsNull() && !data.ValueWOVersion.IsUnknown() {
+		if data.ValueWO.IsNull() || data.ValueWO.IsUnknown() {
+			resp.Diagnostics.AddError(
+				"Invalid Attribute Combination",
+				"The 'value_wo_version' attribute requires 'value_wo' to be set. 'value_wo_version' is used together with 'value_wo' to trigger an update.",
+			)
+		}
 	}
 }
 
@@ -187,6 +224,25 @@ func (r *ConjurSecretResource) Create(ctx context.Context, req resource.CreateRe
 	if err != nil {
 		resp.Diagnostics.AddError("Error Building Secret Payload", fmt.Sprintf("Could not build secret payload: %s", err))
 		return
+	}
+
+	// Read value_wo from Config (write-only attributes are in Config, not Plan)
+	var valueWO types.String
+	diags := req.Config.GetAttribute(ctx, path.Root("value_wo"), &valueWO)
+	resp.Diagnostics.Append(diags...)
+
+	// Add an indicator to the private state to determine whether we're using value or value_wo
+	if !valueWO.IsNull() {
+		if resp.Private != nil {
+			diags := resp.Private.SetKey(ctx, valueRWKey, []byte{})
+			resp.Diagnostics.Append(diags...)
+		}
+		newSecret.Value = valueWO.ValueString()
+	} else if !data.Value.IsNull() {
+		if resp.Private != nil {
+			diags := resp.Private.SetKey(ctx, valueRWKey, []byte("true"))
+			resp.Diagnostics.Append(diags...)
+		}
 	}
 
 	secretResp, err := r.client.CreateStaticSecret(newSecret)
@@ -233,16 +289,28 @@ func (r *ConjurSecretResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	// Fetch the secret value (if accessible) to store in state
-	secretValue, err := r.client.RetrieveSecret(strings.TrimPrefix(secretID, "/"))
-	if err != nil {
-		resp.Diagnostics.AddWarning("Unable to fetch secret value", fmt.Sprintf("Could not fetch secret value for %q: %s", secretID, err))
-	} else {
-		resp.Diagnostics.AddWarning(
-			"Sensitive Value in Configuration",
-			"The 'value' attribute is marked as sensitive and will be stored in the Terraform state. Ensure your state file is securely managed.",
-		)
-		data.Value = types.StringValue(string(secretValue))
+	// Determine if we should fetch the secret value:
+	// 1. If private state explicitly says "true" → fetch (using "value" attribute)
+	// 2. If private state is missing but value is already in config → fetch (likely imported/managed)
+	// 3. Otherwise → skip fetch (using "value_wo" or not managing value)
+	valueRW, diags := req.Private.GetKey(ctx, valueRWKey)
+	resp.Diagnostics.Append(diags...)
+	hasPrivateStateMarker := len(valueRW) > 0 && string(valueRW) == "true"
+	hasValueInState := !data.Value.IsNull() && !data.Value.IsUnknown()
+	shouldFetchValue := hasPrivateStateMarker || (len(valueRW) == 0 && hasValueInState)
+
+	if shouldFetchValue {
+		secretValue, err := r.client.RetrieveSecret(strings.TrimPrefix(secretID, "/"))
+		if err != nil {
+			resp.Diagnostics.AddWarning("Unable to fetch secret value", fmt.Sprintf("Could not fetch secret value for %q: %s", secretID, err))
+		} else {
+			data.Value = types.StringValue(string(secretValue))
+			// Set private state marker if it was missing (e.g., after import)
+			if len(valueRW) == 0 && resp.Private != nil {
+				diags := resp.Private.SetKey(ctx, valueRWKey, []byte("true"))
+				resp.Diagnostics.Append(diags...)
+			}
+		}
 	}
 
 	tflog.Trace(ctx, "read secret resource")
@@ -260,15 +328,28 @@ func (r *ConjurSecretResource) Update(ctx context.Context, req resource.UpdateRe
 
 	secretID := fmt.Sprintf("%s/%s", data.Branch.ValueString(), data.Name.ValueString())
 
+	var err error
+	// Read value_wo from Config (write-only attributes are in Config, not Plan)
+	var valueWO types.String
+	diags := req.Config.GetAttribute(ctx, path.Root("value_wo"), &valueWO)
+	resp.Diagnostics.Append(diags...)
 	// Update the secret value
-	err := r.client.AddSecret(strings.TrimPrefix(secretID, "/"), data.Value.ValueString())
+	if !valueWO.IsNull() {
+		// Mark that we're using value_wo (write-only) so Read knows not to fetch/store the value
+		if resp.Private != nil {
+			diags := resp.Private.SetKey(ctx, valueRWKey, []byte{})
+			resp.Diagnostics.Append(diags...)
+		}
+		err = r.client.AddSecret(strings.TrimPrefix(secretID, "/"), valueWO.ValueString())
+	} else if !data.Value.IsNull() {
+		if resp.Private != nil {
+			diags := resp.Private.SetKey(ctx, valueRWKey, []byte("true"))
+			resp.Diagnostics.Append(diags...)
+		}
+		err = r.client.AddSecret(strings.TrimPrefix(secretID, "/"), data.Value.ValueString())
+	}
 	if err != nil {
-		resp.Diagnostics.AddWarning("Unable to set secret value", fmt.Sprintf("Could not update secret value for %q: %s", secretID, err))
-	} else {
-		resp.Diagnostics.AddWarning(
-			"Sensitive Value in Configuration",
-			"The 'value' attribute is marked as sensitive and will be stored in the Terraform state. Ensure your state file is securely managed.",
-		)
+		resp.Diagnostics.AddError("Unable to set secret value", fmt.Sprintf("Could not update secret value for %q: %s", secretID, err))
 	}
 
 	tflog.Trace(ctx, "updated secret resource")
