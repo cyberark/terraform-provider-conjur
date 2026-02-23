@@ -74,6 +74,14 @@ func (d *SecretDataSource) Configure(_ context.Context, req datasource.Configure
 }
 
 func (d *SecretDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	if d.client == nil {
+		resp.Diagnostics.AddWarning(
+			"Provider client not configured",
+			"The Conjur provider client is not available. This may occur when the JWT token is unknown during the plan phase (e.g., in HCP Terraform). The operation will be skipped.",
+		)
+		return
+	}
+
 	var data SecretDataSourceModel
 
 	// Read Terraform configuration data into the model

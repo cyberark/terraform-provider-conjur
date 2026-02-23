@@ -131,6 +131,13 @@ func (r *ConjurPolicyBranchResource) Configure(ctx context.Context, req resource
 }
 
 func (r *ConjurPolicyBranchResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	if r.client == nil {
+		resp.Diagnostics.AddWarning(
+			"Provider client not configured",
+			"The Conjur provider client is not available. This may occur when the JWT token is unknown during the plan phase (e.g., in HCP Terraform). The operation will be skipped.",
+		)
+		return
+	}
 	var data ConjurPolicyBranchResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -188,6 +195,13 @@ func (r *ConjurPolicyBranchResource) Create(ctx context.Context, req resource.Cr
 }
 
 func (r *ConjurPolicyBranchResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	if r.client == nil {
+		resp.Diagnostics.AddWarning(
+			"Provider client not configured",
+			"The Conjur provider client is not available. This may occur when the JWT token is unknown during the plan phase (e.g., in HCP Terraform). The operation will be skipped.",
+		)
+		return
+	}
 	var data ConjurPolicyBranchResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -230,6 +244,13 @@ func (r *ConjurPolicyBranchResource) Read(ctx context.Context, req resource.Read
 
 // Not supported in CC - requires resource recreation via planmodifiers since there's no PATCH support in the API
 func (r *ConjurPolicyBranchResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	if r.client == nil {
+		resp.Diagnostics.AddWarning(
+			"Provider client not configured",
+			"The Conjur provider client is not available. This may occur when the JWT token is unknown during the plan phase (e.g., in HCP Terraform). The operation will be skipped.",
+		)
+		return
+	}
 	resp.Diagnostics.AddWarning(
 		"Update will delete child resources!",
 		"Recreating a policy branch will remove all resources under that branch path. Applying this change may therefore delete variables, hosts, or other resources under the branch.",
@@ -237,6 +258,13 @@ func (r *ConjurPolicyBranchResource) Update(ctx context.Context, req resource.Up
 }
 
 func (r *ConjurPolicyBranchResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	if r.client == nil {
+		resp.Diagnostics.AddWarning(
+			"Provider client not configured",
+			"The Conjur provider client is not available. This may occur when the JWT token is unknown during the plan phase (e.g., in HCP Terraform). The operation will be skipped.",
+		)
+		return
+	}
 	var data ConjurPolicyBranchResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {

@@ -76,6 +76,13 @@ func (r *EphemeralSecretResource) Configure(_ context.Context, req ephemeral.Con
 // Open retrieves the secret value. This is called during each Terraform operation
 // and the value is NOT stored in state - it exists only during the operation.
 func (r *EphemeralSecretResource) Open(ctx context.Context, req ephemeral.OpenRequest, resp *ephemeral.OpenResponse) {
+	if r.client == nil {
+		resp.Diagnostics.AddWarning(
+			"Provider client not configured",
+			"The Conjur provider client is not available. This may occur when the JWT token is unknown during the plan phase (e.g., in HCP Terraform). The operation will be skipped.",
+		)
+		return
+	}
 	var data EphemeralSecretResourceModel
 
 	// Read Terraform configuration data into the model

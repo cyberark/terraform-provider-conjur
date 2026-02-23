@@ -128,6 +128,13 @@ func (r *ConjurGroupResource) Configure(ctx context.Context, req resource.Config
 }
 
 func (r *ConjurGroupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	if r.client == nil {
+		resp.Diagnostics.AddWarning(
+			"Provider client not configured",
+			"The Conjur provider client is not available. This may occur when the JWT token is unknown during the plan phase (e.g., in HCP Terraform). The operation will be skipped.",
+		)
+		return
+	}
 	var data ConjurGroupResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
@@ -154,6 +161,13 @@ func (r *ConjurGroupResource) Create(ctx context.Context, req resource.CreateReq
 }
 
 func (r *ConjurGroupResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	if r.client == nil {
+		resp.Diagnostics.AddWarning(
+			"Provider client not configured",
+			"The Conjur provider client is not available. This may occur when the JWT token is unknown during the plan phase (e.g., in HCP Terraform). The operation will be skipped.",
+		)
+		return
+	}
 	var data ConjurGroupResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -165,6 +179,13 @@ func (r *ConjurGroupResource) Update(ctx context.Context, req resource.UpdateReq
 }
 
 func (r *ConjurGroupResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	if r.client == nil {
+		resp.Diagnostics.AddWarning(
+			"Provider client not configured",
+			"The Conjur provider client is not available. This may occur when the JWT token is unknown during the plan phase (e.g., in HCP Terraform). The operation will be skipped.",
+		)
+		return
+	}
 	var data ConjurGroupResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
@@ -196,6 +217,13 @@ func (r *ConjurGroupResource) Read(ctx context.Context, req resource.ReadRequest
 }
 
 func (r *ConjurGroupResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	if r.client == nil {
+		resp.Diagnostics.AddWarning(
+			"Provider client not configured",
+			"The Conjur provider client is not available. This may occur when the JWT token is unknown during the plan phase (e.g., in HCP Terraform). The operation will be skipped.",
+		)
+		return
+	}
 	var data ConjurGroupResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)

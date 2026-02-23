@@ -134,6 +134,13 @@ func (d *certificateIssueDataSource) Configure(ctx context.Context, req datasour
 }
 
 func (d *certificateIssueDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	if d.client == nil {
+		resp.Diagnostics.AddWarning(
+			"Provider client not configured",
+			"The Conjur provider client is not available. This may occur when the JWT token is unknown during the plan phase (e.g., in HCP Terraform). The operation will be skipped.",
+		)
+		return
+	}
 	var data certificateIssueDataSourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
