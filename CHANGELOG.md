@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [0.8.4] - 2026-02-24
+
+### Fixed
+- Add terraform-registry-manifest.json to repo root.
+
 ## [0.8.3] - 2026-02-23
 
 ### Fixed

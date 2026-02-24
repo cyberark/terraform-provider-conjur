@@ -106,5 +106,5 @@ contributor!
    or manually trigger aditional releases as needed.
 1. Reference the [internal automated release doc](https://github.com/conjurinc/docs/blob/master/reference/infrastructure/automated_releases.md#release-and-promotion-process) for releasing and promoting.
 1. **After promotion:**
-    - **Publish to the Terraform Registry**
-    - **Request infra sign the SHA256SUMS file for the release and attach the resulting .sig file to the github release**
+    - **Verify the release was automatically published to the Terraform Registry**
+    - **If it doesn't appear, ask infra to resync the provider releases**
