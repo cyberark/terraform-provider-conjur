@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api"
@@ -64,16 +63,18 @@ func (d *SecretDataSource) Configure(_ context.Context, req datasource.Configure
 	}
 	client, ok := req.ProviderData.(api.ClientV2)
 	if !ok {
-		resp.Diagnostics.AddError(
-			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected api.ClientV2, got: %T", req.ProviderData),
-		)
+		AddUnexpectedConfigureTypeError(&resp.Diagnostics, "api.ClientV2", req.ProviderData)
 		return
 	}
 	d.client = client
 }
 
 func (d *SecretDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	if d.client == nil {
+		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
+		return
+	}
+
 	var data SecretDataSourceModel
 
 	// Read Terraform configuration data into the model

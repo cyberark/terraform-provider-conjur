@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -95,10 +94,7 @@ func (d *certificateSignDataSource) Configure(ctx context.Context, req datasourc
 	}
 	client, ok := req.ProviderData.(api.ClientV2)
 	if !ok {
-		resp.Diagnostics.AddError(
-			"Unexpected Provider Data Type",
-			fmt.Sprintf("Expected certificateSignClient, got: %T", req.ProviderData),
-		)
+		AddUnexpectedConfigureTypeError(&resp.Diagnostics, "certificateSignClient", req.ProviderData)
 		return
 	}
 
@@ -106,6 +102,10 @@ func (d *certificateSignDataSource) Configure(ctx context.Context, req datasourc
 }
 
 func (d *certificateSignDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	if d.client == nil {
+		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
+		return
+	}
 	var data certificateSignDataSourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
