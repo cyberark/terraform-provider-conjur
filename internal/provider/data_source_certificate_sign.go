@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -95,10 +94,7 @@ func (d *certificateSignDataSource) Configure(ctx context.Context, req datasourc
 	}
 	client, ok := req.ProviderData.(api.ClientV2)
 	if !ok {
-		resp.Diagnostics.AddError(
-			"Unexpected Provider Data Type",
-			fmt.Sprintf("Expected certificateSignClient, got: %T", req.ProviderData),
-		)
+		AddUnexpectedConfigureTypeError(&resp.Diagnostics, "certificateSignClient", req.ProviderData)
 		return
 	}
 
@@ -107,10 +103,7 @@ func (d *certificateSignDataSource) Configure(ctx context.Context, req datasourc
 
 func (d *certificateSignDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	if d.client == nil {
-		resp.Diagnostics.AddWarning(
-			"Provider client not configured",
-			"The Conjur provider client is not available. This may occur when the JWT token is unknown during the plan phase (e.g., in HCP Terraform). The operation will be skipped.",
-		)
+		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
 	}
 	var data certificateSignDataSourceModel

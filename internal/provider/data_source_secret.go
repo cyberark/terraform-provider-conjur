@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api"
@@ -64,10 +63,7 @@ func (d *SecretDataSource) Configure(_ context.Context, req datasource.Configure
 	}
 	client, ok := req.ProviderData.(api.ClientV2)
 	if !ok {
-		resp.Diagnostics.AddError(
-			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected api.ClientV2, got: %T", req.ProviderData),
-		)
+		AddUnexpectedConfigureTypeError(&resp.Diagnostics, "api.ClientV2", req.ProviderData)
 		return
 	}
 	d.client = client
@@ -75,10 +71,7 @@ func (d *SecretDataSource) Configure(_ context.Context, req datasource.Configure
 
 func (d *SecretDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	if d.client == nil {
-		resp.Diagnostics.AddWarning(
-			"Provider client not configured",
-			"The Conjur provider client is not available. This may occur when the JWT token is unknown during the plan phase (e.g., in HCP Terraform). The operation will be skipped.",
-		)
+		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
 	}
 

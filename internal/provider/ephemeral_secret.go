@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api"
@@ -64,10 +63,7 @@ func (r *EphemeralSecretResource) Configure(_ context.Context, req ephemeral.Con
 	}
 	client, ok := req.ProviderData.(api.ClientV2)
 	if !ok {
-		resp.Diagnostics.AddError(
-			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected api.ClientV2, got: %T", req.ProviderData),
-		)
+		AddUnexpectedConfigureTypeError(&resp.Diagnostics, "api.ClientV2", req.ProviderData)
 		return
 	}
 	r.client = client
@@ -77,10 +73,7 @@ func (r *EphemeralSecretResource) Configure(_ context.Context, req ephemeral.Con
 // and the value is NOT stored in state - it exists only during the operation.
 func (r *EphemeralSecretResource) Open(ctx context.Context, req ephemeral.OpenRequest, resp *ephemeral.OpenResponse) {
 	if r.client == nil {
-		resp.Diagnostics.AddWarning(
-			"Provider client not configured",
-			"The Conjur provider client is not available. This may occur when the JWT token is unknown during the plan phase (e.g., in HCP Terraform). The operation will be skipped.",
-		)
+		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
 	}
 	var data EphemeralSecretResourceModel
