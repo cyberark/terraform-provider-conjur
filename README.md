@@ -79,18 +79,101 @@ $ ln -sf /usr/local/Cellar/terraform-provider-conjur/$VERSION/bin/terraform-prov
 If you wish to compile the provider from source code, you will first need Go installed
 on your machine (version >=1.12 is required).
 
-- Clone repository and go into the cloned directory
+1. **Clone repository and go into the cloned directory**
+
 ```sh
 $ git clone https://github.com/cyberark/terraform-provider-conjur.git
 $ cd terraform-provider-conjur
 ```
-- Build the provider
+
+2. **Build the provider**
 
 ```sh
-$ mkdir -p ~/.terraform.d/plugins/
 $ # Note: If a static binary is required, use ./bin/build to create the executable
-$ go build -o ~/.terraform.d/plugins/terraform-provider-conjur main.go
+$ go build -o terraform-provider-conjur main.go
 ```
+
+This command compiles the provider into an executable binary.
+
+3. **Configure Terraform to Use the Local Provider**
+
+**Option A: Development Overrides (Recommended for Active Development)**
+
+For active development, configure `~/.terraformrc` to override the provider:
+
+```hcl
+provider_installation {
+  dev_overrides {
+    "terraform.example.com/cyberark/conjur" = "/path/to/terraform-provider-conjur"
+  }
+  direct {}
+}
+```
+
+Replace `/path/to/terraform-provider-conjur` with the absolute path to your cloned repository directory (where the compiled binary `terraform-provider-conjur` is located). Then in your Terraform configuration use:
+
+```hcl
+terraform {
+  required_providers {
+    conjur = {
+      source = "terraform.example.com/cyberark/conjur"
+    }
+  }
+}
+```
+
+With this method, **skip `terraform init`** and run Terraform commands directly (e.g., `terraform plan`). The provider is loaded directly from your build directory.
+
+**Option B: Standard Plugin Directory**
+
+For production-like testing, place the compiled provider binary in a specific directory structure that Terraform recognizes. The path should be structured as follows:
+
+```
+~/.terraform.d/plugins/registry.terraform.io/cyberark/conjur/<VERSION>/<OS_ARCH>/
+```
+
+Replace `<VERSION>` with the version number you are using (e.g., `0.8.2`), and `<OS_ARCH>` with your operating system and architecture, such as `linux_amd64` or `darwin_arm64`.
+
+For example, on macOS with Apple Silicon:
+
+```sh
+$ mkdir -p ~/.terraform.d/plugins/registry.terraform.io/cyberark/conjur/0.8.2/darwin_arm64/
+```
+
+Or on Linux with AMD64:
+
+```sh
+$ mkdir -p ~/.terraform.d/plugins/registry.terraform.io/cyberark/conjur/0.8.2/linux_amd64/
+```
+
+Copy the Provider Plugin and ensure the binary's name is correctly formatted:
+
+```sh
+$ # For macOS with Apple Silicon (darwin_arm64)
+$ cp terraform-provider-conjur ~/.terraform.d/plugins/registry.terraform.io/cyberark/conjur/0.8.2/darwin_arm64/terraform-provider-conjur_v0.8.2
+
+$ # For Linux with AMD64 (linux_amd64)
+$ cp terraform-provider-conjur ~/.terraform.d/plugins/registry.terraform.io/cyberark/conjur/0.8.2/linux_amd64/terraform-provider-conjur_v0.8.2
+```
+
+In your Terraform configuration file:
+
+```hcl
+terraform {
+  required_providers {
+    conjur = {
+      source  = "cyberark/conjur"
+      version = "0.8.2"
+    }
+  }
+}
+
+provider "conjur" {
+  # provider configuration
+}
+```
+
+Then run `terraform init` to initialize Terraform with your locally compiled provider.
 
 ## Usage
 
