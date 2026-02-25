@@ -172,10 +172,7 @@ func (r *ConjurSecretResource) Configure(ctx context.Context, req resource.Confi
 	}
 	client, ok := req.ProviderData.(api.ClientV2)
 	if !ok {
-		resp.Diagnostics.AddError(
-			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected api.ClientV2, got: %T", req.ProviderData),
-		)
+		AddUnexpectedConfigureTypeError(&resp.Diagnostics, "api.ClientV2", req.ProviderData)
 		return
 	}
 	r.client = client
@@ -213,6 +210,10 @@ func (r *ConjurSecretResource) ValidateConfig(ctx context.Context, req resource.
 }
 
 func (r *ConjurSecretResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	if r.client == nil {
+		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
+		return
+	}
 	var data ConjurSecretResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
@@ -259,6 +260,10 @@ func (r *ConjurSecretResource) Create(ctx context.Context, req resource.CreateRe
 }
 
 func (r *ConjurSecretResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	if r.client == nil {
+		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
+		return
+	}
 	var data ConjurSecretResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
@@ -319,6 +324,10 @@ func (r *ConjurSecretResource) Read(ctx context.Context, req resource.ReadReques
 
 // Only supports rotating the secret value
 func (r *ConjurSecretResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	if r.client == nil {
+		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
+		return
+	}
 	var data ConjurSecretResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
@@ -357,6 +366,10 @@ func (r *ConjurSecretResource) Update(ctx context.Context, req resource.UpdateRe
 }
 
 func (r *ConjurSecretResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	if r.client == nil {
+		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
+		return
+	}
 	var data ConjurSecretResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)

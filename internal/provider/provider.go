@@ -148,9 +148,9 @@ func (p *conjurProvider) ValidateConfig(ctx context.Context, req provider.Valida
 	}
 
 	authnJWTAttributes := map[string]types.String{
-		"appliance_url":   data.ApplianceUrl,
-		"service_id":      data.ServiceID,
-		"authn_jwt_token": data.AuthnJWT,
+		"appliance_url": data.ApplianceUrl,
+		"service_id":    data.ServiceID,
+		// authn_jwt_token omitted - may come from TFC_WORKLOAD_IDENTITY_TOKEN env var
 	}
 
 	switch data.AuthnType.ValueString() {
@@ -194,6 +194,15 @@ func (p *conjurProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		return
 	}
 
+	if data.AuthnType.ValueString() == "jwt" {
+		if token, ok := resolveAuthnJWT(data.AuthnJWT); !ok {
+			// Client will be nil; resources/data sources log when operations are skipped
+			return
+		} else {
+			data.AuthnJWT = token
+		}
+	}
+
 	config, err := p.buildConjurConfig(&data)
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to load config", err.Error())
@@ -209,6 +218,19 @@ func (p *conjurProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	resp.DataSourceData = client
 	resp.ResourceData = client
 	resp.EphemeralResourceData = client
+}
+
+// resolveAuthnJWT returns the JWT from config or TFC_WORKLOAD_IDENTITY_TOKEN env var.
+// ok is false if the token is unknown or could not be resolved (caller should defer auth).
+func resolveAuthnJWT(authnJWT types.String) (types.String, bool) {
+	token := authnJWT.ValueString()
+	if token == "" {
+		token = os.Getenv("TFC_WORKLOAD_IDENTITY_TOKEN")
+	}
+	if token == "" {
+		return types.String{}, false
+	}
+	return types.StringValue(token), true
 }
 
 func (p *conjurProvider) buildConjurConfig(data *conjurProviderModel) (*conjurapi.Config, error) {

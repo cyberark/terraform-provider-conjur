@@ -190,10 +190,7 @@ func (r *ConjurHostResource) Configure(ctx context.Context, req resource.Configu
 
 	client, ok := req.ProviderData.(api.ClientV2)
 	if !ok {
-		resp.Diagnostics.AddError(
-			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected api.ClientV2, got: %T", req.ProviderData),
-		)
+		AddUnexpectedConfigureTypeError(&resp.Diagnostics, "api.ClientV2", req.ProviderData)
 		return
 	}
 
@@ -201,6 +198,10 @@ func (r *ConjurHostResource) Configure(ctx context.Context, req resource.Configu
 }
 
 func (r *ConjurHostResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	if r.client == nil {
+		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
+		return
+	}
 	var data ConjurHostResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
@@ -225,6 +226,10 @@ func (r *ConjurHostResource) Create(ctx context.Context, req resource.CreateRequ
 }
 
 func (r *ConjurHostResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	if r.client == nil {
+		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
+		return
+	}
 	var data ConjurHostResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
@@ -253,12 +258,20 @@ func (r *ConjurHostResource) Read(ctx context.Context, req resource.ReadRequest,
 
 // Update replaces the host by deleting and recreating it since there's no PATCH support
 func (r *ConjurHostResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	if r.client == nil {
+		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
+		return
+	}
 	// This should never be called since in-place updates are not supported by the API. Therefore any attribute changes
 	// require replacement of the resource (Delete + Create) as denoted by the plan modifiers.
 	resp.Diagnostics.AddWarning("Update not supported", "Host resources require replacement for any changes, so update is not supported. Please recreate the resource with the desired changes.")
 }
 
 func (r *ConjurHostResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	if r.client == nil {
+		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
+		return
+	}
 	var data ConjurHostResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
