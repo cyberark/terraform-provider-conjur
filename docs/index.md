@@ -69,9 +69,9 @@ provider "conjur" {}
 ### Optional
 
 - `account` (String) CyberArk Secrets Manager account
-- `api_key` (String) CyberArk Secrets Manager API key
+- `api_key` (String, Sensitive) CyberArk Secrets Manager API key
 - `appliance_url` (String) CyberArk Secrets Manager endpoint URL
-- `authn_jwt_token` (String) Authn JWT Token
+- `authn_jwt_token` (String, Sensitive) Authn JWT Token
 - `authn_type` (String) CyberArk Secrets Manager Authentication Type
 - `client_id` (String) Azure client ID for user assigned managed identity
 - `host_id` (String) CyberArk Secrets Manager host ID
