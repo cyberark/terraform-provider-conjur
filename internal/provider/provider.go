@@ -89,6 +89,7 @@ func (p *conjurProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 			"api_key": schema.StringAttribute{
 				Optional:    true,
 				Description: "CyberArk Secrets Manager API key",
+				Sensitive:   true,
 			},
 			"ssl_cert": schema.StringAttribute{
 				Optional:    true,
@@ -101,6 +102,7 @@ func (p *conjurProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 			"authn_jwt_token": schema.StringAttribute{
 				Optional:    true,
 				Description: "Authn JWT Token",
+				Sensitive:   true,
 			},
 		},
 	}
