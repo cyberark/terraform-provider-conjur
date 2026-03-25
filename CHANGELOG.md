@@ -6,9 +6,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
-## [0.8.4] - 2026-02-24
+## [0.8.4] - 2026-03-25
+
+### Security
+- Updated Go to 1.26
 
 ### Fixed
+- API key and JWT credentials are marked as sensitive on the provider schema.
 - Add terraform-registry-manifest.json to repo root.
 
 ## [0.8.3] - 2026-02-23
