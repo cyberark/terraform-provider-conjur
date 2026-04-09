@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Security
 - Updated Go to 1.26
+- Updated dependencies to resolve CVE-2026-29181, CVE-2026-34986, CVE-2026-24051. CNJR-13646
 
 ### Fixed
 - API key and JWT credentials are marked as sensitive on the provider schema.
