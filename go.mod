@@ -1,6 +1,6 @@
 module github.com/cyberark/terraform-provider-conjur
 
-go 1.26.1
+go 1.26.2
 
 require (
 	github.com/cyberark/conjur-api-go v0.13.14
@@ -81,12 +81,12 @@ require (
 	golang.org/x/mod v0.33.0 // indirect
 	golang.org/x/net v0.49.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.41.0 // indirect
+	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
 	golang.org/x/tools v0.41.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto v0.0.0-20200904004341-0bd0a958aa1d // indirect
-	google.golang.org/grpc v1.79.3 // indirect
+	google.golang.org/grpc v1.80.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
 
@@ -100,6 +100,15 @@ replace github.com/cyberark/conjur-api-go => github.com/cyberark/conjur-api-go l
 
 // Only put specific versions on the left side of the =>
 // so we don't downgrade future versions unintentionally.
+replace go.opentelemetry.io/otel v1.39.0 => go.opentelemetry.io/otel v1.43.0
+
+replace go.opentelemetry.io/otel/metric v1.39.0 => go.opentelemetry.io/otel/metric v1.43.0
+
+replace go.opentelemetry.io/otel/sdk v1.39.0 => go.opentelemetry.io/otel/sdk v1.43.0
+
+replace go.opentelemetry.io/otel/trace v1.39.0 => go.opentelemetry.io/otel/trace v1.43.0
+
+replace go.opentelemetry.io/otel/sdk/metric v1.39.0 => go.opentelemetry.io/otel/sdk/metric v1.43.0
 
 replace github.com/aws/aws-sdk-go v1.15.78 => github.com/aws/aws-sdk-go v1.34.2
 
