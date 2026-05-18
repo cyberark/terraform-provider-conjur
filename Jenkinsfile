@@ -362,10 +362,10 @@ pipeline {
   
   post {
     always {
-      releaseInfraPoolAgent(".infrapool/release_agents") 
       // Resolve ownership issue before running infra post hook
       sh 'git config --global --add safe.directory ${PWD}'
-      infraPostHook()
+      sendNotification(channel: '#conjur-integrations-ci-notifications')
+      releaseInfraPoolAgent(".infrapool/release_agents")
     }
   }
 }
