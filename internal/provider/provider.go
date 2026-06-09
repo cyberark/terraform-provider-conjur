@@ -22,6 +22,8 @@ import (
 // Defaults for local builds so `go build` still works.
 var IntegrationVersion = "0.0.1"
 
+var telemetryData = conjurapi.NewTelemetry("Terraform Provider", "idira-secretsmanager", IntegrationVersion, "Idira", "")
+
 var (
 	_ provider.Provider                       = &conjurProvider{}
 	_ provider.ProviderWithValidateConfig     = &conjurProvider{}
@@ -241,11 +243,6 @@ func (p *conjurProvider) buildConjurConfig(data *conjurProviderModel) (*conjurap
 		return nil, err
 	}
 
-	config.SetIntegrationName("TerraformSecretsManager")
-	config.SetIntegrationType("cybr-secretsmanager-go-sdk")
-	config.SetIntegrationVersion(IntegrationVersion)
-	config.SetVendorName("HashiCorp")
-
 	// Apply configuration overrides if specified in the Terraform provider block
 	p.applyConfigOverrides(&config, data)
 
@@ -297,7 +294,7 @@ func (p *conjurProvider) createJWTClient(config *conjurapi.Config, data *conjurP
 	config.AuthnType = data.AuthnType.ValueString()
 	config.JWTContent = data.AuthnJWT.ValueString()
 
-	client, err := conjurapi.NewClientFromJwt(*config)
+	client, err := conjurapi.NewClientFromJwt(*config, telemetryData)
 	if err != nil {
 		return nil, err
 	}
@@ -316,7 +313,7 @@ func (p *conjurProvider) createGCPClient(config *conjurapi.Config, data *conjurP
 		config.JWTContent = gcpToken
 	}
 
-	client, err := conjurapi.NewClientFromGCPCredentials(*config, "")
+	client, err := conjurapi.NewClientFromGCPCredentials(*config, "", telemetryData)
 	if err != nil {
 		return nil, err
 	}
@@ -332,7 +329,7 @@ func (p *conjurProvider) createAzureClient(config *conjurapi.Config, data *conju
 		config.AzureClientID = data.ClientID.ValueString()
 	}
 
-	client, err := conjurapi.NewClientFromAzureCredentials(*config)
+	client, err := conjurapi.NewClientFromAzureCredentials(*config, telemetryData)
 	if err != nil {
 		return nil, err
 	}
@@ -345,7 +342,7 @@ func (p *conjurProvider) createIAMClient(config *conjurapi.Config, data *conjurP
 	config.AuthnType = "iam"
 	config.JWTHostID = strings.TrimPrefix(data.HostID.ValueString(), "host/")
 
-	client, err := conjurapi.NewClientFromAWSCredentials(*config)
+	client, err := conjurapi.NewClientFromAWSCredentials(*config, telemetryData)
 	if err != nil {
 		return nil, err
 	}
@@ -364,9 +361,9 @@ func (p *conjurProvider) createAPIKeyClient(config *conjurapi.Config, data *conj
 		client, err = conjurapi.NewClientFromKey(*config, authn.LoginPair{
 			Login:  login,
 			APIKey: apiKey,
-		})
+		}, telemetryData)
 	} else {
-		client, err = conjurapi.NewClientFromEnvironment(*config)
+		client, err = conjurapi.NewClientFromEnvironment(*config, telemetryData)
 	}
 
 	if err != nil {
