@@ -33,22 +33,22 @@ const (
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var (
-	_ resource.Resource                   = &ConjurSecretResource{}
-	_ resource.ResourceWithImportState    = &ConjurSecretResource{}
-	_ resource.ResourceWithConfigure      = &ConjurSecretResource{}
-	_ resource.ResourceWithValidateConfig = &ConjurSecretResource{}
+	_ resource.Resource                   = &SecretResource{}
+	_ resource.ResourceWithImportState    = &SecretResource{}
+	_ resource.ResourceWithConfigure      = &SecretResource{}
+	_ resource.ResourceWithValidateConfig = &SecretResource{}
 )
 
-func NewConjurSecretResource() resource.Resource {
-	return &ConjurSecretResource{}
+func NewSecretResource() resource.Resource {
+	return &SecretResource{}
 }
 
-// ConjurSecretResource defines the resource implementation.
-type ConjurSecretResource struct {
+// SecretResource defines the resource implementation.
+type SecretResource struct {
 	client api.ClientV2
 }
 
-type ConjurSecretResourceModel struct {
+type SecretResourceModel struct {
 	Branch         types.String             `tfsdk:"branch"`
 	Name           types.String             `tfsdk:"name"`
 	MimeType       types.String             `tfsdk:"mime_type"`
@@ -56,24 +56,24 @@ type ConjurSecretResourceModel struct {
 	ValueWO        types.String             `tfsdk:"value_wo"`
 	ValueWOVersion types.Int32              `tfsdk:"value_wo_version"`
 	Annotations    map[string]string        `tfsdk:"annotations"`
-	Permissions    []ConjurSecretPermission `tfsdk:"permissions"`
+	Permissions    []SecretPermission `tfsdk:"permissions"`
 }
 
-type ConjurSecretPermission struct {
-	Subject    ConjurSecretSubject `tfsdk:"subject"`
+type SecretPermission struct {
+	Subject    SecretSubject `tfsdk:"subject"`
 	Privileges types.List          `tfsdk:"privileges"`
 }
 
-type ConjurSecretSubject struct {
+type SecretSubject struct {
 	Id   types.String `tfsdk:"id"`
 	Kind types.String `tfsdk:"kind"`
 }
 
-func (r *ConjurSecretResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+func (r *SecretResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_secret"
 }
 
-func (r *ConjurSecretResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *SecretResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "CyberArk Secrets Manager secret resource",
 
@@ -166,7 +166,7 @@ func (r *ConjurSecretResource) Schema(ctx context.Context, req resource.SchemaRe
 	}
 }
 
-func (r *ConjurSecretResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *SecretResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -178,8 +178,8 @@ func (r *ConjurSecretResource) Configure(ctx context.Context, req resource.Confi
 	r.client = client
 }
 
-func (r *ConjurSecretResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	var data ConjurSecretResourceModel
+func (r *SecretResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var data SecretResourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -209,12 +209,12 @@ func (r *ConjurSecretResource) ValidateConfig(ctx context.Context, req resource.
 	}
 }
 
-func (r *ConjurSecretResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *SecretResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if r.client == nil {
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
 	}
-	var data ConjurSecretResourceModel
+	var data SecretResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -259,12 +259,12 @@ func (r *ConjurSecretResource) Create(ctx context.Context, req resource.CreateRe
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *ConjurSecretResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *SecretResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	if r.client == nil {
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
 	}
-	var data ConjurSecretResourceModel
+	var data SecretResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
 	secretID := fmt.Sprintf("%s/%s", data.Branch.ValueString(), data.Name.ValueString())
@@ -323,12 +323,12 @@ func (r *ConjurSecretResource) Read(ctx context.Context, req resource.ReadReques
 }
 
 // Only supports rotating the secret value
-func (r *ConjurSecretResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *SecretResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	if r.client == nil {
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
 	}
-	var data ConjurSecretResourceModel
+	var data SecretResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -365,12 +365,12 @@ func (r *ConjurSecretResource) Update(ctx context.Context, req resource.UpdateRe
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *ConjurSecretResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *SecretResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	if r.client == nil {
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
 	}
-	var data ConjurSecretResourceModel
+	var data SecretResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -393,7 +393,7 @@ func (r *ConjurSecretResource) Delete(ctx context.Context, req resource.DeleteRe
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *ConjurSecretResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *SecretResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	// Split the full ID into branch and name components
 	segments := strings.Split(req.ID, "/")
 	if len(segments) < 2 {
@@ -412,7 +412,7 @@ func (r *ConjurSecretResource) ImportState(ctx context.Context, req resource.Imp
 }
 
 // buildSecretPayload maps the resource model to an API payload
-func (r *ConjurSecretResource) buildSecretPayload(data *ConjurSecretResourceModel) (conjurapi.StaticSecret, error) {
+func (r *SecretResource) buildSecretPayload(data *SecretResourceModel) (conjurapi.StaticSecret, error) {
 	// Initialize with required fields
 	secret := conjurapi.StaticSecret{
 		Name:   data.Name.ValueString(),
@@ -455,7 +455,7 @@ func (r *ConjurSecretResource) buildSecretPayload(data *ConjurSecretResourceMode
 	return secret, nil
 }
 
-func (r *ConjurSecretResource) parseSecretResponse(secretResp conjurapi.StaticSecretResponse, permissionResp conjurapi.PermissionResponse, data *ConjurSecretResourceModel) error {
+func (r *SecretResource) parseSecretResponse(secretResp conjurapi.StaticSecretResponse, permissionResp conjurapi.PermissionResponse, data *SecretResourceModel) error {
 	data.Name = types.StringValue(secretResp.Name)
 	data.Branch = types.StringValue(secretResp.Branch)
 	if secretResp.MimeType == "" {
@@ -465,11 +465,11 @@ func (r *ConjurSecretResource) parseSecretResponse(secretResp conjurapi.StaticSe
 	}
 
 	if len(permissionResp.Permission) > 0 {
-		permissions := make([]ConjurSecretPermission, len(permissionResp.Permission))
+		permissions := make([]SecretPermission, len(permissionResp.Permission))
 		for i, v := range permissionResp.Permission {
-			permission := ConjurSecretPermission{}
+			permission := SecretPermission{}
 			if v.Subject.Id != "" && v.Subject.Kind != "" {
-				permission.Subject = ConjurSecretSubject{
+				permission.Subject = SecretSubject{
 					Id:   types.StringValue(v.Subject.Id),
 					Kind: types.StringValue(v.Subject.Kind),
 				}
@@ -495,7 +495,7 @@ func (r *ConjurSecretResource) parseSecretResponse(secretResp conjurapi.StaticSe
 	return nil
 }
 
-func (r *ConjurSecretResource) generateSecretDeletionPolicy(data *ConjurSecretResourceModel) (string, error) {
+func (r *SecretResource) generateSecretDeletionPolicy(data *SecretResourceModel) (string, error) {
 	name := strings.TrimSpace(data.Name.ValueString())
 
 	delete := conjurpolicy.Delete{

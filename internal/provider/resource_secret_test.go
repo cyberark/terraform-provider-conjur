@@ -14,11 +14,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestConjurSecretResource_Schema(t *testing.T) {
+func TestSecretResource_Schema(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
-	ds := NewConjurSecretResource()
+	ds := NewSecretResource()
 	req := resource.SchemaRequest{}
 	resp := &resource.SchemaResponse{}
 
@@ -33,7 +33,7 @@ func TestConjurSecretResource_Schema(t *testing.T) {
 }
 
 func TestBuildSecretPayload(t *testing.T) {
-	r := &ConjurSecretResource{}
+	r := &SecretResource{}
 
 	// Permissions need []attr.Value for the List
 	privs := []attr.Value{
@@ -41,14 +41,14 @@ func TestBuildSecretPayload(t *testing.T) {
 		types.StringValue("write"),
 	}
 
-	model := &ConjurSecretResourceModel{
+	model := &SecretResourceModel{
 		Name:     types.StringValue("my-secret"),
 		Branch:   types.StringValue("/my/branch"),
 		MimeType: types.StringValue("text/plain"),
 		Value:    types.StringValue("supersecret"),
-		Permissions: []ConjurSecretPermission{
+		Permissions: []SecretPermission{
 			{
-				Subject: ConjurSecretSubject{
+				Subject: SecretSubject{
 					Id:   types.StringValue("alice"),
 					Kind: types.StringValue("user"),
 				},
@@ -77,8 +77,8 @@ func TestBuildSecretPayload(t *testing.T) {
 }
 
 func TestParseSecretResponse(t *testing.T) {
-	r := &ConjurSecretResource{}
-	data := &ConjurSecretResourceModel{}
+	r := &SecretResource{}
+	data := &SecretResourceModel{}
 
 	secretResp := conjurapi.StaticSecretResponse{
 		StaticSecret: conjurapi.StaticSecret{
@@ -121,7 +121,7 @@ func TestParseSecretResponse(t *testing.T) {
 }
 
 func TestGenerateSecretDeletionPolicy(t *testing.T) {
-	r := &ConjurSecretResource{}
+	r := &SecretResource{}
 
 	testCases := []struct {
 		name        string
@@ -252,7 +252,7 @@ func TestGenerateSecretDeletionPolicy(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			data := &ConjurSecretResourceModel{
+			data := &SecretResourceModel{
 				Name: types.StringValue(tc.secretName),
 			}
 

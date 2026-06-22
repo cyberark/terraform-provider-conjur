@@ -20,14 +20,14 @@ import (
 func TestAuthenticatorResource_Create(t *testing.T) {
 	tests := []struct {
 		name          string
-		data          ConjurAuthenticatorResourceModel
+		data          AuthenticatorResourceModel
 		setupMock     func(*mocks.MockClientV2)
 		expectedError bool
 		errorContains string
 	}{
 		{
 			name: "successful JWT authenticator creation",
-			data: ConjurAuthenticatorResourceModel{
+			data: AuthenticatorResourceModel{
 				Type:    types.StringValue("authn-jwt"),
 				Name:    types.StringValue("test-jwt"),
 				Enabled: types.BoolValue(true),
@@ -45,7 +45,7 @@ func TestAuthenticatorResource_Create(t *testing.T) {
 		},
 		{
 			name: "API error during creation",
-			data: ConjurAuthenticatorResourceModel{
+			data: AuthenticatorResourceModel{
 				Type:    types.StringValue("authn-jwt"),
 				Name:    types.StringValue("error-auth"),
 				Enabled: types.BoolValue(true),
@@ -62,11 +62,11 @@ func TestAuthenticatorResource_Create(t *testing.T) {
 		},
 		{
 			name: "creation with data and annotations",
-			data: ConjurAuthenticatorResourceModel{
+			data: AuthenticatorResourceModel{
 				Type:    types.StringValue("authn-jwt"),
 				Name:    types.StringValue("prod-jwt"),
 				Enabled: types.BoolValue(true),
-				Data: &ConjurAuthenticatorDataModel{
+				Data: &AuthenticatorDataModel{
 					Audience: types.StringValue("https://example.com"),
 					Issuer:   types.StringValue("https://issuer.com"),
 				},
@@ -85,7 +85,7 @@ func TestAuthenticatorResource_Create(t *testing.T) {
 		},
 		{
 			name: "creation with owner",
-			data: ConjurAuthenticatorResourceModel{
+			data: AuthenticatorResourceModel{
 				Type:    types.StringValue("authn-oidc"),
 				Name:    types.StringValue("oidc-auth"),
 				Enabled: types.BoolValue(false),
@@ -106,7 +106,7 @@ func TestAuthenticatorResource_Create(t *testing.T) {
 		},
 		{
 			name: "creation with subtype",
-			data: ConjurAuthenticatorResourceModel{
+			data: AuthenticatorResourceModel{
 				Type:    types.StringValue("authn-jwt"),
 				Name:    types.StringValue("github-jwt"),
 				Subtype: types.StringValue("github"),
@@ -130,7 +130,7 @@ func TestAuthenticatorResource_Create(t *testing.T) {
 			mockV2 := mocks.NewMockClientV2(t)
 			tt.setupMock(mockV2)
 
-			r := &ConjurAuthenticatorResource{
+			r := &AuthenticatorResource{
 				client: mockV2,
 			}
 
@@ -175,14 +175,14 @@ func TestAuthenticatorResource_Create(t *testing.T) {
 func TestAuthenticatorResource_Read(t *testing.T) {
 	tests := []struct {
 		name          string
-		data          ConjurAuthenticatorResourceModel
+		data          AuthenticatorResourceModel
 		setupMock     func(*mocks.MockClientV2)
 		expectedError bool
 		errorContains string
 	}{
 		{
 			name: "authenticator exists",
-			data: ConjurAuthenticatorResourceModel{
+			data: AuthenticatorResourceModel{
 				Type:    types.StringValue("authn-jwt"),
 				Name:    types.StringValue("test-jwt"),
 				Enabled: types.BoolValue(true),
@@ -198,7 +198,7 @@ func TestAuthenticatorResource_Read(t *testing.T) {
 		},
 		{
 			name: "API error reading authenticator",
-			data: ConjurAuthenticatorResourceModel{
+			data: AuthenticatorResourceModel{
 				Type:    types.StringValue("authn-jwt"),
 				Name:    types.StringValue("error-auth"),
 				Enabled: types.BoolValue(true),
@@ -216,7 +216,7 @@ func TestAuthenticatorResource_Read(t *testing.T) {
 		},
 		{
 			name: "authenticator with data exists",
-			data: ConjurAuthenticatorResourceModel{
+			data: AuthenticatorResourceModel{
 				Type:    types.StringValue("authn-oidc"),
 				Name:    types.StringValue("oidc-prod"),
 				Enabled: types.BoolValue(true),
@@ -232,7 +232,7 @@ func TestAuthenticatorResource_Read(t *testing.T) {
 		},
 		{
 			name: "authenticator with owner exists",
-			data: ConjurAuthenticatorResourceModel{
+			data: AuthenticatorResourceModel{
 				Type:    types.StringValue("authn-jwt"),
 				Name:    types.StringValue("jwt-secure"),
 				Enabled: types.BoolValue(true),
@@ -256,7 +256,7 @@ func TestAuthenticatorResource_Read(t *testing.T) {
 			mockV2 := mocks.NewMockClientV2(t)
 			tt.setupMock(mockV2)
 
-			r := &ConjurAuthenticatorResource{
+			r := &AuthenticatorResource{
 				client: mockV2,
 			}
 
@@ -301,15 +301,15 @@ func TestAuthenticatorResource_Read(t *testing.T) {
 func TestAuthenticatorResource_Update(t *testing.T) {
 	tests := []struct {
 		name          string
-		data          ConjurAuthenticatorResourceModel
-		state         ConjurAuthenticatorResourceModel
+		data          AuthenticatorResourceModel
+		state         AuthenticatorResourceModel
 		setupMock     func(*mocks.MockClientV2)
 		expectedError bool
 		errorContains string
 	}{
 		{
 			name: "enable authenticator",
-			data: ConjurAuthenticatorResourceModel{
+			data: AuthenticatorResourceModel{
 				Type:    types.StringValue("authn-jwt"),
 				Name:    types.StringValue("test-jwt"),
 				Enabled: types.BoolValue(true),
@@ -318,7 +318,7 @@ func TestAuthenticatorResource_Update(t *testing.T) {
 					"id":   types.StringType,
 				}),
 			},
-			state: ConjurAuthenticatorResourceModel{
+			state: AuthenticatorResourceModel{
 				Type:    types.StringValue("authn-jwt"),
 				Name:    types.StringValue("test-jwt"),
 				Enabled: types.BoolValue(false),
@@ -334,7 +334,7 @@ func TestAuthenticatorResource_Update(t *testing.T) {
 		},
 		{
 			name: "disable authenticator",
-			data: ConjurAuthenticatorResourceModel{
+			data: AuthenticatorResourceModel{
 				Type:    types.StringValue("authn-oidc"),
 				Name:    types.StringValue("oidc-auth"),
 				Enabled: types.BoolValue(false),
@@ -343,7 +343,7 @@ func TestAuthenticatorResource_Update(t *testing.T) {
 					"id":   types.StringType,
 				}),
 			},
-			state: ConjurAuthenticatorResourceModel{
+			state: AuthenticatorResourceModel{
 				Type:    types.StringValue("authn-oidc"),
 				Name:    types.StringValue("oidc-auth"),
 				Enabled: types.BoolValue(true),
@@ -359,7 +359,7 @@ func TestAuthenticatorResource_Update(t *testing.T) {
 		},
 		{
 			name: "API error during update",
-			data: ConjurAuthenticatorResourceModel{
+			data: AuthenticatorResourceModel{
 				Type:    types.StringValue("authn-jwt"),
 				Name:    types.StringValue("error-auth"),
 				Enabled: types.BoolValue(true),
@@ -368,7 +368,7 @@ func TestAuthenticatorResource_Update(t *testing.T) {
 					"id":   types.StringType,
 				}),
 			},
-			state: ConjurAuthenticatorResourceModel{
+			state: AuthenticatorResourceModel{
 				Type:    types.StringValue("authn-jwt"),
 				Name:    types.StringValue("error-auth"),
 				Enabled: types.BoolValue(false),
@@ -385,7 +385,7 @@ func TestAuthenticatorResource_Update(t *testing.T) {
 		},
 		{
 			name: "update with owner preserved from state",
-			data: ConjurAuthenticatorResourceModel{
+			data: AuthenticatorResourceModel{
 				Type:    types.StringValue("authn-jwt"),
 				Name:    types.StringValue("jwt-prod"),
 				Enabled: types.BoolValue(true),
@@ -394,7 +394,7 @@ func TestAuthenticatorResource_Update(t *testing.T) {
 					"id":   types.StringType,
 				}),
 			},
-			state: ConjurAuthenticatorResourceModel{
+			state: AuthenticatorResourceModel{
 				Type:    types.StringValue("authn-jwt"),
 				Name:    types.StringValue("jwt-prod"),
 				Enabled: types.BoolValue(false),
@@ -418,7 +418,7 @@ func TestAuthenticatorResource_Update(t *testing.T) {
 			mockV2 := mocks.NewMockClientV2(t)
 			tt.setupMock(mockV2)
 
-			r := &ConjurAuthenticatorResource{
+			r := &AuthenticatorResource{
 				client: mockV2,
 			}
 
@@ -468,14 +468,14 @@ func TestAuthenticatorResource_Update(t *testing.T) {
 func TestAuthenticatorResource_Delete(t *testing.T) {
 	tests := []struct {
 		name          string
-		data          ConjurAuthenticatorResourceModel
+		data          AuthenticatorResourceModel
 		setupMock     func(*mocks.MockClientV2)
 		expectedError bool
 		errorContains string
 	}{
 		{
 			name: "successful deletion",
-			data: ConjurAuthenticatorResourceModel{
+			data: AuthenticatorResourceModel{
 				Type:    types.StringValue("authn-jwt"),
 				Name:    types.StringValue("test-jwt"),
 				Enabled: types.BoolValue(true),
@@ -491,7 +491,7 @@ func TestAuthenticatorResource_Delete(t *testing.T) {
 		},
 		{
 			name: "API error during deletion",
-			data: ConjurAuthenticatorResourceModel{
+			data: AuthenticatorResourceModel{
 				Type:    types.StringValue("authn-oidc"),
 				Name:    types.StringValue("error-auth"),
 				Enabled: types.BoolValue(true),
@@ -509,7 +509,7 @@ func TestAuthenticatorResource_Delete(t *testing.T) {
 		},
 		{
 			name: "404 not found error",
-			data: ConjurAuthenticatorResourceModel{
+			data: AuthenticatorResourceModel{
 				Type:    types.StringValue("authn-jwt"),
 				Name:    types.StringValue("nonexistent-auth"),
 				Enabled: types.BoolValue(true),
@@ -527,7 +527,7 @@ func TestAuthenticatorResource_Delete(t *testing.T) {
 		},
 		{
 			name: "deletion of authenticator with annotations",
-			data: ConjurAuthenticatorResourceModel{
+			data: AuthenticatorResourceModel{
 				Type:        types.StringValue("authn-jwt"),
 				Name:        types.StringValue("prod-jwt"),
 				Enabled:     types.BoolValue(true),
@@ -544,7 +544,7 @@ func TestAuthenticatorResource_Delete(t *testing.T) {
 		},
 		{
 			name: "deletion of disabled authenticator",
-			data: ConjurAuthenticatorResourceModel{
+			data: AuthenticatorResourceModel{
 				Type:    types.StringValue("authn-ldap"),
 				Name:    types.StringValue("ldap-auth"),
 				Enabled: types.BoolValue(false),
@@ -565,7 +565,7 @@ func TestAuthenticatorResource_Delete(t *testing.T) {
 			mockV2 := mocks.NewMockClientV2(t)
 			tt.setupMock(mockV2)
 
-			r := &ConjurAuthenticatorResource{
+			r := &AuthenticatorResource{
 				client: mockV2,
 			}
 
@@ -608,7 +608,7 @@ func TestAuthenticatorResource_Delete(t *testing.T) {
 }
 
 func getAuthenticatorTestSchema() schema.Schema {
-	r := &ConjurAuthenticatorResource{}
+	r := &AuthenticatorResource{}
 	var schemaResp resource.SchemaResponse
 	r.Schema(context.Background(), resource.SchemaRequest{}, &schemaResp)
 	return schemaResp.Schema

@@ -13,11 +13,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestConjurGroupResource_Schema(t *testing.T) {
+func TestGroupResource_Schema(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	ds := NewConjurGroupResource()
+	ds := NewGroupResource()
 
 	schemaRequest := resource.SchemaRequest{}
 	schemaResponse := &resource.SchemaResponse{}
@@ -32,11 +32,11 @@ func TestConjurGroupResource_Schema(t *testing.T) {
 	}
 }
 
-func TestConjurGroupResource_generateGroupPolicy(t *testing.T) {
-	r := &ConjurGroupResource{}
+func TestGroupResource_generateGroupPolicy(t *testing.T) {
+	r := &GroupResource{}
 
 	t.Run("Minimum group fields provided", func(t *testing.T) {
-		data := &ConjurGroupResourceModel{
+		data := &GroupResourceModel{
 			Name:        types.StringValue("test-group"),
 			Branch:      types.StringValue("data"),
 			Owner:       nil,
@@ -52,10 +52,10 @@ func TestConjurGroupResource_generateGroupPolicy(t *testing.T) {
 	})
 
 	t.Run("All group fields provided", func(t *testing.T) {
-		data := &ConjurGroupResourceModel{
+		data := &GroupResourceModel{
 			Name:   types.StringValue("test-group"),
 			Branch: types.StringValue("data/production"),
-			Owner: &ConjurOwnerModel{
+			Owner: &OwnerModel{
 				Kind: types.StringValue("group"),
 				ID:   types.StringValue("jenkins-admins"),
 			},
@@ -79,11 +79,11 @@ func TestConjurGroupResource_generateGroupPolicy(t *testing.T) {
 	})
 }
 
-func TestConjurGroupResource_generateGroupDeletionPolicy(t *testing.T) {
-	r := &ConjurGroupResource{}
+func TestGroupResource_generateGroupDeletionPolicy(t *testing.T) {
+	r := &GroupResource{}
 
 	t.Run("Generate deletion policy", func(t *testing.T) {
-		data := &ConjurGroupResourceModel{
+		data := &GroupResourceModel{
 			Name:   types.StringValue("test-group"),
 			Branch: types.StringValue("data"),
 		}
@@ -99,7 +99,7 @@ func TestConjurGroupResource_generateGroupDeletionPolicy(t *testing.T) {
 
 // TestGenerateGroupPolicy_YAMLInjection tests that user input cannot inject additional YAML statements
 func TestGenerateGroupPolicy_YAMLInjection(t *testing.T) {
-	r := &ConjurGroupResource{}
+	r := &GroupResource{}
 
 	testCases := []struct {
 		name        string
@@ -166,13 +166,13 @@ func TestGenerateGroupPolicy_YAMLInjection(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			data := &ConjurGroupResourceModel{
+			data := &GroupResourceModel{
 				Name:   types.StringValue(tc.groupName),
 				Branch: types.StringValue("data"),
 			}
 
 			if tc.ownerKind != "" || tc.ownerID != "" {
-				data.Owner = &ConjurOwnerModel{
+				data.Owner = &OwnerModel{
 					Kind: types.StringValue(tc.ownerKind),
 					ID:   types.StringValue(tc.ownerID),
 				}
@@ -207,7 +207,7 @@ func TestGenerateGroupPolicy_YAMLInjection(t *testing.T) {
 
 // TestGenerateGroupDeletionPolicy_YAMLInjection tests that user input cannot inject additional YAML statements
 func TestGenerateGroupDeletionPolicy_YAMLInjection(t *testing.T) {
-	r := &ConjurGroupResource{}
+	r := &GroupResource{}
 
 	testCases := []struct {
 		name        string
@@ -248,7 +248,7 @@ func TestGenerateGroupDeletionPolicy_YAMLInjection(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			data := &ConjurGroupResourceModel{
+			data := &GroupResourceModel{
 				Name:   types.StringValue(tc.groupName),
 				Branch: types.StringValue("data"),
 			}

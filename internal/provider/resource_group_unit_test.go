@@ -21,14 +21,14 @@ import (
 func TestGroupResource_Create(t *testing.T) {
 	tests := []struct {
 		name          string
-		data          ConjurGroupResourceModel
+		data          GroupResourceModel
 		setupMock     func(*mocks.MockClientV2)
 		expectedError bool
 		errorContains string
 	}{
 		{
 			name: "successful group creation with minimal fields",
-			data: ConjurGroupResourceModel{
+			data: GroupResourceModel{
 				Name:   types.StringValue("developers"),
 				Branch: types.StringValue("data/test"),
 			},
@@ -44,7 +44,7 @@ func TestGroupResource_Create(t *testing.T) {
 		},
 		{
 			name: "API error during creation",
-			data: ConjurGroupResourceModel{
+			data: GroupResourceModel{
 				Name:   types.StringValue("error-group"),
 				Branch: types.StringValue("data/test"),
 			},
@@ -57,10 +57,10 @@ func TestGroupResource_Create(t *testing.T) {
 		},
 		{
 			name: "creation with owner",
-			data: ConjurGroupResourceModel{
+			data: GroupResourceModel{
 				Name:   types.StringValue("admins"),
 				Branch: types.StringValue("data/production"),
-				Owner: &ConjurOwnerModel{
+				Owner: &OwnerModel{
 					Kind: types.StringValue("user"),
 					ID:   types.StringValue("admin"),
 				},
@@ -77,7 +77,7 @@ func TestGroupResource_Create(t *testing.T) {
 		},
 		{
 			name: "creation with annotations",
-			data: ConjurGroupResourceModel{
+			data: GroupResourceModel{
 				Name:        types.StringValue("platform-team"),
 				Branch:      types.StringValue("data/teams"),
 				Annotations: map[string]string{"env": "prod", "department": "engineering"},
@@ -94,10 +94,10 @@ func TestGroupResource_Create(t *testing.T) {
 		},
 		{
 			name: "creation with owner and annotations",
-			data: ConjurGroupResourceModel{
+			data: GroupResourceModel{
 				Name:   types.StringValue("security-team"),
 				Branch: types.StringValue("data/groups"),
-				Owner: &ConjurOwnerModel{
+				Owner: &OwnerModel{
 					Kind: types.StringValue("group"),
 					ID:   types.StringValue("managers"),
 				},
@@ -115,7 +115,7 @@ func TestGroupResource_Create(t *testing.T) {
 			mockV2 := mocks.NewMockClientV2(t)
 			tt.setupMock(mockV2)
 
-			r := &ConjurGroupResource{
+			r := &GroupResource{
 				client: mockV2,
 			}
 
@@ -160,7 +160,7 @@ func TestGroupResource_Create(t *testing.T) {
 func TestGroupResource_Read(t *testing.T) {
 	tests := []struct {
 		name          string
-		data          ConjurGroupResourceModel
+		data          GroupResourceModel
 		setupMock     func(*mocks.MockClientV2)
 		expectedError bool
 		shouldRemove  bool
@@ -168,7 +168,7 @@ func TestGroupResource_Read(t *testing.T) {
 	}{
 		{
 			name: "group exists",
-			data: ConjurGroupResourceModel{
+			data: GroupResourceModel{
 				Name:   types.StringValue("developers"),
 				Branch: types.StringValue("data/test"),
 			},
@@ -180,7 +180,7 @@ func TestGroupResource_Read(t *testing.T) {
 		},
 		{
 			name: "group not found - removes from state",
-			data: ConjurGroupResourceModel{
+			data: GroupResourceModel{
 				Name:   types.StringValue("missing-group"),
 				Branch: types.StringValue("data/test"),
 			},
@@ -192,7 +192,7 @@ func TestGroupResource_Read(t *testing.T) {
 		},
 		{
 			name: "API error checking existence",
-			data: ConjurGroupResourceModel{
+			data: GroupResourceModel{
 				Name:   types.StringValue("error-group"),
 				Branch: types.StringValue("data/test"),
 			},
@@ -205,7 +205,7 @@ func TestGroupResource_Read(t *testing.T) {
 		},
 		{
 			name: "nested branch group exists",
-			data: ConjurGroupResourceModel{
+			data: GroupResourceModel{
 				Name:   types.StringValue("admins"),
 				Branch: types.StringValue("data/production/teams"),
 			},
@@ -217,10 +217,10 @@ func TestGroupResource_Read(t *testing.T) {
 		},
 		{
 			name: "group with owner exists",
-			data: ConjurGroupResourceModel{
+			data: GroupResourceModel{
 				Name:   types.StringValue("security"),
 				Branch: types.StringValue("data/groups"),
-				Owner: &ConjurOwnerModel{
+				Owner: &OwnerModel{
 					Kind: types.StringValue("user"),
 					ID:   types.StringValue("admin"),
 				},
@@ -238,7 +238,7 @@ func TestGroupResource_Read(t *testing.T) {
 			mockV2 := mocks.NewMockClientV2(t)
 			tt.setupMock(mockV2)
 
-			r := &ConjurGroupResource{
+			r := &GroupResource{
 				client: mockV2,
 			}
 
@@ -277,12 +277,12 @@ func TestGroupResource_Read(t *testing.T) {
 
 				if tt.shouldRemove {
 					// State should be removed when group doesn't exist
-					var result ConjurGroupResourceModel
+					var result GroupResourceModel
 					diag := resp.State.Get(ctx, &result)
 					assert.True(t, diag.HasError() || result.Name.IsNull())
 				} else {
 					// State should still exist
-					var result ConjurGroupResourceModel
+					var result GroupResourceModel
 					resp.State.Get(ctx, &result)
 					assert.False(t, result.Name.IsNull())
 					assert.Equal(t, tt.data.Name.ValueString(), result.Name.ValueString())
@@ -297,14 +297,14 @@ func TestGroupResource_Read(t *testing.T) {
 func TestGroupResource_Delete(t *testing.T) {
 	tests := []struct {
 		name          string
-		data          ConjurGroupResourceModel
+		data          GroupResourceModel
 		setupMock     func(*mocks.MockClientV2)
 		expectedError bool
 		errorContains string
 	}{
 		{
 			name: "successful deletion",
-			data: ConjurGroupResourceModel{
+			data: GroupResourceModel{
 				Name:   types.StringValue("developers"),
 				Branch: types.StringValue("data/test"),
 			},
@@ -320,7 +320,7 @@ func TestGroupResource_Delete(t *testing.T) {
 		},
 		{
 			name: "API error during deletion",
-			data: ConjurGroupResourceModel{
+			data: GroupResourceModel{
 				Name:   types.StringValue("error-group"),
 				Branch: types.StringValue("data/test"),
 			},
@@ -333,7 +333,7 @@ func TestGroupResource_Delete(t *testing.T) {
 		},
 		{
 			name: "deletion from nested branch",
-			data: ConjurGroupResourceModel{
+			data: GroupResourceModel{
 				Name:   types.StringValue("admins"),
 				Branch: types.StringValue("data/production/teams"),
 			},
@@ -349,7 +349,7 @@ func TestGroupResource_Delete(t *testing.T) {
 		},
 		{
 			name: "404 not found error",
-			data: ConjurGroupResourceModel{
+			data: GroupResourceModel{
 				Name:   types.StringValue("nonexistent-group"),
 				Branch: types.StringValue("data/test"),
 			},
@@ -362,7 +362,7 @@ func TestGroupResource_Delete(t *testing.T) {
 		},
 		{
 			name: "deletion of group with annotations",
-			data: ConjurGroupResourceModel{
+			data: GroupResourceModel{
 				Name:        types.StringValue("platform-team"),
 				Branch:      types.StringValue("data/teams"),
 				Annotations: map[string]string{"env": "prod"},
@@ -379,7 +379,7 @@ func TestGroupResource_Delete(t *testing.T) {
 			mockV2 := mocks.NewMockClientV2(t)
 			tt.setupMock(mockV2)
 
-			r := &ConjurGroupResource{
+			r := &GroupResource{
 				client: mockV2,
 			}
 
@@ -422,7 +422,7 @@ func TestGroupResource_Delete(t *testing.T) {
 }
 
 func getGroupTestSchema() schema.Schema {
-	r := &ConjurGroupResource{}
+	r := &GroupResource{}
 	var schemaResp resource.SchemaResponse
 	r.Schema(context.Background(), resource.SchemaRequest{}, &schemaResp)
 	return schemaResp.Schema

@@ -25,18 +25,18 @@ var IntegrationVersion = "0.0.1"
 var telemetryData = conjurapi.NewTelemetry("Terraform Provider", "idira-secretsmanager", IntegrationVersion, "Idira", "")
 
 var (
-	_ provider.Provider                       = &conjurProvider{}
-	_ provider.ProviderWithValidateConfig     = &conjurProvider{}
-	_ provider.ProviderWithEphemeralResources = &conjurProvider{}
+	_ provider.Provider                       = &providerImpl{}
+	_ provider.ProviderWithValidateConfig     = &providerImpl{}
+	_ provider.ProviderWithEphemeralResources = &providerImpl{}
 )
 
-type conjurProvider struct {
+type providerImpl struct {
 	version string
 	client  api.ClientV2
 }
 
-// conjurProviderModel describes the provider data model.
-type conjurProviderModel struct {
+// providerModel describes the provider data model.
+type providerModel struct {
 	AuthnType    types.String `tfsdk:"authn_type"`
 	ApplianceUrl types.String `tfsdk:"appliance_url"`
 	Account      types.String `tfsdk:"account"`
@@ -51,12 +51,12 @@ type conjurProviderModel struct {
 }
 
 // Metadata returns the provider type name.
-func (p *conjurProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
+func (p *providerImpl) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
 	resp.TypeName = "conjur"
 	resp.Version = p.version
 }
 
-func (p *conjurProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
+func (p *providerImpl) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Fetch secrets and manage CyberArk Secrets Manager resources.",
 		Attributes: map[string]schema.Attribute{
@@ -110,8 +110,8 @@ func (p *conjurProvider) Schema(_ context.Context, _ provider.SchemaRequest, res
 	}
 }
 
-func (p *conjurProvider) ValidateConfig(ctx context.Context, req provider.ValidateConfigRequest, resp *provider.ValidateConfigResponse) {
-	var data conjurProviderModel
+func (p *providerImpl) ValidateConfig(ctx context.Context, req provider.ValidateConfigRequest, resp *provider.ValidateConfigResponse) {
+	var data providerModel
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -191,8 +191,8 @@ func validateAttributes(attributes map[string]types.String, label string, resp *
 	}
 }
 
-func (p *conjurProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
-	var data conjurProviderModel
+func (p *providerImpl) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
+	var data providerModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -207,13 +207,13 @@ func (p *conjurProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		}
 	}
 
-	config, err := p.buildConjurConfig(&data)
+	config, err := p.buildConfig(&data)
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to load config", err.Error())
 		return
 	}
 
-	client, err := p.createConjurClient(config, &data)
+	client, err := p.createClient(config, &data)
 	if err != nil {
 		resp.Diagnostics.AddError("Client initialization failed", err.Error())
 		return
@@ -237,7 +237,7 @@ func resolveAuthnJWT(authnJWT types.String) (types.String, bool) {
 	return types.StringValue(token), true
 }
 
-func (p *conjurProvider) buildConjurConfig(data *conjurProviderModel) (*conjurapi.Config, error) {
+func (p *providerImpl) buildConfig(data *providerModel) (*conjurapi.Config, error) {
 	config, err := conjurapi.LoadConfig()
 	if err != nil {
 		return nil, err
@@ -249,7 +249,7 @@ func (p *conjurProvider) buildConjurConfig(data *conjurProviderModel) (*conjurap
 	return &config, nil
 }
 
-func (p *conjurProvider) applyConfigOverrides(config *conjurapi.Config, data *conjurProviderModel) {
+func (p *providerImpl) applyConfigOverrides(config *conjurapi.Config, data *providerModel) {
 	if url := data.ApplianceUrl.ValueString(); url != "" {
 		config.ApplianceURL = url
 	}
@@ -269,7 +269,7 @@ func (p *conjurProvider) applyConfigOverrides(config *conjurapi.Config, data *co
 	config.CredentialStorage = conjurapi.CredentialStorageNone
 }
 
-func (p *conjurProvider) createConjurClient(config *conjurapi.Config, data *conjurProviderModel) (api.ClientV2, error) {
+func (p *providerImpl) createClient(config *conjurapi.Config, data *providerModel) (api.ClientV2, error) {
 	authnType := data.AuthnType.ValueString()
 
 	switch authnType {
@@ -288,7 +288,7 @@ func (p *conjurProvider) createConjurClient(config *conjurapi.Config, data *conj
 	}
 }
 
-func (p *conjurProvider) createJWTClient(config *conjurapi.Config, data *conjurProviderModel) (api.ClientV2, error) {
+func (p *providerImpl) createJWTClient(config *conjurapi.Config, data *providerModel) (api.ClientV2, error) {
 	config.ServiceID = data.ServiceID.ValueString()
 	config.JWTHostID = data.HostID.ValueString()
 	config.AuthnType = data.AuthnType.ValueString()
@@ -302,7 +302,7 @@ func (p *conjurProvider) createJWTClient(config *conjurapi.Config, data *conjurP
 	return client.V2(), nil
 }
 
-func (p *conjurProvider) createGCPClient(config *conjurapi.Config, data *conjurProviderModel) (api.ClientV2, error) {
+func (p *providerImpl) createGCPClient(config *conjurapi.Config, data *providerModel) (api.ClientV2, error) {
 	config.ServiceID = data.ServiceID.ValueString()
 	config.AuthnType = "gcp"
 	config.JWTHostID = strings.TrimPrefix(data.HostID.ValueString(), "host/")
@@ -321,7 +321,7 @@ func (p *conjurProvider) createGCPClient(config *conjurapi.Config, data *conjurP
 	return client.V2(), nil
 }
 
-func (p *conjurProvider) createAzureClient(config *conjurapi.Config, data *conjurProviderModel) (api.ClientV2, error) {
+func (p *providerImpl) createAzureClient(config *conjurapi.Config, data *providerModel) (api.ClientV2, error) {
 	config.ServiceID = data.ServiceID.ValueString()
 	config.AuthnType = "azure"
 	config.JWTHostID = strings.TrimPrefix(data.HostID.ValueString(), "host/")
@@ -337,7 +337,7 @@ func (p *conjurProvider) createAzureClient(config *conjurapi.Config, data *conju
 	return client.V2(), nil
 }
 
-func (p *conjurProvider) createIAMClient(config *conjurapi.Config, data *conjurProviderModel) (api.ClientV2, error) {
+func (p *providerImpl) createIAMClient(config *conjurapi.Config, data *providerModel) (api.ClientV2, error) {
 	config.ServiceID = data.ServiceID.ValueString()
 	config.AuthnType = "iam"
 	config.JWTHostID = strings.TrimPrefix(data.HostID.ValueString(), "host/")
@@ -350,7 +350,7 @@ func (p *conjurProvider) createIAMClient(config *conjurapi.Config, data *conjurP
 	return client.V2(), nil
 }
 
-func (p *conjurProvider) createAPIKeyClient(config *conjurapi.Config, data *conjurProviderModel) (api.ClientV2, error) {
+func (p *providerImpl) createAPIKeyClient(config *conjurapi.Config, data *providerModel) (api.ClientV2, error) {
 	login := data.Login.ValueString()
 	apiKey := data.APIKey.ValueString()
 
@@ -373,7 +373,7 @@ func (p *conjurProvider) createAPIKeyClient(config *conjurapi.Config, data *conj
 	return client.V2(), nil
 }
 
-func (p *conjurProvider) DataSources(_ context.Context) []func() datasource.DataSource {
+func (p *providerImpl) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		NewSecretDataSource,
 		NewCertificateIssueDataSource,
@@ -382,29 +382,29 @@ func (p *conjurProvider) DataSources(_ context.Context) []func() datasource.Data
 }
 
 // EphemeralResources returns the ephemeral resources implemented in the provider.
-func (p *conjurProvider) EphemeralResources(_ context.Context) []func() ephemeral.EphemeralResource {
+func (p *providerImpl) EphemeralResources(_ context.Context) []func() ephemeral.EphemeralResource {
 	return []func() ephemeral.EphemeralResource{
 		NewEphemeralSecretResource,
 	}
 }
 
 // Resources define the resources implemented in the provider.
-func (p *conjurProvider) Resources(_ context.Context) []func() resource.Resource {
+func (p *providerImpl) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		NewConjurAuthenticatorResource,
-		NewConjurHostResource,
-		NewConjurGroupResource,
-		NewConjurPermissionResource,
-		NewConjurMembershipResource,
-		NewConjurSecretResource,
-		NewConjurPolicyBranchResource,
+		NewAuthenticatorResource,
+		NewHostResource,
+		NewGroupResource,
+		NewPermissionResource,
+		NewMembershipResource,
+		NewSecretResource,
+		NewPolicyBranchResource,
 	}
 }
 
 // New creates a new provider instance.
 func New(version string) func() provider.Provider {
 	return func() provider.Provider {
-		return &conjurProvider{
+		return &providerImpl{
 			version: version,
 		}
 	}

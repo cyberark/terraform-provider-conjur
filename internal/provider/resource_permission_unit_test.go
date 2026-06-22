@@ -22,14 +22,14 @@ import (
 func TestPermissionResource_Create(t *testing.T) {
 	tests := []struct {
 		name          string
-		data          ConjurPermissionResourceModel
+		data          PermissionResourceModel
 		setupMock     func(*mocks.MockClientV2)
 		expectedError bool
 		errorContains string
 	}{
 		{
 			name: "successful permission creation",
-			data: ConjurPermissionResourceModel{
+			data: PermissionResourceModel{
 				Role: RoleModel{
 					Name:   types.StringValue("developers"),
 					Kind:   types.StringValue("group"),
@@ -57,7 +57,7 @@ func TestPermissionResource_Create(t *testing.T) {
 		},
 		{
 			name: "API error during creation",
-			data: ConjurPermissionResourceModel{
+			data: PermissionResourceModel{
 				Role: RoleModel{
 					Name:   types.StringValue("users"),
 					Kind:   types.StringValue("group"),
@@ -81,7 +81,7 @@ func TestPermissionResource_Create(t *testing.T) {
 		},
 		{
 			name: "permission with multiple privileges",
-			data: ConjurPermissionResourceModel{
+			data: PermissionResourceModel{
 				Role: RoleModel{
 					Name:   types.StringValue("admins"),
 					Kind:   types.StringValue("group"),
@@ -110,7 +110,7 @@ func TestPermissionResource_Create(t *testing.T) {
 		},
 		{
 			name: "permission for host role",
-			data: ConjurPermissionResourceModel{
+			data: PermissionResourceModel{
 				Role: RoleModel{
 					Name:   types.StringValue("server-01"),
 					Kind:   types.StringValue("host"),
@@ -137,7 +137,7 @@ func TestPermissionResource_Create(t *testing.T) {
 			mockV2 := mocks.NewMockClientV2(t)
 			tt.setupMock(mockV2)
 
-			r := &ConjurPermissionResource{
+			r := &PermissionResource{
 				client: mockV2,
 			}
 
@@ -182,7 +182,7 @@ func TestPermissionResource_Create(t *testing.T) {
 func TestPermissionResource_Read(t *testing.T) {
 	tests := []struct {
 		name          string
-		data          ConjurPermissionResourceModel
+		data          PermissionResourceModel
 		setupMock     func(*mocks.MockClientV2)
 		expectedError bool
 		errorContains string
@@ -190,7 +190,7 @@ func TestPermissionResource_Read(t *testing.T) {
 	}{
 		{
 			name: "permission exists with read privilege",
-			data: ConjurPermissionResourceModel{
+			data: PermissionResourceModel{
 				Role: RoleModel{
 					Name:   types.StringValue("developers"),
 					Kind:   types.StringValue("group"),
@@ -216,7 +216,7 @@ func TestPermissionResource_Read(t *testing.T) {
 		},
 		{
 			name: "permission exists with multiple privileges",
-			data: ConjurPermissionResourceModel{
+			data: PermissionResourceModel{
 				Role: RoleModel{
 					Name:   types.StringValue("admins"),
 					Kind:   types.StringValue("group"),
@@ -243,7 +243,7 @@ func TestPermissionResource_Read(t *testing.T) {
 		},
 		{
 			name: "API error checking permissions",
-			data: ConjurPermissionResourceModel{
+			data: PermissionResourceModel{
 				Role: RoleModel{
 					Name:   types.StringValue("users"),
 					Kind:   types.StringValue("group"),
@@ -266,7 +266,7 @@ func TestPermissionResource_Read(t *testing.T) {
 		},
 		{
 			name: "no privileges exist",
-			data: ConjurPermissionResourceModel{
+			data: PermissionResourceModel{
 				Role: RoleModel{
 					Name:   types.StringValue("guests"),
 					Kind:   types.StringValue("group"),
@@ -295,7 +295,7 @@ func TestPermissionResource_Read(t *testing.T) {
 			mockV2 := mocks.NewMockClientV2(t)
 			tt.setupMock(mockV2)
 
-			r := &ConjurPermissionResource{
+			r := &PermissionResource{
 				client: mockV2,
 			}
 
@@ -331,7 +331,7 @@ func TestPermissionResource_Read(t *testing.T) {
 				}
 			} else {
 				assert.False(t, resp.Diagnostics.HasError())
-				var result ConjurPermissionResourceModel
+				var result PermissionResourceModel
 				resp.State.Get(ctx, &result)
 
 				assert.Equal(t, len(tt.expectedPrivs), len(result.Privileges.Elements()))
@@ -345,14 +345,14 @@ func TestPermissionResource_Read(t *testing.T) {
 func TestPermissionResource_Update(t *testing.T) {
 	tests := []struct {
 		name          string
-		data          ConjurPermissionResourceModel
+		data          PermissionResourceModel
 		setupMock     func(*mocks.MockClientV2)
 		expectedError bool
 		errorContains string
 	}{
 		{
 			name: "successful permission update",
-			data: ConjurPermissionResourceModel{
+			data: PermissionResourceModel{
 				Role: RoleModel{
 					Name:   types.StringValue("developers"),
 					Kind:   types.StringValue("group"),
@@ -380,7 +380,7 @@ func TestPermissionResource_Update(t *testing.T) {
 		},
 		{
 			name: "API error during update",
-			data: ConjurPermissionResourceModel{
+			data: PermissionResourceModel{
 				Role: RoleModel{
 					Name:   types.StringValue("users"),
 					Kind:   types.StringValue("group"),
@@ -404,7 +404,7 @@ func TestPermissionResource_Update(t *testing.T) {
 		},
 		{
 			name: "update to add more privileges",
-			data: ConjurPermissionResourceModel{
+			data: PermissionResourceModel{
 				Role: RoleModel{
 					Name:   types.StringValue("admins"),
 					Kind:   types.StringValue("group"),
@@ -434,7 +434,7 @@ func TestPermissionResource_Update(t *testing.T) {
 			mockV2 := mocks.NewMockClientV2(t)
 			tt.setupMock(mockV2)
 
-			r := &ConjurPermissionResource{
+			r := &PermissionResource{
 				client: mockV2,
 			}
 
@@ -479,14 +479,14 @@ func TestPermissionResource_Update(t *testing.T) {
 func TestPermissionResource_Delete(t *testing.T) {
 	tests := []struct {
 		name          string
-		data          ConjurPermissionResourceModel
+		data          PermissionResourceModel
 		setupMock     func(*mocks.MockClientV2)
 		expectedError bool
 		errorContains string
 	}{
 		{
 			name: "successful permission deletion",
-			data: ConjurPermissionResourceModel{
+			data: PermissionResourceModel{
 				Role: RoleModel{
 					Name:   types.StringValue("developers"),
 					Kind:   types.StringValue("group"),
@@ -513,7 +513,7 @@ func TestPermissionResource_Delete(t *testing.T) {
 		},
 		{
 			name: "API error during deletion",
-			data: ConjurPermissionResourceModel{
+			data: PermissionResourceModel{
 				Role: RoleModel{
 					Name:   types.StringValue("users"),
 					Kind:   types.StringValue("group"),
@@ -537,7 +537,7 @@ func TestPermissionResource_Delete(t *testing.T) {
 		},
 		{
 			name: "delete permission with multiple privileges",
-			data: ConjurPermissionResourceModel{
+			data: PermissionResourceModel{
 				Role: RoleModel{
 					Name:   types.StringValue("admins"),
 					Kind:   types.StringValue("group"),
@@ -566,7 +566,7 @@ func TestPermissionResource_Delete(t *testing.T) {
 			mockV2 := mocks.NewMockClientV2(t)
 			tt.setupMock(mockV2)
 
-			r := &ConjurPermissionResource{
+			r := &PermissionResource{
 				client: mockV2,
 			}
 
@@ -609,7 +609,7 @@ func TestPermissionResource_Delete(t *testing.T) {
 }
 
 func getPermissionTestSchema() schema.Schema {
-	r := &ConjurPermissionResource{}
+	r := &PermissionResource{}
 	var schemaResp resource.SchemaResponse
 	r.Schema(context.Background(), resource.SchemaRequest{}, &schemaResp)
 	return schemaResp.Schema

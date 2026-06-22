@@ -19,18 +19,18 @@ import (
 func TestHostResource_Create(t *testing.T) {
 	tests := []struct {
 		name          string
-		data          ConjurHostResourceModel
+		data          HostResourceModel
 		setupMock     func(*mocks.MockClientV2)
 		expectedError bool
 		errorContains string
 	}{
 		{
 			name: "successful creation with minimal fields",
-			data: ConjurHostResourceModel{
+			data: HostResourceModel{
 				Name:         types.StringValue("test-host"),
 				Branch:       types.StringValue("data"),
 				RestrictedTo: types.ListNull(types.StringType),
-				AuthnDescriptors: []ConjurHostAuthnDescriptor{
+				AuthnDescriptors: []HostAuthnDescriptor{
 					{
 						Type: types.StringValue("api_key"),
 					},
@@ -45,11 +45,11 @@ func TestHostResource_Create(t *testing.T) {
 		},
 		{
 			name: "API error during creation",
-			data: ConjurHostResourceModel{
+			data: HostResourceModel{
 				Name:         types.StringValue("error-host"),
 				Branch:       types.StringValue("data"),
 				RestrictedTo: types.ListNull(types.StringType),
-				AuthnDescriptors: []ConjurHostAuthnDescriptor{
+				AuthnDescriptors: []HostAuthnDescriptor{
 					{
 						Type: types.StringValue("api_key"),
 					},
@@ -63,20 +63,20 @@ func TestHostResource_Create(t *testing.T) {
 		},
 		{
 			name: "creation with all optional fields",
-			data: ConjurHostResourceModel{
+			data: HostResourceModel{
 				Name:   types.StringValue("prod-host"),
 				Branch: types.StringValue("data/production"),
 				Type:   types.StringValue("jenkins"),
-				Owner: &ConjurHostOwnerModel{
+				Owner: &HostOwnerModel{
 					Kind: types.StringValue("group"),
 					ID:   types.StringValue("admins"),
 				},
 				RestrictedTo: types.ListNull(types.StringType),
-				AuthnDescriptors: []ConjurHostAuthnDescriptor{
+				AuthnDescriptors: []HostAuthnDescriptor{
 					{
 						Type:      types.StringValue("jwt"),
 						ServiceID: types.StringValue("jwt-service"),
-						Data: &ConjurHostAuthnDescriptorData{
+						Data: &HostAuthnDescriptorData{
 							Claims: map[string]string{"sub": "test", "aud": "myapp"},
 						},
 					},
@@ -100,11 +100,11 @@ func TestHostResource_Create(t *testing.T) {
 		},
 		{
 			name: "creation with multiple authn descriptors",
-			data: ConjurHostResourceModel{
+			data: HostResourceModel{
 				Name:         types.StringValue("multi-auth-host"),
 				Branch:       types.StringValue("data"),
 				RestrictedTo: types.ListNull(types.StringType),
-				AuthnDescriptors: []ConjurHostAuthnDescriptor{
+				AuthnDescriptors: []HostAuthnDescriptor{
 					{
 						Type: types.StringValue("api_key"),
 					},
@@ -128,7 +128,7 @@ func TestHostResource_Create(t *testing.T) {
 			mockV2 := mocks.NewMockClientV2(t)
 			tt.setupMock(mockV2)
 
-			r := &ConjurHostResource{
+			r := &HostResource{
 				client: mockV2,
 			}
 
@@ -164,7 +164,7 @@ func TestHostResource_Create(t *testing.T) {
 				}
 			} else {
 				assert.False(t, resp.Diagnostics.HasError())
-				var result ConjurHostResourceModel
+				var result HostResourceModel
 				resp.State.Get(ctx, &result)
 				assert.Equal(t, tt.data.Name.ValueString(), result.Name.ValueString())
 				assert.Equal(t, tt.data.Branch.ValueString(), result.Branch.ValueString())
@@ -178,7 +178,7 @@ func TestHostResource_Create(t *testing.T) {
 func TestHostResource_Read(t *testing.T) {
 	tests := []struct {
 		name          string
-		data          ConjurHostResourceModel
+		data          HostResourceModel
 		setupMock     func(*mocks.MockClientV2)
 		expectedError bool
 		shouldRemove  bool
@@ -186,11 +186,11 @@ func TestHostResource_Read(t *testing.T) {
 	}{
 		{
 			name: "host exists",
-			data: ConjurHostResourceModel{
+			data: HostResourceModel{
 				Name:         types.StringValue("test-host"),
 				Branch:       types.StringValue("data"),
 				RestrictedTo: types.ListNull(types.StringType),
-				AuthnDescriptors: []ConjurHostAuthnDescriptor{
+				AuthnDescriptors: []HostAuthnDescriptor{
 					{
 						Type: types.StringValue("api_key"),
 					},
@@ -204,11 +204,11 @@ func TestHostResource_Read(t *testing.T) {
 		},
 		{
 			name: "host not found - removes from state",
-			data: ConjurHostResourceModel{
+			data: HostResourceModel{
 				Name:         types.StringValue("missing-host"),
 				Branch:       types.StringValue("data"),
 				RestrictedTo: types.ListNull(types.StringType),
-				AuthnDescriptors: []ConjurHostAuthnDescriptor{
+				AuthnDescriptors: []HostAuthnDescriptor{
 					{
 						Type: types.StringValue("api_key"),
 					},
@@ -222,11 +222,11 @@ func TestHostResource_Read(t *testing.T) {
 		},
 		{
 			name: "API error checking existence",
-			data: ConjurHostResourceModel{
+			data: HostResourceModel{
 				Name:         types.StringValue("error-host"),
 				Branch:       types.StringValue("data"),
 				RestrictedTo: types.ListNull(types.StringType),
-				AuthnDescriptors: []ConjurHostAuthnDescriptor{
+				AuthnDescriptors: []HostAuthnDescriptor{
 					{
 						Type: types.StringValue("api_key"),
 					},
@@ -241,11 +241,11 @@ func TestHostResource_Read(t *testing.T) {
 		},
 		{
 			name: "nested branch path host exists",
-			data: ConjurHostResourceModel{
+			data: HostResourceModel{
 				Name:         types.StringValue("server-01"),
 				Branch:       types.StringValue("data/production/servers"),
 				RestrictedTo: types.ListNull(types.StringType),
-				AuthnDescriptors: []ConjurHostAuthnDescriptor{
+				AuthnDescriptors: []HostAuthnDescriptor{
 					{
 						Type: types.StringValue("api_key"),
 					},
@@ -264,7 +264,7 @@ func TestHostResource_Read(t *testing.T) {
 			mockV2 := mocks.NewMockClientV2(t)
 			tt.setupMock(mockV2)
 
-			r := &ConjurHostResource{
+			r := &HostResource{
 				client: mockV2,
 			}
 
@@ -303,12 +303,12 @@ func TestHostResource_Read(t *testing.T) {
 
 				if tt.shouldRemove {
 					// State should be removed when host doesn't exist
-					var result ConjurHostResourceModel
+					var result HostResourceModel
 					diag := resp.State.Get(ctx, &result)
 					assert.True(t, diag.HasError() || result.Name.IsNull())
 				} else {
 					// State should still exist
-					var result ConjurHostResourceModel
+					var result HostResourceModel
 					resp.State.Get(ctx, &result)
 					assert.False(t, result.Name.IsNull())
 					assert.Equal(t, tt.data.Name.ValueString(), result.Name.ValueString())
@@ -324,18 +324,18 @@ func TestHostResource_Read(t *testing.T) {
 func TestHostResource_Delete(t *testing.T) {
 	tests := []struct {
 		name          string
-		data          ConjurHostResourceModel
+		data          HostResourceModel
 		setupMock     func(*mocks.MockClientV2)
 		expectedError bool
 		errorContains string
 	}{
 		{
 			name: "successful deletion",
-			data: ConjurHostResourceModel{
+			data: HostResourceModel{
 				Name:         types.StringValue("test-host"),
 				Branch:       types.StringValue("data"),
 				RestrictedTo: types.ListNull(types.StringType),
-				AuthnDescriptors: []ConjurHostAuthnDescriptor{
+				AuthnDescriptors: []HostAuthnDescriptor{
 					{
 						Type: types.StringValue("api_key"),
 					},
@@ -348,11 +348,11 @@ func TestHostResource_Delete(t *testing.T) {
 		},
 		{
 			name: "API error during deletion",
-			data: ConjurHostResourceModel{
+			data: HostResourceModel{
 				Name:         types.StringValue("error-host"),
 				Branch:       types.StringValue("data"),
 				RestrictedTo: types.ListNull(types.StringType),
-				AuthnDescriptors: []ConjurHostAuthnDescriptor{
+				AuthnDescriptors: []HostAuthnDescriptor{
 					{
 						Type: types.StringValue("api_key"),
 					},
@@ -367,11 +367,11 @@ func TestHostResource_Delete(t *testing.T) {
 		},
 		{
 			name: "nested branch deletion",
-			data: ConjurHostResourceModel{
+			data: HostResourceModel{
 				Name:         types.StringValue("server-01"),
 				Branch:       types.StringValue("data/production/servers"),
 				RestrictedTo: types.ListNull(types.StringType),
-				AuthnDescriptors: []ConjurHostAuthnDescriptor{
+				AuthnDescriptors: []HostAuthnDescriptor{
 					{
 						Type: types.StringValue("api_key"),
 					},
@@ -384,11 +384,11 @@ func TestHostResource_Delete(t *testing.T) {
 		},
 		{
 			name: "404 not found error",
-			data: ConjurHostResourceModel{
+			data: HostResourceModel{
 				Name:         types.StringValue("nonexistent-host"),
 				Branch:       types.StringValue("data"),
 				RestrictedTo: types.ListNull(types.StringType),
-				AuthnDescriptors: []ConjurHostAuthnDescriptor{
+				AuthnDescriptors: []HostAuthnDescriptor{
 					{
 						Type: types.StringValue("api_key"),
 					},
@@ -408,7 +408,7 @@ func TestHostResource_Delete(t *testing.T) {
 			mockV2 := mocks.NewMockClientV2(t)
 			tt.setupMock(mockV2)
 
-			r := &ConjurHostResource{
+			r := &HostResource{
 				client: mockV2,
 			}
 
@@ -452,7 +452,7 @@ func TestHostResource_Delete(t *testing.T) {
 }
 
 func getHostTestSchema() schema.Schema {
-	r := &ConjurHostResource{}
+	r := &HostResource{}
 	var schemaResp resource.SchemaResponse
 	r.Schema(context.Background(), resource.SchemaRequest{}, &schemaResp)
 	return schemaResp.Schema

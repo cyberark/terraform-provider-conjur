@@ -19,38 +19,38 @@ import (
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var (
-	_ resource.Resource                   = &ConjurGroupResource{}
-	_ resource.ResourceWithConfigure      = &ConjurGroupResource{}
-	_ resource.ResourceWithValidateConfig = &ConjurGroupResource{}
+	_ resource.Resource                   = &GroupResource{}
+	_ resource.ResourceWithConfigure      = &GroupResource{}
+	_ resource.ResourceWithValidateConfig = &GroupResource{}
 )
 
-func NewConjurGroupResource() resource.Resource {
-	return &ConjurGroupResource{}
+func NewGroupResource() resource.Resource {
+	return &GroupResource{}
 }
 
-// ConjurGroupResource defines the resource implementation.
-type ConjurGroupResource struct {
+// GroupResource defines the resource implementation.
+type GroupResource struct {
 	client api.ClientV2
 }
 
-// ConjurGroupResourceModel describes the resource data model.
-type ConjurGroupResourceModel struct {
+// GroupResourceModel describes the resource data model.
+type GroupResourceModel struct {
 	Name        types.String      `tfsdk:"name"`
 	Branch      types.String      `tfsdk:"branch"`
-	Owner       *ConjurOwnerModel `tfsdk:"owner"`
+	Owner       *OwnerModel `tfsdk:"owner"`
 	Annotations map[string]string `tfsdk:"annotations"`
 }
 
-type ConjurOwnerModel struct {
+type OwnerModel struct {
 	Kind types.String `tfsdk:"kind"`
 	ID   types.String `tfsdk:"id"`
 }
 
-func (r *ConjurGroupResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+func (r *GroupResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_group"
 }
 
-func (r *ConjurGroupResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *GroupResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "CyberArk Secrets Manager Group resource. This resource creates a group in Conjur using policy. Note that this is a write-only resource - import and exact state tracking are not supported due to API limitations.",
 
@@ -101,8 +101,8 @@ func (r *ConjurGroupResource) Schema(ctx context.Context, req resource.SchemaReq
 	}
 }
 
-func (r *ConjurGroupResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	var data ConjurGroupResourceModel
+func (r *GroupResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var data GroupResourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -112,7 +112,7 @@ func (r *ConjurGroupResource) ValidateConfig(ctx context.Context, req resource.V
 	ValidateBranch(data.Branch, &resp.Diagnostics, "branch")
 }
 
-func (r *ConjurGroupResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *GroupResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -124,12 +124,12 @@ func (r *ConjurGroupResource) Configure(ctx context.Context, req resource.Config
 	r.client = client
 }
 
-func (r *ConjurGroupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *GroupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if r.client == nil {
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
 	}
-	var data ConjurGroupResourceModel
+	var data GroupResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -154,12 +154,12 @@ func (r *ConjurGroupResource) Create(ctx context.Context, req resource.CreateReq
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *ConjurGroupResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *GroupResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	if r.client == nil {
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
 	}
-	var data ConjurGroupResourceModel
+	var data GroupResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -169,12 +169,12 @@ func (r *ConjurGroupResource) Update(ctx context.Context, req resource.UpdateReq
 	resp.Diagnostics.AddError("Update Not Supported", "This resource does not support in-place updates. Please recreate the resource to apply changes.")
 }
 
-func (r *ConjurGroupResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *GroupResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	if r.client == nil {
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
 	}
-	var data ConjurGroupResourceModel
+	var data GroupResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
 	if resp.Diagnostics.HasError() {
@@ -204,12 +204,12 @@ func (r *ConjurGroupResource) Read(ctx context.Context, req resource.ReadRequest
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *ConjurGroupResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *GroupResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	if r.client == nil {
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
 	}
-	var data ConjurGroupResourceModel
+	var data GroupResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -235,7 +235,7 @@ func (r *ConjurGroupResource) Delete(ctx context.Context, req resource.DeleteReq
 }
 
 // generateGroupPolicy creates a Conjur policy for creating a group
-func (r *ConjurGroupResource) generateGroupPolicy(data *ConjurGroupResourceModel) (string, error) {
+func (r *GroupResource) generateGroupPolicy(data *GroupResourceModel) (string, error) {
 	group := conjurpolicy.Group{
 		Id: data.Name.ValueString(),
 	}
@@ -273,7 +273,7 @@ func (r *ConjurGroupResource) generateGroupPolicy(data *ConjurGroupResourceModel
 }
 
 // generateGroupDeletionPolicy creates a policy to delete a group
-func (r *ConjurGroupResource) generateGroupDeletionPolicy(data *ConjurGroupResourceModel) (string, error) {
+func (r *GroupResource) generateGroupDeletionPolicy(data *GroupResourceModel) (string, error) {
 	delete := conjurpolicy.Delete{
 		Record: conjurpolicy.ResourceRef{
 			Kind: conjurpolicy.KindGroup,

@@ -9,11 +9,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 )
 
-func TestConjurMembershipResource_Schema(t *testing.T) {
+func TestMembershipResource_Schema(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	ds := NewConjurMembershipResource()
+	ds := NewMembershipResource()
 
 	schemaRequest := resource.SchemaRequest{}
 	schemaResponse := &resource.SchemaResponse{}

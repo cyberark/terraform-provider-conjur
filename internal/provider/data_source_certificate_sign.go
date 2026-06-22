@@ -22,7 +22,7 @@ type certificateSigner interface {
 	CertificateSign(issuerName string, sign conjurapi.Sign) (*conjurapi.CertificateResponse, error)
 }
 
-func (c *conjurAPIWrapper) CertificateSign(issuerName string, sign conjurapi.Sign) (*conjurapi.CertificateResponse, error) {
+func (c *apiWrapper) CertificateSign(issuerName string, sign conjurapi.Sign) (*conjurapi.CertificateResponse, error) {
 	return c.client.CertificateSign(issuerName, sign)
 }
 
@@ -98,7 +98,7 @@ func (d *certificateSignDataSource) Configure(ctx context.Context, req datasourc
 		return
 	}
 
-	d.client = &conjurAPIWrapper{client}
+	d.client = &apiWrapper{client}
 }
 
 func (d *certificateSignDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {

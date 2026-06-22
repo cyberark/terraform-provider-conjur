@@ -19,13 +19,13 @@ import (
 const groupMemberIDSeparator = ":"
 
 var (
-	_ resource.Resource                   = &conjurMembershipResource{}
-	_ resource.ResourceWithConfigure      = &conjurMembershipResource{}
-	_ resource.ResourceWithImportState    = &conjurMembershipResource{}
-	_ resource.ResourceWithValidateConfig = &conjurMembershipResource{}
+	_ resource.Resource                   = &membershipResource{}
+	_ resource.ResourceWithConfigure      = &membershipResource{}
+	_ resource.ResourceWithImportState    = &membershipResource{}
+	_ resource.ResourceWithValidateConfig = &membershipResource{}
 )
 
-type conjurMembershipResource struct {
+type membershipResource struct {
 	client api.ClientV2
 }
 
@@ -36,15 +36,15 @@ type membershipResourceModel struct {
 	MemberID   types.String `tfsdk:"member_id"`
 }
 
-func NewConjurMembershipResource() resource.Resource {
-	return &conjurMembershipResource{}
+func NewMembershipResource() resource.Resource {
+	return &membershipResource{}
 }
 
-func (r *conjurMembershipResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+func (r *membershipResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_membership"
 }
 
-func (r *conjurMembershipResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *membershipResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "CyberArk Secrets Manager membership resource",
 		Attributes: map[string]schema.Attribute{
@@ -77,7 +77,7 @@ func (r *conjurMembershipResource) Schema(_ context.Context, _ resource.SchemaRe
 	}
 }
 
-func (r *conjurMembershipResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+func (r *membershipResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	var data membershipResourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -89,7 +89,7 @@ func (r *conjurMembershipResource) ValidateConfig(ctx context.Context, req resou
 	ValidateNonEmpty(data.MemberID, &resp.Diagnostics, "member_id")
 }
 
-func (r *conjurMembershipResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *membershipResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -101,7 +101,7 @@ func (r *conjurMembershipResource) Configure(_ context.Context, req resource.Con
 	r.client = client
 }
 
-func (r *conjurMembershipResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *membershipResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if r.client == nil {
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
@@ -127,7 +127,7 @@ func (r *conjurMembershipResource) Create(ctx context.Context, req resource.Crea
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *conjurMembershipResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *membershipResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	if r.client == nil {
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
@@ -185,7 +185,7 @@ func (r *conjurMembershipResource) Read(ctx context.Context, req resource.ReadRe
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *conjurMembershipResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *membershipResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	if r.client == nil {
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
@@ -196,7 +196,7 @@ func (r *conjurMembershipResource) Update(ctx context.Context, req resource.Upda
 	)
 }
 
-func (r *conjurMembershipResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *membershipResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	if r.client == nil {
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
@@ -222,7 +222,7 @@ func (r *conjurMembershipResource) Delete(ctx context.Context, req resource.Dele
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *conjurMembershipResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *membershipResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	groupID, kind, memberID, err := splitGroupMemberID(req.ID)
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid import ID", "Expected format: group_id|member_kind|member_id")
