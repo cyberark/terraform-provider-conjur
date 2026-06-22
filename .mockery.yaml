@@ -1,5 +1,15 @@
 force-file-write: true
+formatter: goimports
+include-auto-generated: true
 packages:
+  github.com/cyberark/terraform-provider-conjur/internal/swa/client:
+    config:
+      filename: "{{.InterfaceName}}.go"
+      dir: "{{.InterfaceDir}}/mocks"
+      structname: "{{.Mock}}{{.InterfaceName}}"
+      pkgname: "mocks"
+    interfaces:
+      ClientWithResponsesInterface:
   github.com/cyberark/terraform-provider-conjur/internal/conjur:
     config:
       all: true

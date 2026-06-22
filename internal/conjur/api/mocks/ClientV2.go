@@ -76,7 +76,7 @@ type MockClientV2_AddGroupMember_Call struct {
 // AddGroupMember is a helper method to define mock.On call
 //   - s string
 //   - groupMember conjurapi.GroupMember
-func (_e *MockClientV2_Expecter) AddGroupMember(s interface{}, groupMember interface{}) *MockClientV2_AddGroupMember_Call {
+func (_e *MockClientV2_Expecter) AddGroupMember(s any, groupMember any) *MockClientV2_AddGroupMember_Call {
 	return &MockClientV2_AddGroupMember_Call{Call: _e.mock.On("AddGroupMember", s, groupMember)}
 }
 
@@ -144,7 +144,7 @@ type MockClientV2_AddGroupMemberRequest_Call struct {
 // AddGroupMemberRequest is a helper method to define mock.On call
 //   - s string
 //   - groupMember conjurapi.GroupMember
-func (_e *MockClientV2_Expecter) AddGroupMemberRequest(s interface{}, groupMember interface{}) *MockClientV2_AddGroupMemberRequest_Call {
+func (_e *MockClientV2_Expecter) AddGroupMemberRequest(s any, groupMember any) *MockClientV2_AddGroupMemberRequest_Call {
 	return &MockClientV2_AddGroupMemberRequest_Call{Call: _e.mock.On("AddGroupMemberRequest", s, groupMember)}
 }
 
@@ -201,7 +201,7 @@ type MockClientV2_AddSecret_Call struct {
 // AddSecret is a helper method to define mock.On call
 //   - s string
 //   - s1 string
-func (_e *MockClientV2_Expecter) AddSecret(s interface{}, s1 interface{}) *MockClientV2_AddSecret_Call {
+func (_e *MockClientV2_Expecter) AddSecret(s any, s1 any) *MockClientV2_AddSecret_Call {
 	return &MockClientV2_AddSecret_Call{Call: _e.mock.On("AddSecret", s, s1)}
 }
 
@@ -269,7 +269,7 @@ type MockClientV2_AddSecretRequest_Call struct {
 // AddSecretRequest is a helper method to define mock.On call
 //   - s string
 //   - s1 string
-func (_e *MockClientV2_Expecter) AddSecretRequest(s interface{}, s1 interface{}) *MockClientV2_AddSecretRequest_Call {
+func (_e *MockClientV2_Expecter) AddSecretRequest(s any, s1 any) *MockClientV2_AddSecretRequest_Call {
 	return &MockClientV2_AddSecretRequest_Call{Call: _e.mock.On("AddSecretRequest", s, s1)}
 }
 
@@ -336,7 +336,7 @@ type MockClientV2_Authenticate_Call struct {
 
 // Authenticate is a helper method to define mock.On call
 //   - loginPair authn.LoginPair
-func (_e *MockClientV2_Expecter) Authenticate(loginPair interface{}) *MockClientV2_Authenticate_Call {
+func (_e *MockClientV2_Expecter) Authenticate(loginPair any) *MockClientV2_Authenticate_Call {
 	return &MockClientV2_Authenticate_Call{Call: _e.mock.On("Authenticate", loginPair)}
 }
 
@@ -398,7 +398,7 @@ type MockClientV2_AuthenticateReader_Call struct {
 
 // AuthenticateReader is a helper method to define mock.On call
 //   - loginPair authn.LoginPair
-func (_e *MockClientV2_Expecter) AuthenticateReader(loginPair interface{}) *MockClientV2_AuthenticateReader_Call {
+func (_e *MockClientV2_Expecter) AuthenticateReader(loginPair any) *MockClientV2_AuthenticateReader_Call {
 	return &MockClientV2_AuthenticateReader_Call{Call: _e.mock.On("AuthenticateReader", loginPair)}
 }
 
@@ -460,7 +460,7 @@ type MockClientV2_AuthenticateRequest_Call struct {
 
 // AuthenticateRequest is a helper method to define mock.On call
 //   - loginPair authn.LoginPair
-func (_e *MockClientV2_Expecter) AuthenticateRequest(loginPair interface{}) *MockClientV2_AuthenticateRequest_Call {
+func (_e *MockClientV2_Expecter) AuthenticateRequest(loginPair any) *MockClientV2_AuthenticateRequest_Call {
 	return &MockClientV2_AuthenticateRequest_Call{Call: _e.mock.On("AuthenticateRequest", loginPair)}
 }
 
@@ -523,7 +523,7 @@ type MockClientV2_AuthenticatorStatus_Call struct {
 // AuthenticatorStatus is a helper method to define mock.On call
 //   - s string
 //   - s1 string
-func (_e *MockClientV2_Expecter) AuthenticatorStatus(s interface{}, s1 interface{}) *MockClientV2_AuthenticatorStatus_Call {
+func (_e *MockClientV2_Expecter) AuthenticatorStatus(s any, s1 any) *MockClientV2_AuthenticatorStatus_Call {
 	return &MockClientV2_AuthenticatorStatus_Call{Call: _e.mock.On("AuthenticatorStatus", s, s1)}
 }
 
@@ -591,7 +591,7 @@ type MockClientV2_AuthenticatorStatusRequest_Call struct {
 // AuthenticatorStatusRequest is a helper method to define mock.On call
 //   - s string
 //   - s1 string
-func (_e *MockClientV2_Expecter) AuthenticatorStatusRequest(s interface{}, s1 interface{}) *MockClientV2_AuthenticatorStatusRequest_Call {
+func (_e *MockClientV2_Expecter) AuthenticatorStatusRequest(s any, s1 any) *MockClientV2_AuthenticatorStatusRequest_Call {
 	return &MockClientV2_AuthenticatorStatusRequest_Call{Call: _e.mock.On("AuthenticatorStatusRequest", s, s1)}
 }
 
@@ -658,7 +658,7 @@ type MockClientV2_AzureAuthenticate_Call struct {
 
 // AzureAuthenticate is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) AzureAuthenticate(s interface{}) *MockClientV2_AzureAuthenticate_Call {
+func (_e *MockClientV2_Expecter) AzureAuthenticate(s any) *MockClientV2_AzureAuthenticate_Call {
 	return &MockClientV2_AzureAuthenticate_Call{Call: _e.mock.On("AzureAuthenticate", s)}
 }
 
@@ -720,7 +720,7 @@ type MockClientV2_AzureAuthenticateRequest_Call struct {
 
 // AzureAuthenticateRequest is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) AzureAuthenticateRequest(s interface{}) *MockClientV2_AzureAuthenticateRequest_Call {
+func (_e *MockClientV2_Expecter) AzureAuthenticateRequest(s any) *MockClientV2_AzureAuthenticateRequest_Call {
 	return &MockClientV2_AzureAuthenticateRequest_Call{Call: _e.mock.On("AzureAuthenticateRequest", s)}
 }
 
@@ -783,7 +783,7 @@ type MockClientV2_CertificateIssue_Call struct {
 // CertificateIssue is a helper method to define mock.On call
 //   - s string
 //   - issue conjurapi.Issue
-func (_e *MockClientV2_Expecter) CertificateIssue(s interface{}, issue interface{}) *MockClientV2_CertificateIssue_Call {
+func (_e *MockClientV2_Expecter) CertificateIssue(s any, issue any) *MockClientV2_CertificateIssue_Call {
 	return &MockClientV2_CertificateIssue_Call{Call: _e.mock.On("CertificateIssue", s, issue)}
 }
 
@@ -851,7 +851,7 @@ type MockClientV2_CertificateIssueRequest_Call struct {
 // CertificateIssueRequest is a helper method to define mock.On call
 //   - s string
 //   - issue conjurapi.Issue
-func (_e *MockClientV2_Expecter) CertificateIssueRequest(s interface{}, issue interface{}) *MockClientV2_CertificateIssueRequest_Call {
+func (_e *MockClientV2_Expecter) CertificateIssueRequest(s any, issue any) *MockClientV2_CertificateIssueRequest_Call {
 	return &MockClientV2_CertificateIssueRequest_Call{Call: _e.mock.On("CertificateIssueRequest", s, issue)}
 }
 
@@ -919,7 +919,7 @@ type MockClientV2_CertificateSign_Call struct {
 // CertificateSign is a helper method to define mock.On call
 //   - s string
 //   - sign conjurapi.Sign
-func (_e *MockClientV2_Expecter) CertificateSign(s interface{}, sign interface{}) *MockClientV2_CertificateSign_Call {
+func (_e *MockClientV2_Expecter) CertificateSign(s any, sign any) *MockClientV2_CertificateSign_Call {
 	return &MockClientV2_CertificateSign_Call{Call: _e.mock.On("CertificateSign", s, sign)}
 }
 
@@ -987,7 +987,7 @@ type MockClientV2_CertificateSignRequest_Call struct {
 // CertificateSignRequest is a helper method to define mock.On call
 //   - s string
 //   - sign conjurapi.Sign
-func (_e *MockClientV2_Expecter) CertificateSignRequest(s interface{}, sign interface{}) *MockClientV2_CertificateSignRequest_Call {
+func (_e *MockClientV2_Expecter) CertificateSignRequest(s any, sign any) *MockClientV2_CertificateSignRequest_Call {
 	return &MockClientV2_CertificateSignRequest_Call{Call: _e.mock.On("CertificateSignRequest", s, sign)}
 }
 
@@ -1054,7 +1054,7 @@ type MockClientV2_ChangeCurrentUserPassword_Call struct {
 
 // ChangeCurrentUserPassword is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) ChangeCurrentUserPassword(s interface{}) *MockClientV2_ChangeCurrentUserPassword_Call {
+func (_e *MockClientV2_Expecter) ChangeCurrentUserPassword(s any) *MockClientV2_ChangeCurrentUserPassword_Call {
 	return &MockClientV2_ChangeCurrentUserPassword_Call{Call: _e.mock.On("ChangeCurrentUserPassword", s)}
 }
 
@@ -1118,7 +1118,7 @@ type MockClientV2_ChangeUserPassword_Call struct {
 //   - s string
 //   - s1 string
 //   - s2 string
-func (_e *MockClientV2_Expecter) ChangeUserPassword(s interface{}, s1 interface{}, s2 interface{}) *MockClientV2_ChangeUserPassword_Call {
+func (_e *MockClientV2_Expecter) ChangeUserPassword(s any, s1 any, s2 any) *MockClientV2_ChangeUserPassword_Call {
 	return &MockClientV2_ChangeUserPassword_Call{Call: _e.mock.On("ChangeUserPassword", s, s1, s2)}
 }
 
@@ -1192,7 +1192,7 @@ type MockClientV2_ChangeUserPasswordRequest_Call struct {
 //   - s string
 //   - s1 string
 //   - s2 string
-func (_e *MockClientV2_Expecter) ChangeUserPasswordRequest(s interface{}, s1 interface{}, s2 interface{}) *MockClientV2_ChangeUserPasswordRequest_Call {
+func (_e *MockClientV2_Expecter) ChangeUserPasswordRequest(s any, s1 any, s2 any) *MockClientV2_ChangeUserPasswordRequest_Call {
 	return &MockClientV2_ChangeUserPasswordRequest_Call{Call: _e.mock.On("ChangeUserPasswordRequest", s, s1, s2)}
 }
 
@@ -1263,7 +1263,7 @@ type MockClientV2_CheckPermission_Call struct {
 // CheckPermission is a helper method to define mock.On call
 //   - s string
 //   - s1 string
-func (_e *MockClientV2_Expecter) CheckPermission(s interface{}, s1 interface{}) *MockClientV2_CheckPermission_Call {
+func (_e *MockClientV2_Expecter) CheckPermission(s any, s1 any) *MockClientV2_CheckPermission_Call {
 	return &MockClientV2_CheckPermission_Call{Call: _e.mock.On("CheckPermission", s, s1)}
 }
 
@@ -1330,7 +1330,7 @@ type MockClientV2_CheckPermissionForRole_Call struct {
 //   - s string
 //   - s1 string
 //   - s2 string
-func (_e *MockClientV2_Expecter) CheckPermissionForRole(s interface{}, s1 interface{}, s2 interface{}) *MockClientV2_CheckPermissionForRole_Call {
+func (_e *MockClientV2_Expecter) CheckPermissionForRole(s any, s1 any, s2 any) *MockClientV2_CheckPermissionForRole_Call {
 	return &MockClientV2_CheckPermissionForRole_Call{Call: _e.mock.On("CheckPermissionForRole", s, s1, s2)}
 }
 
@@ -1404,7 +1404,7 @@ type MockClientV2_CheckPermissionForRoleRequest_Call struct {
 //   - s string
 //   - s1 string
 //   - s2 string
-func (_e *MockClientV2_Expecter) CheckPermissionForRoleRequest(s interface{}, s1 interface{}, s2 interface{}) *MockClientV2_CheckPermissionForRoleRequest_Call {
+func (_e *MockClientV2_Expecter) CheckPermissionForRoleRequest(s any, s1 any, s2 any) *MockClientV2_CheckPermissionForRoleRequest_Call {
 	return &MockClientV2_CheckPermissionForRoleRequest_Call{Call: _e.mock.On("CheckPermissionForRoleRequest", s, s1, s2)}
 }
 
@@ -1477,7 +1477,7 @@ type MockClientV2_CheckPermissionRequest_Call struct {
 // CheckPermissionRequest is a helper method to define mock.On call
 //   - s string
 //   - s1 string
-func (_e *MockClientV2_Expecter) CheckPermissionRequest(s interface{}, s1 interface{}) *MockClientV2_CheckPermissionRequest_Call {
+func (_e *MockClientV2_Expecter) CheckPermissionRequest(s any, s1 any) *MockClientV2_CheckPermissionRequest_Call {
 	return &MockClientV2_CheckPermissionRequest_Call{Call: _e.mock.On("CheckPermissionRequest", s, s1)}
 }
 
@@ -1577,7 +1577,7 @@ type MockClientV2_CreateAuthenticator_Call struct {
 
 // CreateAuthenticator is a helper method to define mock.On call
 //   - authenticatorBase *conjurapi.AuthenticatorBase
-func (_e *MockClientV2_Expecter) CreateAuthenticator(authenticatorBase interface{}) *MockClientV2_CreateAuthenticator_Call {
+func (_e *MockClientV2_Expecter) CreateAuthenticator(authenticatorBase any) *MockClientV2_CreateAuthenticator_Call {
 	return &MockClientV2_CreateAuthenticator_Call{Call: _e.mock.On("CreateAuthenticator", authenticatorBase)}
 }
 
@@ -1639,7 +1639,7 @@ type MockClientV2_CreateAuthenticatorRequest_Call struct {
 
 // CreateAuthenticatorRequest is a helper method to define mock.On call
 //   - authenticatorBase *conjurapi.AuthenticatorBase
-func (_e *MockClientV2_Expecter) CreateAuthenticatorRequest(authenticatorBase interface{}) *MockClientV2_CreateAuthenticatorRequest_Call {
+func (_e *MockClientV2_Expecter) CreateAuthenticatorRequest(authenticatorBase any) *MockClientV2_CreateAuthenticatorRequest_Call {
 	return &MockClientV2_CreateAuthenticatorRequest_Call{Call: _e.mock.On("CreateAuthenticatorRequest", authenticatorBase)}
 }
 
@@ -1701,7 +1701,7 @@ type MockClientV2_CreateBranch_Call struct {
 
 // CreateBranch is a helper method to define mock.On call
 //   - branch conjurapi.Branch
-func (_e *MockClientV2_Expecter) CreateBranch(branch interface{}) *MockClientV2_CreateBranch_Call {
+func (_e *MockClientV2_Expecter) CreateBranch(branch any) *MockClientV2_CreateBranch_Call {
 	return &MockClientV2_CreateBranch_Call{Call: _e.mock.On("CreateBranch", branch)}
 }
 
@@ -1763,7 +1763,7 @@ type MockClientV2_CreateBranchRequest_Call struct {
 
 // CreateBranchRequest is a helper method to define mock.On call
 //   - branch conjurapi.Branch
-func (_e *MockClientV2_Expecter) CreateBranchRequest(branch interface{}) *MockClientV2_CreateBranchRequest_Call {
+func (_e *MockClientV2_Expecter) CreateBranchRequest(branch any) *MockClientV2_CreateBranchRequest_Call {
 	return &MockClientV2_CreateBranchRequest_Call{Call: _e.mock.On("CreateBranchRequest", branch)}
 }
 
@@ -1824,7 +1824,7 @@ type MockClientV2_CreateHost_Call struct {
 // CreateHost is a helper method to define mock.On call
 //   - s string
 //   - s1 string
-func (_e *MockClientV2_Expecter) CreateHost(s interface{}, s1 interface{}) *MockClientV2_CreateHost_Call {
+func (_e *MockClientV2_Expecter) CreateHost(s any, s1 any) *MockClientV2_CreateHost_Call {
 	return &MockClientV2_CreateHost_Call{Call: _e.mock.On("CreateHost", s, s1)}
 }
 
@@ -1892,7 +1892,7 @@ type MockClientV2_CreateHostRequest_Call struct {
 // CreateHostRequest is a helper method to define mock.On call
 //   - s string
 //   - s1 string
-func (_e *MockClientV2_Expecter) CreateHostRequest(s interface{}, s1 interface{}) *MockClientV2_CreateHostRequest_Call {
+func (_e *MockClientV2_Expecter) CreateHostRequest(s any, s1 any) *MockClientV2_CreateHostRequest_Call {
 	return &MockClientV2_CreateHostRequest_Call{Call: _e.mock.On("CreateHostRequest", s, s1)}
 }
 
@@ -1959,7 +1959,7 @@ type MockClientV2_CreateHostWithAnnotations_Call struct {
 //   - s string
 //   - s1 string
 //   - stringToString map[string]string
-func (_e *MockClientV2_Expecter) CreateHostWithAnnotations(s interface{}, s1 interface{}, stringToString interface{}) *MockClientV2_CreateHostWithAnnotations_Call {
+func (_e *MockClientV2_Expecter) CreateHostWithAnnotations(s any, s1 any, stringToString any) *MockClientV2_CreateHostWithAnnotations_Call {
 	return &MockClientV2_CreateHostWithAnnotations_Call{Call: _e.mock.On("CreateHostWithAnnotations", s, s1, stringToString)}
 }
 
@@ -2029,7 +2029,7 @@ type MockClientV2_CreateIssuer_Call struct {
 
 // CreateIssuer is a helper method to define mock.On call
 //   - issuer conjurapi.Issuer
-func (_e *MockClientV2_Expecter) CreateIssuer(issuer interface{}) *MockClientV2_CreateIssuer_Call {
+func (_e *MockClientV2_Expecter) CreateIssuer(issuer any) *MockClientV2_CreateIssuer_Call {
 	return &MockClientV2_CreateIssuer_Call{Call: _e.mock.On("CreateIssuer", issuer)}
 }
 
@@ -2091,7 +2091,7 @@ type MockClientV2_CreateStaticSecret_Call struct {
 
 // CreateStaticSecret is a helper method to define mock.On call
 //   - staticSecret conjurapi.StaticSecret
-func (_e *MockClientV2_Expecter) CreateStaticSecret(staticSecret interface{}) *MockClientV2_CreateStaticSecret_Call {
+func (_e *MockClientV2_Expecter) CreateStaticSecret(staticSecret any) *MockClientV2_CreateStaticSecret_Call {
 	return &MockClientV2_CreateStaticSecret_Call{Call: _e.mock.On("CreateStaticSecret", staticSecret)}
 }
 
@@ -2153,7 +2153,7 @@ type MockClientV2_CreateStaticSecretRequest_Call struct {
 
 // CreateStaticSecretRequest is a helper method to define mock.On call
 //   - staticSecret conjurapi.StaticSecret
-func (_e *MockClientV2_Expecter) CreateStaticSecretRequest(staticSecret interface{}) *MockClientV2_CreateStaticSecretRequest_Call {
+func (_e *MockClientV2_Expecter) CreateStaticSecretRequest(staticSecret any) *MockClientV2_CreateStaticSecretRequest_Call {
 	return &MockClientV2_CreateStaticSecretRequest_Call{Call: _e.mock.On("CreateStaticSecretRequest", staticSecret)}
 }
 
@@ -2218,7 +2218,7 @@ type MockClientV2_CreateToken_Call struct {
 //   - s1 string
 //   - strings []string
 //   - n int
-func (_e *MockClientV2_Expecter) CreateToken(s interface{}, s1 interface{}, strings interface{}, n interface{}) *MockClientV2_CreateToken_Call {
+func (_e *MockClientV2_Expecter) CreateToken(s any, s1 any, strings any, n any) *MockClientV2_CreateToken_Call {
 	return &MockClientV2_CreateToken_Call{Call: _e.mock.On("CreateToken", s, s1, strings, n)}
 }
 
@@ -2295,7 +2295,7 @@ type MockClientV2_CreateTokenRequest_Call struct {
 
 // CreateTokenRequest is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) CreateTokenRequest(s interface{}) *MockClientV2_CreateTokenRequest_Call {
+func (_e *MockClientV2_Expecter) CreateTokenRequest(s any) *MockClientV2_CreateTokenRequest_Call {
 	return &MockClientV2_CreateTokenRequest_Call{Call: _e.mock.On("CreateTokenRequest", s)}
 }
 
@@ -2357,7 +2357,7 @@ type MockClientV2_CreateWorkload_Call struct {
 
 // CreateWorkload is a helper method to define mock.On call
 //   - workload conjurapi.Workload
-func (_e *MockClientV2_Expecter) CreateWorkload(workload interface{}) *MockClientV2_CreateWorkload_Call {
+func (_e *MockClientV2_Expecter) CreateWorkload(workload any) *MockClientV2_CreateWorkload_Call {
 	return &MockClientV2_CreateWorkload_Call{Call: _e.mock.On("CreateWorkload", workload)}
 }
 
@@ -2419,7 +2419,7 @@ type MockClientV2_CreateWorkloadRequest_Call struct {
 
 // CreateWorkloadRequest is a helper method to define mock.On call
 //   - workload conjurapi.Workload
-func (_e *MockClientV2_Expecter) CreateWorkloadRequest(workload interface{}) *MockClientV2_CreateWorkloadRequest_Call {
+func (_e *MockClientV2_Expecter) CreateWorkloadRequest(workload any) *MockClientV2_CreateWorkloadRequest_Call {
 	return &MockClientV2_CreateWorkloadRequest_Call{Call: _e.mock.On("CreateWorkloadRequest", workload)}
 }
 
@@ -2471,7 +2471,7 @@ type MockClientV2_DeleteAuthenticator_Call struct {
 // DeleteAuthenticator is a helper method to define mock.On call
 //   - s string
 //   - s1 string
-func (_e *MockClientV2_Expecter) DeleteAuthenticator(s interface{}, s1 interface{}) *MockClientV2_DeleteAuthenticator_Call {
+func (_e *MockClientV2_Expecter) DeleteAuthenticator(s any, s1 any) *MockClientV2_DeleteAuthenticator_Call {
 	return &MockClientV2_DeleteAuthenticator_Call{Call: _e.mock.On("DeleteAuthenticator", s, s1)}
 }
 
@@ -2539,7 +2539,7 @@ type MockClientV2_DeleteAuthenticatorRequest_Call struct {
 // DeleteAuthenticatorRequest is a helper method to define mock.On call
 //   - s string
 //   - s1 string
-func (_e *MockClientV2_Expecter) DeleteAuthenticatorRequest(s interface{}, s1 interface{}) *MockClientV2_DeleteAuthenticatorRequest_Call {
+func (_e *MockClientV2_Expecter) DeleteAuthenticatorRequest(s any, s1 any) *MockClientV2_DeleteAuthenticatorRequest_Call {
 	return &MockClientV2_DeleteAuthenticatorRequest_Call{Call: _e.mock.On("DeleteAuthenticatorRequest", s, s1)}
 }
 
@@ -2606,7 +2606,7 @@ type MockClientV2_DeleteBranch_Call struct {
 
 // DeleteBranch is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) DeleteBranch(s interface{}) *MockClientV2_DeleteBranch_Call {
+func (_e *MockClientV2_Expecter) DeleteBranch(s any) *MockClientV2_DeleteBranch_Call {
 	return &MockClientV2_DeleteBranch_Call{Call: _e.mock.On("DeleteBranch", s)}
 }
 
@@ -2668,7 +2668,7 @@ type MockClientV2_DeleteBranchRequest_Call struct {
 
 // DeleteBranchRequest is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) DeleteBranchRequest(s interface{}) *MockClientV2_DeleteBranchRequest_Call {
+func (_e *MockClientV2_Expecter) DeleteBranchRequest(s any) *MockClientV2_DeleteBranchRequest_Call {
 	return &MockClientV2_DeleteBranchRequest_Call{Call: _e.mock.On("DeleteBranchRequest", s)}
 }
 
@@ -2720,7 +2720,7 @@ type MockClientV2_DeleteIssuer_Call struct {
 // DeleteIssuer is a helper method to define mock.On call
 //   - s string
 //   - b bool
-func (_e *MockClientV2_Expecter) DeleteIssuer(s interface{}, b interface{}) *MockClientV2_DeleteIssuer_Call {
+func (_e *MockClientV2_Expecter) DeleteIssuer(s any, b any) *MockClientV2_DeleteIssuer_Call {
 	return &MockClientV2_DeleteIssuer_Call{Call: _e.mock.On("DeleteIssuer", s, b)}
 }
 
@@ -2776,7 +2776,7 @@ type MockClientV2_DeleteToken_Call struct {
 
 // DeleteToken is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) DeleteToken(s interface{}) *MockClientV2_DeleteToken_Call {
+func (_e *MockClientV2_Expecter) DeleteToken(s any) *MockClientV2_DeleteToken_Call {
 	return &MockClientV2_DeleteToken_Call{Call: _e.mock.On("DeleteToken", s)}
 }
 
@@ -2838,7 +2838,7 @@ type MockClientV2_DeleteTokenRequest_Call struct {
 
 // DeleteTokenRequest is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) DeleteTokenRequest(s interface{}) *MockClientV2_DeleteTokenRequest_Call {
+func (_e *MockClientV2_Expecter) DeleteTokenRequest(s any) *MockClientV2_DeleteTokenRequest_Call {
 	return &MockClientV2_DeleteTokenRequest_Call{Call: _e.mock.On("DeleteTokenRequest", s)}
 }
 
@@ -2900,7 +2900,7 @@ type MockClientV2_DeleteWorkload_Call struct {
 
 // DeleteWorkload is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) DeleteWorkload(s interface{}) *MockClientV2_DeleteWorkload_Call {
+func (_e *MockClientV2_Expecter) DeleteWorkload(s any) *MockClientV2_DeleteWorkload_Call {
 	return &MockClientV2_DeleteWorkload_Call{Call: _e.mock.On("DeleteWorkload", s)}
 }
 
@@ -2962,7 +2962,7 @@ type MockClientV2_DeleteWorkloadRequest_Call struct {
 
 // DeleteWorkloadRequest is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) DeleteWorkloadRequest(s interface{}) *MockClientV2_DeleteWorkloadRequest_Call {
+func (_e *MockClientV2_Expecter) DeleteWorkloadRequest(s any) *MockClientV2_DeleteWorkloadRequest_Call {
 	return &MockClientV2_DeleteWorkloadRequest_Call{Call: _e.mock.On("DeleteWorkloadRequest", s)}
 }
 
@@ -3026,7 +3026,7 @@ type MockClientV2_DryRunPolicy_Call struct {
 //   - policyMode conjurapi.PolicyMode
 //   - s string
 //   - reader io.Reader
-func (_e *MockClientV2_Expecter) DryRunPolicy(policyMode interface{}, s interface{}, reader interface{}) *MockClientV2_DryRunPolicy_Call {
+func (_e *MockClientV2_Expecter) DryRunPolicy(policyMode any, s any, reader any) *MockClientV2_DryRunPolicy_Call {
 	return &MockClientV2_DryRunPolicy_Call{Call: _e.mock.On("DryRunPolicy", policyMode, s, reader)}
 }
 
@@ -3089,7 +3089,7 @@ type MockClientV2_EnableAuthenticator_Call struct {
 //   - s string
 //   - s1 string
 //   - b bool
-func (_e *MockClientV2_Expecter) EnableAuthenticator(s interface{}, s1 interface{}, b interface{}) *MockClientV2_EnableAuthenticator_Call {
+func (_e *MockClientV2_Expecter) EnableAuthenticator(s any, s1 any, b any) *MockClientV2_EnableAuthenticator_Call {
 	return &MockClientV2_EnableAuthenticator_Call{Call: _e.mock.On("EnableAuthenticator", s, s1, b)}
 }
 
@@ -3163,7 +3163,7 @@ type MockClientV2_EnableAuthenticatorRequest_Call struct {
 //   - s string
 //   - s1 string
 //   - b bool
-func (_e *MockClientV2_Expecter) EnableAuthenticatorRequest(s interface{}, s1 interface{}, b interface{}) *MockClientV2_EnableAuthenticatorRequest_Call {
+func (_e *MockClientV2_Expecter) EnableAuthenticatorRequest(s any, s1 any, b any) *MockClientV2_EnableAuthenticatorRequest_Call {
 	return &MockClientV2_EnableAuthenticatorRequest_Call{Call: _e.mock.On("EnableAuthenticatorRequest", s, s1, b)}
 }
 
@@ -3293,7 +3293,7 @@ type MockClientV2_FetchPolicy_Call struct {
 //   - b bool
 //   - v uint
 //   - v1 uint
-func (_e *MockClientV2_Expecter) FetchPolicy(s interface{}, b interface{}, v interface{}, v1 interface{}) *MockClientV2_FetchPolicy_Call {
+func (_e *MockClientV2_Expecter) FetchPolicy(s any, b any, v any, v1 any) *MockClientV2_FetchPolicy_Call {
 	return &MockClientV2_FetchPolicy_Call{Call: _e.mock.On("FetchPolicy", s, b, v, v1)}
 }
 
@@ -3414,7 +3414,7 @@ type MockClientV2_GCPAuthenticate_Call struct {
 
 // GCPAuthenticate is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) GCPAuthenticate(s interface{}) *MockClientV2_GCPAuthenticate_Call {
+func (_e *MockClientV2_Expecter) GCPAuthenticate(s any) *MockClientV2_GCPAuthenticate_Call {
 	return &MockClientV2_GCPAuthenticate_Call{Call: _e.mock.On("GCPAuthenticate", s)}
 }
 
@@ -3476,7 +3476,7 @@ type MockClientV2_GCPAuthenticateRequest_Call struct {
 
 // GCPAuthenticateRequest is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) GCPAuthenticateRequest(s interface{}) *MockClientV2_GCPAuthenticateRequest_Call {
+func (_e *MockClientV2_Expecter) GCPAuthenticateRequest(s any) *MockClientV2_GCPAuthenticateRequest_Call {
 	return &MockClientV2_GCPAuthenticateRequest_Call{Call: _e.mock.On("GCPAuthenticateRequest", s)}
 }
 
@@ -3539,7 +3539,7 @@ type MockClientV2_GetAuthenticator_Call struct {
 // GetAuthenticator is a helper method to define mock.On call
 //   - s string
 //   - s1 string
-func (_e *MockClientV2_Expecter) GetAuthenticator(s interface{}, s1 interface{}) *MockClientV2_GetAuthenticator_Call {
+func (_e *MockClientV2_Expecter) GetAuthenticator(s any, s1 any) *MockClientV2_GetAuthenticator_Call {
 	return &MockClientV2_GetAuthenticator_Call{Call: _e.mock.On("GetAuthenticator", s, s1)}
 }
 
@@ -3607,7 +3607,7 @@ type MockClientV2_GetAuthenticatorRequest_Call struct {
 // GetAuthenticatorRequest is a helper method to define mock.On call
 //   - s string
 //   - s1 string
-func (_e *MockClientV2_Expecter) GetAuthenticatorRequest(s interface{}, s1 interface{}) *MockClientV2_GetAuthenticatorRequest_Call {
+func (_e *MockClientV2_Expecter) GetAuthenticatorRequest(s any, s1 any) *MockClientV2_GetAuthenticatorRequest_Call {
 	return &MockClientV2_GetAuthenticatorRequest_Call{Call: _e.mock.On("GetAuthenticatorRequest", s, s1)}
 }
 
@@ -3764,7 +3764,7 @@ type MockClientV2_GetStaticSecretDetails_Call struct {
 
 // GetStaticSecretDetails is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) GetStaticSecretDetails(s interface{}) *MockClientV2_GetStaticSecretDetails_Call {
+func (_e *MockClientV2_Expecter) GetStaticSecretDetails(s any) *MockClientV2_GetStaticSecretDetails_Call {
 	return &MockClientV2_GetStaticSecretDetails_Call{Call: _e.mock.On("GetStaticSecretDetails", s)}
 }
 
@@ -3826,7 +3826,7 @@ type MockClientV2_GetStaticSecretDetailsRequest_Call struct {
 
 // GetStaticSecretDetailsRequest is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) GetStaticSecretDetailsRequest(s interface{}) *MockClientV2_GetStaticSecretDetailsRequest_Call {
+func (_e *MockClientV2_Expecter) GetStaticSecretDetailsRequest(s any) *MockClientV2_GetStaticSecretDetailsRequest_Call {
 	return &MockClientV2_GetStaticSecretDetailsRequest_Call{Call: _e.mock.On("GetStaticSecretDetailsRequest", s)}
 }
 
@@ -3888,7 +3888,7 @@ type MockClientV2_GetStaticSecretPermissions_Call struct {
 
 // GetStaticSecretPermissions is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) GetStaticSecretPermissions(s interface{}) *MockClientV2_GetStaticSecretPermissions_Call {
+func (_e *MockClientV2_Expecter) GetStaticSecretPermissions(s any) *MockClientV2_GetStaticSecretPermissions_Call {
 	return &MockClientV2_GetStaticSecretPermissions_Call{Call: _e.mock.On("GetStaticSecretPermissions", s)}
 }
 
@@ -3950,7 +3950,7 @@ type MockClientV2_GetStaticSecretPermissionsRequest_Call struct {
 
 // GetStaticSecretPermissionsRequest is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) GetStaticSecretPermissionsRequest(s interface{}) *MockClientV2_GetStaticSecretPermissionsRequest_Call {
+func (_e *MockClientV2_Expecter) GetStaticSecretPermissionsRequest(s any) *MockClientV2_GetStaticSecretPermissionsRequest_Call {
 	return &MockClientV2_GetStaticSecretPermissionsRequest_Call{Call: _e.mock.On("GetStaticSecretPermissionsRequest", s)}
 }
 
@@ -4111,7 +4111,7 @@ type MockClientV2_IAMAuthenticateRequest_Call struct {
 
 // IAMAuthenticateRequest is a helper method to define mock.On call
 //   - bytes []byte
-func (_e *MockClientV2_Expecter) IAMAuthenticateRequest(bytes interface{}) *MockClientV2_IAMAuthenticateRequest_Call {
+func (_e *MockClientV2_Expecter) IAMAuthenticateRequest(bytes any) *MockClientV2_IAMAuthenticateRequest_Call {
 	return &MockClientV2_IAMAuthenticateRequest_Call{Call: _e.mock.On("IAMAuthenticateRequest", bytes)}
 }
 
@@ -4226,7 +4226,7 @@ type MockClientV2_Issuer_Call struct {
 
 // Issuer is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) Issuer(s interface{}) *MockClientV2_Issuer_Call {
+func (_e *MockClientV2_Expecter) Issuer(s any) *MockClientV2_Issuer_Call {
 	return &MockClientV2_Issuer_Call{Call: _e.mock.On("Issuer", s)}
 }
 
@@ -4344,7 +4344,7 @@ type MockClientV2_JWTAuthenticate_Call struct {
 // JWTAuthenticate is a helper method to define mock.On call
 //   - s string
 //   - s1 string
-func (_e *MockClientV2_Expecter) JWTAuthenticate(s interface{}, s1 interface{}) *MockClientV2_JWTAuthenticate_Call {
+func (_e *MockClientV2_Expecter) JWTAuthenticate(s any, s1 any) *MockClientV2_JWTAuthenticate_Call {
 	return &MockClientV2_JWTAuthenticate_Call{Call: _e.mock.On("JWTAuthenticate", s, s1)}
 }
 
@@ -4412,7 +4412,7 @@ type MockClientV2_JWTAuthenticateRequest_Call struct {
 // JWTAuthenticateRequest is a helper method to define mock.On call
 //   - s string
 //   - s1 string
-func (_e *MockClientV2_Expecter) JWTAuthenticateRequest(s interface{}, s1 interface{}) *MockClientV2_JWTAuthenticateRequest_Call {
+func (_e *MockClientV2_Expecter) JWTAuthenticateRequest(s any, s1 any) *MockClientV2_JWTAuthenticateRequest_Call {
 	return &MockClientV2_JWTAuthenticateRequest_Call{Call: _e.mock.On("JWTAuthenticateRequest", s, s1)}
 }
 
@@ -4701,7 +4701,7 @@ type MockClientV2_LoadPolicy_Call struct {
 //   - policyMode conjurapi.PolicyMode
 //   - s string
 //   - reader io.Reader
-func (_e *MockClientV2_Expecter) LoadPolicy(policyMode interface{}, s interface{}, reader interface{}) *MockClientV2_LoadPolicy_Call {
+func (_e *MockClientV2_Expecter) LoadPolicy(policyMode any, s any, reader any) *MockClientV2_LoadPolicy_Call {
 	return &MockClientV2_LoadPolicy_Call{Call: _e.mock.On("LoadPolicy", policyMode, s, reader)}
 }
 
@@ -4776,7 +4776,7 @@ type MockClientV2_LoadPolicyRequest_Call struct {
 //   - s string
 //   - reader io.Reader
 //   - b bool
-func (_e *MockClientV2_Expecter) LoadPolicyRequest(policyMode interface{}, s interface{}, reader interface{}, b interface{}) *MockClientV2_LoadPolicyRequest_Call {
+func (_e *MockClientV2_Expecter) LoadPolicyRequest(policyMode any, s any, reader any, b any) *MockClientV2_LoadPolicyRequest_Call {
 	return &MockClientV2_LoadPolicyRequest_Call{Call: _e.mock.On("LoadPolicyRequest", policyMode, s, reader, b)}
 }
 
@@ -4854,7 +4854,7 @@ type MockClientV2_Login_Call struct {
 // Login is a helper method to define mock.On call
 //   - s string
 //   - s1 string
-func (_e *MockClientV2_Expecter) Login(s interface{}, s1 interface{}) *MockClientV2_Login_Call {
+func (_e *MockClientV2_Expecter) Login(s any, s1 any) *MockClientV2_Login_Call {
 	return &MockClientV2_Login_Call{Call: _e.mock.On("Login", s, s1)}
 }
 
@@ -4922,7 +4922,7 @@ type MockClientV2_LoginRequest_Call struct {
 // LoginRequest is a helper method to define mock.On call
 //   - s string
 //   - s1 string
-func (_e *MockClientV2_Expecter) LoginRequest(s interface{}, s1 interface{}) *MockClientV2_LoginRequest_Call {
+func (_e *MockClientV2_Expecter) LoginRequest(s any, s1 any) *MockClientV2_LoginRequest_Call {
 	return &MockClientV2_LoginRequest_Call{Call: _e.mock.On("LoginRequest", s, s1)}
 }
 
@@ -5035,7 +5035,7 @@ type MockClientV2_OidcAuthenticate_Call struct {
 //   - s string
 //   - s1 string
 //   - s2 string
-func (_e *MockClientV2_Expecter) OidcAuthenticate(s interface{}, s1 interface{}, s2 interface{}) *MockClientV2_OidcAuthenticate_Call {
+func (_e *MockClientV2_Expecter) OidcAuthenticate(s any, s1 any, s2 any) *MockClientV2_OidcAuthenticate_Call {
 	return &MockClientV2_OidcAuthenticate_Call{Call: _e.mock.On("OidcAuthenticate", s, s1, s2)}
 }
 
@@ -5109,7 +5109,7 @@ type MockClientV2_OidcAuthenticateRequest_Call struct {
 //   - s string
 //   - s1 string
 //   - s2 string
-func (_e *MockClientV2_Expecter) OidcAuthenticateRequest(s interface{}, s1 interface{}, s2 interface{}) *MockClientV2_OidcAuthenticateRequest_Call {
+func (_e *MockClientV2_Expecter) OidcAuthenticateRequest(s any, s1 any, s2 any) *MockClientV2_OidcAuthenticateRequest_Call {
 	return &MockClientV2_OidcAuthenticateRequest_Call{Call: _e.mock.On("OidcAuthenticateRequest", s, s1, s2)}
 }
 
@@ -5181,7 +5181,7 @@ type MockClientV2_OidcTokenAuthenticate_Call struct {
 
 // OidcTokenAuthenticate is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) OidcTokenAuthenticate(s interface{}) *MockClientV2_OidcTokenAuthenticate_Call {
+func (_e *MockClientV2_Expecter) OidcTokenAuthenticate(s any) *MockClientV2_OidcTokenAuthenticate_Call {
 	return &MockClientV2_OidcTokenAuthenticate_Call{Call: _e.mock.On("OidcTokenAuthenticate", s)}
 }
 
@@ -5243,7 +5243,7 @@ type MockClientV2_OidcTokenAuthenticateRequest_Call struct {
 
 // OidcTokenAuthenticateRequest is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) OidcTokenAuthenticateRequest(s interface{}) *MockClientV2_OidcTokenAuthenticateRequest_Call {
+func (_e *MockClientV2_Expecter) OidcTokenAuthenticateRequest(s any) *MockClientV2_OidcTokenAuthenticateRequest_Call {
 	return &MockClientV2_OidcTokenAuthenticateRequest_Call{Call: _e.mock.On("OidcTokenAuthenticateRequest", s)}
 }
 
@@ -5306,7 +5306,7 @@ type MockClientV2_PermittedRoles_Call struct {
 // PermittedRoles is a helper method to define mock.On call
 //   - s string
 //   - s1 string
-func (_e *MockClientV2_Expecter) PermittedRoles(s interface{}, s1 interface{}) *MockClientV2_PermittedRoles_Call {
+func (_e *MockClientV2_Expecter) PermittedRoles(s any, s1 any) *MockClientV2_PermittedRoles_Call {
 	return &MockClientV2_PermittedRoles_Call{Call: _e.mock.On("PermittedRoles", s, s1)}
 }
 
@@ -5374,7 +5374,7 @@ type MockClientV2_PermittedRolesRequest_Call struct {
 // PermittedRolesRequest is a helper method to define mock.On call
 //   - s string
 //   - s1 string
-func (_e *MockClientV2_Expecter) PermittedRolesRequest(s interface{}, s1 interface{}) *MockClientV2_PermittedRolesRequest_Call {
+func (_e *MockClientV2_Expecter) PermittedRolesRequest(s any, s1 any) *MockClientV2_PermittedRolesRequest_Call {
 	return &MockClientV2_PermittedRolesRequest_Call{Call: _e.mock.On("PermittedRolesRequest", s, s1)}
 }
 
@@ -5442,7 +5442,7 @@ type MockClientV2_PublicKeys_Call struct {
 // PublicKeys is a helper method to define mock.On call
 //   - s string
 //   - s1 string
-func (_e *MockClientV2_Expecter) PublicKeys(s interface{}, s1 interface{}) *MockClientV2_PublicKeys_Call {
+func (_e *MockClientV2_Expecter) PublicKeys(s any, s1 any) *MockClientV2_PublicKeys_Call {
 	return &MockClientV2_PublicKeys_Call{Call: _e.mock.On("PublicKeys", s, s1)}
 }
 
@@ -5510,7 +5510,7 @@ type MockClientV2_PublicKeysRequest_Call struct {
 // PublicKeysRequest is a helper method to define mock.On call
 //   - s string
 //   - s1 string
-func (_e *MockClientV2_Expecter) PublicKeysRequest(s interface{}, s1 interface{}) *MockClientV2_PublicKeysRequest_Call {
+func (_e *MockClientV2_Expecter) PublicKeysRequest(s any, s1 any) *MockClientV2_PublicKeysRequest_Call {
 	return &MockClientV2_PublicKeysRequest_Call{Call: _e.mock.On("PublicKeysRequest", s, s1)}
 }
 
@@ -5621,7 +5621,7 @@ type MockClientV2_ReadBranch_Call struct {
 
 // ReadBranch is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) ReadBranch(s interface{}) *MockClientV2_ReadBranch_Call {
+func (_e *MockClientV2_Expecter) ReadBranch(s any) *MockClientV2_ReadBranch_Call {
 	return &MockClientV2_ReadBranch_Call{Call: _e.mock.On("ReadBranch", s)}
 }
 
@@ -5683,7 +5683,7 @@ type MockClientV2_ReadBranchRequest_Call struct {
 
 // ReadBranchRequest is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) ReadBranchRequest(s interface{}) *MockClientV2_ReadBranchRequest_Call {
+func (_e *MockClientV2_Expecter) ReadBranchRequest(s any) *MockClientV2_ReadBranchRequest_Call {
 	return &MockClientV2_ReadBranchRequest_Call{Call: _e.mock.On("ReadBranchRequest", s)}
 }
 
@@ -5743,7 +5743,7 @@ type MockClientV2_ReadBranches_Call struct {
 
 // ReadBranches is a helper method to define mock.On call
 //   - branchFilter *conjurapi.BranchFilter
-func (_e *MockClientV2_Expecter) ReadBranches(branchFilter interface{}) *MockClientV2_ReadBranches_Call {
+func (_e *MockClientV2_Expecter) ReadBranches(branchFilter any) *MockClientV2_ReadBranches_Call {
 	return &MockClientV2_ReadBranches_Call{Call: _e.mock.On("ReadBranches", branchFilter)}
 }
 
@@ -5805,7 +5805,7 @@ type MockClientV2_ReadBranchesRequest_Call struct {
 
 // ReadBranchesRequest is a helper method to define mock.On call
 //   - branchFilter *conjurapi.BranchFilter
-func (_e *MockClientV2_Expecter) ReadBranchesRequest(branchFilter interface{}) *MockClientV2_ReadBranchesRequest_Call {
+func (_e *MockClientV2_Expecter) ReadBranchesRequest(branchFilter any) *MockClientV2_ReadBranchesRequest_Call {
 	return &MockClientV2_ReadBranchesRequest_Call{Call: _e.mock.On("ReadBranchesRequest", branchFilter)}
 }
 
@@ -5912,7 +5912,7 @@ type MockClientV2_RemoveGroupMember_Call struct {
 // RemoveGroupMember is a helper method to define mock.On call
 //   - s string
 //   - groupMember conjurapi.GroupMember
-func (_e *MockClientV2_Expecter) RemoveGroupMember(s interface{}, groupMember interface{}) *MockClientV2_RemoveGroupMember_Call {
+func (_e *MockClientV2_Expecter) RemoveGroupMember(s any, groupMember any) *MockClientV2_RemoveGroupMember_Call {
 	return &MockClientV2_RemoveGroupMember_Call{Call: _e.mock.On("RemoveGroupMember", s, groupMember)}
 }
 
@@ -5980,7 +5980,7 @@ type MockClientV2_RemoveGroupMemberRequest_Call struct {
 // RemoveGroupMemberRequest is a helper method to define mock.On call
 //   - s string
 //   - groupMember conjurapi.GroupMember
-func (_e *MockClientV2_Expecter) RemoveGroupMemberRequest(s interface{}, groupMember interface{}) *MockClientV2_RemoveGroupMemberRequest_Call {
+func (_e *MockClientV2_Expecter) RemoveGroupMemberRequest(s any, groupMember any) *MockClientV2_RemoveGroupMemberRequest_Call {
 	return &MockClientV2_RemoveGroupMemberRequest_Call{Call: _e.mock.On("RemoveGroupMemberRequest", s, groupMember)}
 }
 
@@ -6047,7 +6047,7 @@ type MockClientV2_Resource_Call struct {
 
 // Resource is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) Resource(s interface{}) *MockClientV2_Resource_Call {
+func (_e *MockClientV2_Expecter) Resource(s any) *MockClientV2_Resource_Call {
 	return &MockClientV2_Resource_Call{Call: _e.mock.On("Resource", s)}
 }
 
@@ -6107,7 +6107,7 @@ type MockClientV2_ResourceExists_Call struct {
 
 // ResourceExists is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) ResourceExists(s interface{}) *MockClientV2_ResourceExists_Call {
+func (_e *MockClientV2_Expecter) ResourceExists(s any) *MockClientV2_ResourceExists_Call {
 	return &MockClientV2_ResourceExists_Call{Call: _e.mock.On("ResourceExists", s)}
 }
 
@@ -6169,7 +6169,7 @@ type MockClientV2_ResourceIDs_Call struct {
 
 // ResourceIDs is a helper method to define mock.On call
 //   - resourceFilter *conjurapi.ResourceFilter
-func (_e *MockClientV2_Expecter) ResourceIDs(resourceFilter interface{}) *MockClientV2_ResourceIDs_Call {
+func (_e *MockClientV2_Expecter) ResourceIDs(resourceFilter any) *MockClientV2_ResourceIDs_Call {
 	return &MockClientV2_ResourceIDs_Call{Call: _e.mock.On("ResourceIDs", resourceFilter)}
 }
 
@@ -6231,7 +6231,7 @@ type MockClientV2_ResourceRequest_Call struct {
 
 // ResourceRequest is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) ResourceRequest(s interface{}) *MockClientV2_ResourceRequest_Call {
+func (_e *MockClientV2_Expecter) ResourceRequest(s any) *MockClientV2_ResourceRequest_Call {
 	return &MockClientV2_ResourceRequest_Call{Call: _e.mock.On("ResourceRequest", s)}
 }
 
@@ -6293,7 +6293,7 @@ type MockClientV2_Resources_Call struct {
 
 // Resources is a helper method to define mock.On call
 //   - resourceFilter *conjurapi.ResourceFilter
-func (_e *MockClientV2_Expecter) Resources(resourceFilter interface{}) *MockClientV2_Resources_Call {
+func (_e *MockClientV2_Expecter) Resources(resourceFilter any) *MockClientV2_Resources_Call {
 	return &MockClientV2_Resources_Call{Call: _e.mock.On("Resources", resourceFilter)}
 }
 
@@ -6355,7 +6355,7 @@ type MockClientV2_ResourcesCount_Call struct {
 
 // ResourcesCount is a helper method to define mock.On call
 //   - resourceFilter *conjurapi.ResourceFilter
-func (_e *MockClientV2_Expecter) ResourcesCount(resourceFilter interface{}) *MockClientV2_ResourcesCount_Call {
+func (_e *MockClientV2_Expecter) ResourcesCount(resourceFilter any) *MockClientV2_ResourcesCount_Call {
 	return &MockClientV2_ResourcesCount_Call{Call: _e.mock.On("ResourcesCount", resourceFilter)}
 }
 
@@ -6417,7 +6417,7 @@ type MockClientV2_ResourcesCountRequest_Call struct {
 
 // ResourcesCountRequest is a helper method to define mock.On call
 //   - resourceFilter *conjurapi.ResourceFilter
-func (_e *MockClientV2_Expecter) ResourcesCountRequest(resourceFilter interface{}) *MockClientV2_ResourcesCountRequest_Call {
+func (_e *MockClientV2_Expecter) ResourcesCountRequest(resourceFilter any) *MockClientV2_ResourcesCountRequest_Call {
 	return &MockClientV2_ResourcesCountRequest_Call{Call: _e.mock.On("ResourcesCountRequest", resourceFilter)}
 }
 
@@ -6479,7 +6479,7 @@ type MockClientV2_ResourcesRequest_Call struct {
 
 // ResourcesRequest is a helper method to define mock.On call
 //   - resourceFilter *conjurapi.ResourceFilter
-func (_e *MockClientV2_Expecter) ResourcesRequest(resourceFilter interface{}) *MockClientV2_ResourcesRequest_Call {
+func (_e *MockClientV2_Expecter) ResourcesRequest(resourceFilter any) *MockClientV2_ResourcesRequest_Call {
 	return &MockClientV2_ResourcesRequest_Call{Call: _e.mock.On("ResourcesRequest", resourceFilter)}
 }
 
@@ -6541,7 +6541,7 @@ type MockClientV2_RetrieveBatchSecrets_Call struct {
 
 // RetrieveBatchSecrets is a helper method to define mock.On call
 //   - strings []string
-func (_e *MockClientV2_Expecter) RetrieveBatchSecrets(strings interface{}) *MockClientV2_RetrieveBatchSecrets_Call {
+func (_e *MockClientV2_Expecter) RetrieveBatchSecrets(strings any) *MockClientV2_RetrieveBatchSecrets_Call {
 	return &MockClientV2_RetrieveBatchSecrets_Call{Call: _e.mock.On("RetrieveBatchSecrets", strings)}
 }
 
@@ -6604,7 +6604,7 @@ type MockClientV2_RetrieveBatchSecretsRequest_Call struct {
 // RetrieveBatchSecretsRequest is a helper method to define mock.On call
 //   - strings []string
 //   - b bool
-func (_e *MockClientV2_Expecter) RetrieveBatchSecretsRequest(strings interface{}, b interface{}) *MockClientV2_RetrieveBatchSecretsRequest_Call {
+func (_e *MockClientV2_Expecter) RetrieveBatchSecretsRequest(strings any, b any) *MockClientV2_RetrieveBatchSecretsRequest_Call {
 	return &MockClientV2_RetrieveBatchSecretsRequest_Call{Call: _e.mock.On("RetrieveBatchSecretsRequest", strings, b)}
 }
 
@@ -6671,7 +6671,7 @@ type MockClientV2_RetrieveBatchSecretsSafe_Call struct {
 
 // RetrieveBatchSecretsSafe is a helper method to define mock.On call
 //   - strings []string
-func (_e *MockClientV2_Expecter) RetrieveBatchSecretsSafe(strings interface{}) *MockClientV2_RetrieveBatchSecretsSafe_Call {
+func (_e *MockClientV2_Expecter) RetrieveBatchSecretsSafe(strings any) *MockClientV2_RetrieveBatchSecretsSafe_Call {
 	return &MockClientV2_RetrieveBatchSecretsSafe_Call{Call: _e.mock.On("RetrieveBatchSecretsSafe", strings)}
 }
 
@@ -6733,7 +6733,7 @@ type MockClientV2_RetrieveSecret_Call struct {
 
 // RetrieveSecret is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) RetrieveSecret(s interface{}) *MockClientV2_RetrieveSecret_Call {
+func (_e *MockClientV2_Expecter) RetrieveSecret(s any) *MockClientV2_RetrieveSecret_Call {
 	return &MockClientV2_RetrieveSecret_Call{Call: _e.mock.On("RetrieveSecret", s)}
 }
 
@@ -6795,7 +6795,7 @@ type MockClientV2_RetrieveSecretReader_Call struct {
 
 // RetrieveSecretReader is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) RetrieveSecretReader(s interface{}) *MockClientV2_RetrieveSecretReader_Call {
+func (_e *MockClientV2_Expecter) RetrieveSecretReader(s any) *MockClientV2_RetrieveSecretReader_Call {
 	return &MockClientV2_RetrieveSecretReader_Call{Call: _e.mock.On("RetrieveSecretReader", s)}
 }
 
@@ -6857,7 +6857,7 @@ type MockClientV2_RetrieveSecretRequest_Call struct {
 
 // RetrieveSecretRequest is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) RetrieveSecretRequest(s interface{}) *MockClientV2_RetrieveSecretRequest_Call {
+func (_e *MockClientV2_Expecter) RetrieveSecretRequest(s any) *MockClientV2_RetrieveSecretRequest_Call {
 	return &MockClientV2_RetrieveSecretRequest_Call{Call: _e.mock.On("RetrieveSecretRequest", s)}
 }
 
@@ -6920,7 +6920,7 @@ type MockClientV2_RetrieveSecretWithVersion_Call struct {
 // RetrieveSecretWithVersion is a helper method to define mock.On call
 //   - s string
 //   - n int
-func (_e *MockClientV2_Expecter) RetrieveSecretWithVersion(s interface{}, n interface{}) *MockClientV2_RetrieveSecretWithVersion_Call {
+func (_e *MockClientV2_Expecter) RetrieveSecretWithVersion(s any, n any) *MockClientV2_RetrieveSecretWithVersion_Call {
 	return &MockClientV2_RetrieveSecretWithVersion_Call{Call: _e.mock.On("RetrieveSecretWithVersion", s, n)}
 }
 
@@ -6988,7 +6988,7 @@ type MockClientV2_RetrieveSecretWithVersionReader_Call struct {
 // RetrieveSecretWithVersionReader is a helper method to define mock.On call
 //   - s string
 //   - n int
-func (_e *MockClientV2_Expecter) RetrieveSecretWithVersionReader(s interface{}, n interface{}) *MockClientV2_RetrieveSecretWithVersionReader_Call {
+func (_e *MockClientV2_Expecter) RetrieveSecretWithVersionReader(s any, n any) *MockClientV2_RetrieveSecretWithVersionReader_Call {
 	return &MockClientV2_RetrieveSecretWithVersionReader_Call{Call: _e.mock.On("RetrieveSecretWithVersionReader", s, n)}
 }
 
@@ -7056,7 +7056,7 @@ type MockClientV2_RetrieveSecretWithVersionRequest_Call struct {
 // RetrieveSecretWithVersionRequest is a helper method to define mock.On call
 //   - s string
 //   - n int
-func (_e *MockClientV2_Expecter) RetrieveSecretWithVersionRequest(s interface{}, n interface{}) *MockClientV2_RetrieveSecretWithVersionRequest_Call {
+func (_e *MockClientV2_Expecter) RetrieveSecretWithVersionRequest(s any, n any) *MockClientV2_RetrieveSecretWithVersionRequest_Call {
 	return &MockClientV2_RetrieveSecretWithVersionRequest_Call{Call: _e.mock.On("RetrieveSecretWithVersionRequest", s, n)}
 }
 
@@ -7123,7 +7123,7 @@ type MockClientV2_Role_Call struct {
 
 // Role is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) Role(s interface{}) *MockClientV2_Role_Call {
+func (_e *MockClientV2_Expecter) Role(s any) *MockClientV2_Role_Call {
 	return &MockClientV2_Role_Call{Call: _e.mock.On("Role", s)}
 }
 
@@ -7183,7 +7183,7 @@ type MockClientV2_RoleExists_Call struct {
 
 // RoleExists is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) RoleExists(s interface{}) *MockClientV2_RoleExists_Call {
+func (_e *MockClientV2_Expecter) RoleExists(s any) *MockClientV2_RoleExists_Call {
 	return &MockClientV2_RoleExists_Call{Call: _e.mock.On("RoleExists", s)}
 }
 
@@ -7245,7 +7245,7 @@ type MockClientV2_RoleMembers_Call struct {
 
 // RoleMembers is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) RoleMembers(s interface{}) *MockClientV2_RoleMembers_Call {
+func (_e *MockClientV2_Expecter) RoleMembers(s any) *MockClientV2_RoleMembers_Call {
 	return &MockClientV2_RoleMembers_Call{Call: _e.mock.On("RoleMembers", s)}
 }
 
@@ -7307,7 +7307,7 @@ type MockClientV2_RoleMembersRequest_Call struct {
 
 // RoleMembersRequest is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) RoleMembersRequest(s interface{}) *MockClientV2_RoleMembersRequest_Call {
+func (_e *MockClientV2_Expecter) RoleMembersRequest(s any) *MockClientV2_RoleMembersRequest_Call {
 	return &MockClientV2_RoleMembersRequest_Call{Call: _e.mock.On("RoleMembersRequest", s)}
 }
 
@@ -7369,7 +7369,7 @@ type MockClientV2_RoleMemberships_Call struct {
 
 // RoleMemberships is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) RoleMemberships(s interface{}) *MockClientV2_RoleMemberships_Call {
+func (_e *MockClientV2_Expecter) RoleMemberships(s any) *MockClientV2_RoleMemberships_Call {
 	return &MockClientV2_RoleMemberships_Call{Call: _e.mock.On("RoleMemberships", s)}
 }
 
@@ -7431,7 +7431,7 @@ type MockClientV2_RoleMembershipsAll_Call struct {
 
 // RoleMembershipsAll is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) RoleMembershipsAll(s interface{}) *MockClientV2_RoleMembershipsAll_Call {
+func (_e *MockClientV2_Expecter) RoleMembershipsAll(s any) *MockClientV2_RoleMembershipsAll_Call {
 	return &MockClientV2_RoleMembershipsAll_Call{Call: _e.mock.On("RoleMembershipsAll", s)}
 }
 
@@ -7493,7 +7493,7 @@ type MockClientV2_RoleMembershipsRequest_Call struct {
 
 // RoleMembershipsRequest is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) RoleMembershipsRequest(s interface{}) *MockClientV2_RoleMembershipsRequest_Call {
+func (_e *MockClientV2_Expecter) RoleMembershipsRequest(s any) *MockClientV2_RoleMembershipsRequest_Call {
 	return &MockClientV2_RoleMembershipsRequest_Call{Call: _e.mock.On("RoleMembershipsRequest", s)}
 }
 
@@ -7556,7 +7556,7 @@ type MockClientV2_RoleMembershipsRequestWithOptions_Call struct {
 // RoleMembershipsRequestWithOptions is a helper method to define mock.On call
 //   - s string
 //   - b bool
-func (_e *MockClientV2_Expecter) RoleMembershipsRequestWithOptions(s interface{}, b interface{}) *MockClientV2_RoleMembershipsRequestWithOptions_Call {
+func (_e *MockClientV2_Expecter) RoleMembershipsRequestWithOptions(s any, b any) *MockClientV2_RoleMembershipsRequestWithOptions_Call {
 	return &MockClientV2_RoleMembershipsRequestWithOptions_Call{Call: _e.mock.On("RoleMembershipsRequestWithOptions", s, b)}
 }
 
@@ -7623,7 +7623,7 @@ type MockClientV2_RoleRequest_Call struct {
 
 // RoleRequest is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) RoleRequest(s interface{}) *MockClientV2_RoleRequest_Call {
+func (_e *MockClientV2_Expecter) RoleRequest(s any) *MockClientV2_RoleRequest_Call {
 	return &MockClientV2_RoleRequest_Call{Call: _e.mock.On("RoleRequest", s)}
 }
 
@@ -7740,7 +7740,7 @@ type MockClientV2_RotateAPIKey_Call struct {
 
 // RotateAPIKey is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) RotateAPIKey(s interface{}) *MockClientV2_RotateAPIKey_Call {
+func (_e *MockClientV2_Expecter) RotateAPIKey(s any) *MockClientV2_RotateAPIKey_Call {
 	return &MockClientV2_RotateAPIKey_Call{Call: _e.mock.On("RotateAPIKey", s)}
 }
 
@@ -7802,7 +7802,7 @@ type MockClientV2_RotateAPIKeyReader_Call struct {
 
 // RotateAPIKeyReader is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) RotateAPIKeyReader(s interface{}) *MockClientV2_RotateAPIKeyReader_Call {
+func (_e *MockClientV2_Expecter) RotateAPIKeyReader(s any) *MockClientV2_RotateAPIKeyReader_Call {
 	return &MockClientV2_RotateAPIKeyReader_Call{Call: _e.mock.On("RotateAPIKeyReader", s)}
 }
 
@@ -7864,7 +7864,7 @@ type MockClientV2_RotateAPIKeyRequest_Call struct {
 
 // RotateAPIKeyRequest is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) RotateAPIKeyRequest(s interface{}) *MockClientV2_RotateAPIKeyRequest_Call {
+func (_e *MockClientV2_Expecter) RotateAPIKeyRequest(s any) *MockClientV2_RotateAPIKeyRequest_Call {
 	return &MockClientV2_RotateAPIKeyRequest_Call{Call: _e.mock.On("RotateAPIKeyRequest", s)}
 }
 
@@ -7982,7 +7982,7 @@ type MockClientV2_RotateCurrentRoleAPIKeyRequest_Call struct {
 // RotateCurrentRoleAPIKeyRequest is a helper method to define mock.On call
 //   - s string
 //   - s1 string
-func (_e *MockClientV2_Expecter) RotateCurrentRoleAPIKeyRequest(s interface{}, s1 interface{}) *MockClientV2_RotateCurrentRoleAPIKeyRequest_Call {
+func (_e *MockClientV2_Expecter) RotateCurrentRoleAPIKeyRequest(s any, s1 any) *MockClientV2_RotateCurrentRoleAPIKeyRequest_Call {
 	return &MockClientV2_RotateCurrentRoleAPIKeyRequest_Call{Call: _e.mock.On("RotateCurrentRoleAPIKeyRequest", s, s1)}
 }
 
@@ -8105,7 +8105,7 @@ type MockClientV2_RotateCurrentUserAPIKeyRequest_Call struct {
 // RotateCurrentUserAPIKeyRequest is a helper method to define mock.On call
 //   - s string
 //   - s1 string
-func (_e *MockClientV2_Expecter) RotateCurrentUserAPIKeyRequest(s interface{}, s1 interface{}) *MockClientV2_RotateCurrentUserAPIKeyRequest_Call {
+func (_e *MockClientV2_Expecter) RotateCurrentUserAPIKeyRequest(s any, s1 any) *MockClientV2_RotateCurrentUserAPIKeyRequest_Call {
 	return &MockClientV2_RotateCurrentUserAPIKeyRequest_Call{Call: _e.mock.On("RotateCurrentUserAPIKeyRequest", s, s1)}
 }
 
@@ -8172,7 +8172,7 @@ type MockClientV2_RotateHostAPIKey_Call struct {
 
 // RotateHostAPIKey is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) RotateHostAPIKey(s interface{}) *MockClientV2_RotateHostAPIKey_Call {
+func (_e *MockClientV2_Expecter) RotateHostAPIKey(s any) *MockClientV2_RotateHostAPIKey_Call {
 	return &MockClientV2_RotateHostAPIKey_Call{Call: _e.mock.On("RotateHostAPIKey", s)}
 }
 
@@ -8234,7 +8234,7 @@ type MockClientV2_RotateUserAPIKey_Call struct {
 
 // RotateUserAPIKey is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) RotateUserAPIKey(s interface{}) *MockClientV2_RotateUserAPIKey_Call {
+func (_e *MockClientV2_Expecter) RotateUserAPIKey(s any) *MockClientV2_RotateUserAPIKey_Call {
 	return &MockClientV2_RotateUserAPIKey_Call{Call: _e.mock.On("RotateUserAPIKey", s)}
 }
 
@@ -8435,7 +8435,7 @@ type MockClientV2_SetAuthenticator_Call struct {
 
 // SetAuthenticator is a helper method to define mock.On call
 //   - authenticator conjurapi.Authenticator
-func (_e *MockClientV2_Expecter) SetAuthenticator(authenticator interface{}) *MockClientV2_SetAuthenticator_Call {
+func (_e *MockClientV2_Expecter) SetAuthenticator(authenticator any) *MockClientV2_SetAuthenticator_Call {
 	return &MockClientV2_SetAuthenticator_Call{Call: _e.mock.On("SetAuthenticator", authenticator)}
 }
 
@@ -8475,7 +8475,7 @@ type MockClientV2_SetHttpClient_Call struct {
 
 // SetHttpClient is a helper method to define mock.On call
 //   - client *http.Client
-func (_e *MockClientV2_Expecter) SetHttpClient(client interface{}) *MockClientV2_SetHttpClient_Call {
+func (_e *MockClientV2_Expecter) SetHttpClient(client any) *MockClientV2_SetHttpClient_Call {
 	return &MockClientV2_SetHttpClient_Call{Call: _e.mock.On("SetHttpClient", client)}
 }
 
@@ -8537,7 +8537,7 @@ type MockClientV2_SubmitRequest_Call struct {
 
 // SubmitRequest is a helper method to define mock.On call
 //   - request *http.Request
-func (_e *MockClientV2_Expecter) SubmitRequest(request interface{}) *MockClientV2_SubmitRequest_Call {
+func (_e *MockClientV2_Expecter) SubmitRequest(request any) *MockClientV2_SubmitRequest_Call {
 	return &MockClientV2_SubmitRequest_Call{Call: _e.mock.On("SubmitRequest", request)}
 }
 
@@ -8601,7 +8601,7 @@ type MockClientV2_UpdateAuthenticator_Call struct {
 //   - s string
 //   - s1 string
 //   - b bool
-func (_e *MockClientV2_Expecter) UpdateAuthenticator(s interface{}, s1 interface{}, b interface{}) *MockClientV2_UpdateAuthenticator_Call {
+func (_e *MockClientV2_Expecter) UpdateAuthenticator(s any, s1 any, b any) *MockClientV2_UpdateAuthenticator_Call {
 	return &MockClientV2_UpdateAuthenticator_Call{Call: _e.mock.On("UpdateAuthenticator", s, s1, b)}
 }
 
@@ -8675,7 +8675,7 @@ type MockClientV2_UpdateAuthenticatorRequest_Call struct {
 //   - s string
 //   - s1 string
 //   - b bool
-func (_e *MockClientV2_Expecter) UpdateAuthenticatorRequest(s interface{}, s1 interface{}, b interface{}) *MockClientV2_UpdateAuthenticatorRequest_Call {
+func (_e *MockClientV2_Expecter) UpdateAuthenticatorRequest(s any, s1 any, b any) *MockClientV2_UpdateAuthenticatorRequest_Call {
 	return &MockClientV2_UpdateAuthenticatorRequest_Call{Call: _e.mock.On("UpdateAuthenticatorRequest", s, s1, b)}
 }
 
@@ -8747,7 +8747,7 @@ type MockClientV2_UpdateBranch_Call struct {
 
 // UpdateBranch is a helper method to define mock.On call
 //   - branch conjurapi.Branch
-func (_e *MockClientV2_Expecter) UpdateBranch(branch interface{}) *MockClientV2_UpdateBranch_Call {
+func (_e *MockClientV2_Expecter) UpdateBranch(branch any) *MockClientV2_UpdateBranch_Call {
 	return &MockClientV2_UpdateBranch_Call{Call: _e.mock.On("UpdateBranch", branch)}
 }
 
@@ -8811,7 +8811,7 @@ type MockClientV2_UpdateBranchRequest_Call struct {
 //   - s string
 //   - owner *conjurapi.Owner
 //   - stringToString map[string]string
-func (_e *MockClientV2_Expecter) UpdateBranchRequest(s interface{}, owner interface{}, stringToString interface{}) *MockClientV2_UpdateBranchRequest_Call {
+func (_e *MockClientV2_Expecter) UpdateBranchRequest(s any, owner any, stringToString any) *MockClientV2_UpdateBranchRequest_Call {
 	return &MockClientV2_UpdateBranchRequest_Call{Call: _e.mock.On("UpdateBranchRequest", s, owner, stringToString)}
 }
 
@@ -8882,7 +8882,7 @@ type MockClientV2_UpdateIssuer_Call struct {
 // UpdateIssuer is a helper method to define mock.On call
 //   - s string
 //   - issuerUpdate conjurapi.IssuerUpdate
-func (_e *MockClientV2_Expecter) UpdateIssuer(s interface{}, issuerUpdate interface{}) *MockClientV2_UpdateIssuer_Call {
+func (_e *MockClientV2_Expecter) UpdateIssuer(s any, issuerUpdate any) *MockClientV2_UpdateIssuer_Call {
 	return &MockClientV2_UpdateIssuer_Call{Call: _e.mock.On("UpdateIssuer", s, issuerUpdate)}
 }
 
@@ -8984,7 +8984,7 @@ type MockClientV2_VerifyMinServerVersion_Call struct {
 
 // VerifyMinServerVersion is a helper method to define mock.On call
 //   - s string
-func (_e *MockClientV2_Expecter) VerifyMinServerVersion(s interface{}) *MockClientV2_VerifyMinServerVersion_Call {
+func (_e *MockClientV2_Expecter) VerifyMinServerVersion(s any) *MockClientV2_VerifyMinServerVersion_Call {
 	return &MockClientV2_VerifyMinServerVersion_Call{Call: _e.mock.On("VerifyMinServerVersion", s)}
 }
 

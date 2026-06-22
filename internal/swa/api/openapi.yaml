@@ -1,0 +1,2098 @@
+openapi: 3.0.3
+info:
+  title: SWA Service API
+  description: >
+    Documents the REST APIs for Secure Workload Access (SWA). Use these APIs to manage trust domains,
+    server groups, node groups, register servers, and retrieve OIDC discovery and federation endpoints.
+  version: 1.0.0
+  contact:
+    name: SWA Service Team
+
+servers:
+  # Added by API Auto Mocking Plugin
+  - description: SwaggerHub API Auto Mocking
+    url: https://virtserver.swaggerhub.com/CyberArk/swa-services-api/main
+  - url: /
+    x-internal: false
+
+
+security:
+  # kics-scan ignore-line
+  - ConjurAccessToken: []
+
+paths:
+  /api/swa/livez:
+    get:
+      summary: Liveness probe
+      description: Verifies SWA is running. You do not need to authenticate.
+      x-internal: true
+      operationId: get-livez
+      tags:
+        - Health
+      # kics-scan ignore-line
+      security: []  # No auth required - health check endpoint
+      responses:
+        '200':
+          description: Service is alive
+          content:
+            application/x.secretsmgr.v2+json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                required:
+                  - status
+
+  /api/swa/trust-domains:
+    parameters:
+      - $ref: '#/components/parameters/AcceptSwa'
+    get:
+      summary: List SWA trust domains
+      description: Lists SWA trust domains with optional pagination.
+      operationId: get-trust-domains
+      tags:
+        - Trust Domains
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          $ref: '#/components/responses/TrustDomainListSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      summary: Register SWA trust domain
+      description: Registers a new SWA trust domain.
+      operationId: post-trust-domain
+      tags:
+        - Trust Domains
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTrustDomainRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/TrustDomainCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/TrustDomainNotFound'
+        '409':
+          $ref: '#/components/responses/TrustDomainConflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/swa/trust-domains/{trust-domain-name}:
+    parameters:
+      - $ref: '#/components/parameters/AcceptSwa'
+      - $ref: '#/components/parameters/TrustDomainName'
+    get:
+      summary: Get SWA trust domain
+      description: Returns SWA trust domain details for the path `trust-domain-name`.
+      operationId: get-trust-domain
+      tags:
+        - Trust Domains
+      responses:
+        '200':
+          $ref: '#/components/responses/TrustDomainSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/TrustDomainNotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    patch:
+      summary: Update SWA trust domain
+      description: >
+        Updates SWA trust domain settings.
+
+        This operation is idempotent: you can call it multiple times with the same trust domain name, and each call succeeds.
+      operationId: patch-trust-domain
+      tags:
+        - Trust Domains
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTrustDomainRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/TrustDomainSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/TrustDomainNotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      summary: Delete SWA trust domain
+      description: >
+        Deletes the SWA trust domain and all resources inside it.
+      operationId: delete-trust-domain
+      tags:
+        - Trust Domains
+      responses:
+        '204':
+          description: Deleted successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/TrustDomainNotFound'
+        '409':
+          $ref: '#/components/responses/TrustDomainConflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/swa/trust-domains/{trust-domain-name}/.well-known/ca-bundles:
+    parameters:
+      - $ref: '#/components/parameters/TrustDomainName'
+    get:
+      summary: Get SWA CA bundles
+      description: Returns CA bundles for the path `trust-domain-name`.
+      operationId: get-ca-bundles
+      tags:
+        - Trust Domains
+      # kics-scan ignore-line
+      security: []
+      parameters:
+        - name: format
+          in: query
+          required: false
+          description: |
+            Response bundle format:
+            - `der` (default): returns `{ "bundles": ["<base64-der>", ...] }`.
+            - `pem`: returns `{ "bundle": "-----BEGIN CERTIFICATE-----..." }`.
+          schema:
+            type: string
+            enum: [der, pem]
+            default: der
+      responses:
+        '200':
+          description: CA bundles retrieved successfully
+          headers:
+            Content-Type:
+              $ref: '#/components/headers/Content-Type-V2'
+          content:
+            application/x.secretsmgr.v2+json:
+              schema:
+                $ref: '#/components/schemas/CABundleResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/TrustDomainNotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/swa/trust-domains/{trust-domain-name}/server-groups:
+    parameters:
+      - $ref: '#/components/parameters/AcceptSwa'
+      - $ref: '#/components/parameters/TrustDomainName'
+    post:
+      summary: Create SWA server group
+      description: Creates an SWA server group in the path trust domain.
+      operationId: post-server-group
+      tags:
+        - Server Groups
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateServerGroupRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/ServerGroupCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/TrustDomainNotFound'
+        '409':
+          $ref: '#/components/responses/ServerGroupConflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    get:
+      summary: List SWA server groups
+      description: Lists SWA server groups with optional pagination.
+      operationId: get-server-groups
+      tags:
+        - Server Groups
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          $ref: '#/components/responses/ServerGroupListSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/TrustDomainNotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/swa/trust-domains/{trust-domain-name}/server-groups/{server-group-name}:
+    parameters:
+      - $ref: '#/components/parameters/AcceptSwa'
+      - $ref: '#/components/parameters/TrustDomainName'
+      - $ref: '#/components/parameters/ServerGroupName'
+    get:
+      summary: Get SWA server group
+      description: Returns SWA server group details for the path `server-group-name`.
+      operationId: get-server-group
+      tags:
+        - Server Groups
+      responses:
+        '200':
+          $ref: '#/components/responses/ServerGroupSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/ServerGroupNotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      summary: Delete SWA server group
+      description: >
+        Deletes the SWA server group.
+
+        You also delete all servers in that group and their related resources in Secrets Manager.
+      operationId: delete-server-group
+      tags:
+        - Server Groups
+      responses:
+        '204':
+          description: Deleted successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/ServerGroupNotFound'
+        '409':
+          $ref: '#/components/responses/ServerGroupConflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    patch:
+      summary: Update SWA server group
+      description: Updates SWA server group settings for the path `server-group-name`.
+      operationId: patch-server-group
+      tags:
+        - Server Groups
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateServerGroupRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/ServerGroupSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/ServerGroupNotFound'
+        '409':
+          $ref: '#/components/responses/ServerGroupConflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/swa/trust-domains/{trust-domain-name}/server-groups/{server-group-name}/node-groups:
+    parameters:
+      - $ref: '#/components/parameters/AcceptSwa'
+      - $ref: '#/components/parameters/TrustDomainName'
+      - $ref: '#/components/parameters/ServerGroupName'
+    get:
+      summary: List SWA node groups
+      description: >
+        Lists SWA node groups with optional pagination.
+        The response includes only node groups you are authorized to see.
+      operationId: get-node-groups
+      tags:
+        - Node Groups
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          $ref: '#/components/responses/NodeGroupListSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      summary: Create SWA node group
+      description: Creates an SWA node group.
+      operationId: post-node-groups
+      tags:
+        - Node Groups
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NodeGroupCreateRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/NodeGroupCreated'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ServerGroupNotFound'
+        '409':
+          $ref: '#/components/responses/NodeGroupConflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/swa/trust-domains/{trust-domain-name}/server-groups/{server-group-name}/node-groups/{node-group-name}:
+    parameters:
+      - $ref: '#/components/parameters/AcceptSwa'
+      - $ref: '#/components/parameters/TrustDomainName'
+      - $ref: '#/components/parameters/ServerGroupName'
+      - $ref: '#/components/parameters/NodeGroupName'
+    get:
+      summary: Get SWA node group
+      description: Returns SWA node group details for the path `node-group-name`.
+      operationId: get-node-group
+      tags:
+        - Node Groups
+      responses:
+        '200':
+          $ref: '#/components/responses/NodeGroupSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NodeGroupNotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    patch:
+      summary: Update SWA node group
+      description: >
+        Updates SWA node group settings for the path `node-group-name`.
+        You can change `description` and `workload_configuration`. You cannot change the node group `name` or its parent server group after creation.
+      operationId: patch-node-group
+      tags:
+        - Node Groups
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NodeGroupUpdateRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/NodeGroupSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NodeGroupNotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      summary: Delete SWA node group
+      description: Deletes the SWA node group for the path `node-group-name`.
+      operationId: delete-node-group
+      tags:
+        - Node Groups
+      responses:
+        '204':
+          description: Deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NodeGroupNotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/swa/trust-domains/{trust-domain-name}/server-groups/{server-group-name}/components:
+    parameters:
+      - $ref: '#/components/parameters/AcceptSwa'
+      - $ref: '#/components/parameters/TrustDomainName'
+      - $ref: '#/components/parameters/ServerGroupName'
+    post:
+      summary: Register SWA server
+      description: Registers an SWA server.
+      operationId: post-server
+      tags:
+        - Servers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateServerRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/ServerCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ServerGroupNotFound'
+        '409':
+          $ref: '#/components/responses/ServerConflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    get:
+      summary: List SWA servers
+      description: Lists SWA servers in the path server group with optional pagination.
+      operationId: get-servers
+      tags:
+        - Servers
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          $ref: '#/components/responses/ServerListSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/ServerGroupNotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/swa/trust-domains/{trust-domain-name}/server-groups/{server-group-name}/components/{server-name}:
+    parameters:
+      - $ref: '#/components/parameters/AcceptSwa'
+      - $ref: '#/components/parameters/TrustDomainName'
+      - $ref: '#/components/parameters/ServerGroupName'
+      - $ref: '#/components/parameters/ServerName'
+    get:
+      summary: Get SWA server
+      description: Returns SWA server details for the path `server-name`.
+      operationId: get-server
+      tags:
+        - Servers
+      responses:
+        '200':
+          $ref: '#/components/responses/ServerSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/ServerNotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      summary: Delete SWA server
+      description: Deletes the SWA server for the path `server-name`.
+      operationId: delete-server
+      tags:
+        - Servers
+      responses:
+        '204':
+          description: Deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ServerNotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/swa/trust-domains/{trust-domain-name}/.well-known/openid-configuration:
+    get:
+      summary: Get OpenID Connect discovery document
+      description: >
+        Returns the OpenID Connect discovery document for the trust domain in the path.
+        This endpoint is public; you do not need to authenticate.
+      operationId: get-openid-configuration
+      tags:
+        - Signing Keys
+      # kics-scan ignore-line
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/TrustDomainName'
+      responses:
+        '200':
+          description: OpenID Connect discovery document
+          content:
+            application/x.secretsmgr.v2+json:
+              schema:
+                $ref: '#/components/schemas/OpenIDConfiguration'
+        '400':
+          description: Bad request
+          content:
+            application/x.secretsmgr.v2+json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '404':
+          description: Trust domain not found
+          content:
+            application/x.secretsmgr.v2+json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '500':
+          description: Internal server error
+          content:
+            application/x.secretsmgr.v2+json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
+  /api/swa/trust-domains/{trust-domain-name}/.well-known/jwks:
+    get:
+      summary: Get JWKS document
+      description: >
+        Returns the JSON Web Key Set (JWKS) for the trust domain in the path.
+        This endpoint is public; you do not need to authenticate.
+      operationId: get-jwks
+      tags:
+        - Signing Keys
+      # kics-scan ignore-line
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/TrustDomainName'
+      responses:
+        '200':
+          description: JWKS document
+          content:
+            application/x.secretsmgr.v2+json:
+              schema:
+                $ref: '#/components/schemas/JWKS'
+        '400':
+          description: Bad request
+          content:
+            application/x.secretsmgr.v2+json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '404':
+          description: Trust domain not found
+          content:
+            application/x.secretsmgr.v2+json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '500':
+          description: Internal server error
+          content:
+            application/x.secretsmgr.v2+json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
+tags:
+  - name: Trust Domains
+    description: >
+      Create, retrieve, update, list, and delete SWA trust domains.
+  - name: Server Groups
+    description: >
+      Create, retrieve, update, list, and delete SWA server groups.
+  - name: Servers
+    description: Register, list, retrieve, and delete SWA servers in a server group.
+  - name: Node Groups
+    description: >
+      Create, retrieve, update, list, and delete SWA node groups.
+  - name: Signing Keys
+    description: >
+      Retrieve OpenID Connect discovery documents, JWKS documents, and CA bundles for SWA federation.
+
+components:
+  parameters:
+    AcceptSwa:
+      name: Accept
+      in: header
+      description: >
+        Include this `Accept` header on SWA management API requests. Use
+        `application/x.secretsmgr.v2+json`.
+      required: true
+      schema:
+        type: string
+        enum:
+          - application/x.secretsmgr.v2+json
+    TrustDomainName:
+      name: trust-domain-name
+      in: path
+      description: >
+        The trust domain name. This value is case-sensitive, must contain 1-60 characters, and can include letters,
+        numbers, periods, underscores, and hyphens only.
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 60
+        pattern: '^[a-zA-Z0-9._-]+$'
+        example: 'prod.example.com'
+    ServerGroupName:
+      name: server-group-name
+      in: path
+      description: >
+        The server group name. This value is case-sensitive, must contain 1-60 characters, and can include letters,
+        numbers, periods, underscores, and hyphens only.
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 60
+        pattern: '^[a-zA-Z0-9._-]+$'
+        example: 'production-servers'
+    ServerName:
+      name: server-name
+      in: path
+      description: >
+        The server name. This value must be 1-60 characters long and can include only letters, numbers, periods,
+        underscores, and hyphens.
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 60
+        pattern: '^[a-zA-Z0-9._-]+$'
+        example: 'production-server-1'
+    NodeGroupName:
+      name: node-group-name
+      in: path
+      description: >
+        The node group name. This value is case-sensitive, must contain 1-60 characters, and can include letters, numbers,
+        periods, underscores, and hyphens only.
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 60
+        pattern: '^[a-zA-Z0-9._-]+$'
+        example: 'production-nodes'
+    Limit:
+      name: limit
+      in: query
+      description: The maximum number of items to return (default 100, max 1000).
+      required: false
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+        maximum: 1000
+        default: 100
+        example: 100
+    Offset:
+      name: offset
+      in: query
+      description: The number of items to skip before starting to return results (default 0).
+      required: false
+      schema:
+        type: integer
+        format: int32
+        minimum: 0
+        default: 0
+        example: 0
+
+  securitySchemes:
+    ConjurAccessToken:
+      name: Authorization
+      type: apiKey
+      in: header
+      description: 'Set the header to `Token token="<jwt-token>"`.'
+
+  headers:
+    Content-Type-V2:
+      description: >
+        Response body uses the v2 Secrets Manager JSON media type
+        `application/x.secretsmgr.v2+json`.
+      schema:
+        type: string
+        enum:
+          - application/x.secretsmgr.v2+json
+
+  examples:
+    WrongAcceptHeader:
+      value:
+        code: bad_request
+        message: 'This endpoint requires "application/x.secretsmgr.v2+json" accept header'
+    ValidationError:
+      value:
+        code: unprocessable_entity
+        message: "The request contains invalid data. Please check the field values and try again."
+    TrustDomainAlreadyExists:
+      value:
+        code: trust_domain_already_exists
+        message: "trust domain with name 'example.org' already exists"
+    TrustDomainNotFound:
+      value:
+        code: trust_domain_not_found
+        message: "trust domain with name 'example.org' not found"
+    NodeGroupNotFound:
+      value:
+        code: node_group_not_found
+        message: "node group with name 'example_node_group' not found"
+    NodeGroupAlreadyExists:
+      value:
+        code: node_group_already_exists
+        message: "node group with name 'example_node_group' already exists"
+    ServerGroupNotFound:
+      value:
+        code: server_group_not_found
+        message: "server group with name 'example_server_group' not found"
+    ServerGroupAlreadyExists:
+      value:
+        code: server_group_already_exists
+        message: "server group with name 'example_server_group' already exists"
+    ServerNotFound:
+      value:
+        code: server_not_found
+        message: "server with name 'example-server' not found"
+    ServerAlreadyExists:
+      value:
+        code: server_already_exists
+        message: "server with name 'example-server' already exists"
+    Unauthorized:
+      value:
+        code: unauthorized
+        message: 'Authentication is required. Please provide a valid access token.'
+    Forbidden:
+      value:
+        code: forbidden
+        message: 'You do not have permission to perform this action'
+    InternalServerError:
+      value:
+        code: internal_server_error
+        message: 'An unexpected error occurred while processing your request. Please try again later.'
+
+  responses:
+    BadRequest:
+      description: Invalid input or syntax error.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            WrongAcceptHeader:
+              $ref: '#/components/examples/WrongAcceptHeader'
+    Unauthorized:
+      description: Authentication is required or has failed.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            UnauthorizedError:
+              $ref: '#/components/examples/Unauthorized'
+    Forbidden:
+      description: Insufficient permissions.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            ForbiddenError:
+              $ref: '#/components/examples/Forbidden'
+    TrustDomainConflict:
+      description: >
+        A trust domain with this name already exists, or the trust domain cannot be deleted because it is
+        currently in use.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            TrustDomainAlreadyExists:
+              $ref: '#/components/examples/TrustDomainAlreadyExists'
+    ServerGroupConflict:
+      description: >
+        A server group with this name already exists, or the server group cannot be deleted because it is
+        currently in use.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            ServerGroupAlreadyExists:
+              $ref: '#/components/examples/ServerGroupAlreadyExists'
+    ServerConflict:
+      description: A server with this name already exists.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            ServerAlreadyExists:
+              $ref: '#/components/examples/ServerAlreadyExists'
+    ServerNotFound:
+      description: The requested server does not exist.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            ServerNotFound:
+              $ref: '#/components/examples/ServerNotFound'
+    ServerListSuccess:
+      description: Servers retrieved successfully.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/ServerListResponse'
+    UnprocessableEntity:
+      description: Business validation failed.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            ValidationError:
+              $ref: '#/components/examples/ValidationError'
+    InternalServerError:
+      description: An unexpected server error occurred.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            InternalServerError:
+              $ref: '#/components/examples/InternalServerError'
+    TrustDomainListSuccess:
+      description: List of trust domains retrieved successfully.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/TrustDomainListResponse'
+    TrustDomainNotFound:
+      description: The requested trust domain does not exist.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            TrustDomainNotFound:
+              $ref: '#/components/examples/TrustDomainNotFound'
+    TrustDomainCreated:
+      description: Trust domain created successfully.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/TrustDomainResponse'
+    TrustDomainSuccess:
+      description: Trust domain details.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/TrustDomainResponse'
+    ServerGroupCreated:
+      description: Created successfully.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/ServerGroupResponse'
+    ServerGroupSuccess:
+      description: Server group details.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/ServerGroupResponse'
+    ServerGroupListSuccess:
+      description: A list of all configured server groups.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/ServerGroupListResponse'
+    ServerGroupNotFound:
+      description: The requested server group does not exist.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            ServerGroupNotFound:
+              $ref: '#/components/examples/ServerGroupNotFound'
+    NodeGroupListSuccess:
+      description: Node groups retrieved successfully.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/NodeGroupListResponse'
+    NodeGroupCreated:
+      description: Created successfully.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/NodeGroupResponse'
+    NodeGroupSuccess:
+      description: Node group retrieved successfully.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/NodeGroupResponse'
+    NodeGroupConflict:
+      description: A node group with this name already exists.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            NodeGroupAlreadyExists:
+              $ref: '#/components/examples/NodeGroupAlreadyExists'
+    NodeGroupNotFound:
+      description: The requested node group does not exist.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            NodeGroupNotFound:
+              $ref: '#/components/examples/NodeGroupNotFound'
+    ServerCreated:
+      description: Created successfully.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/CreateServerResponse'
+    ServerSuccess:
+      description: SWA server details.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/ServerResponse'
+
+  schemas:
+    CreateTrustDomainRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 60
+          description: >
+            The trust domain name. This value is case-sensitive, must contain 1-60 characters, and can include letters,
+            numbers, periods, underscores, and hyphens only.
+          pattern: '^[a-zA-Z0-9._-]+$'
+          example: 'prod.example.com'
+        jwt:
+          $ref: '#/components/schemas/JWTConfigurationInput'
+        x509:
+          $ref: '#/components/schemas/X509ConfigurationInput'
+    CreateServerGroupRequest:
+      type: object
+      required:
+        - name
+        - node_attestation
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 60
+          pattern: '^[a-zA-Z0-9._-]+$'
+          description: >
+            The server group name. This value is case-sensitive, must contain 1-60 characters, and can include letters,
+            numbers, periods, underscores, and hyphens only.
+          example: 'production-servers'
+        description:
+          type: string
+          maxLength: 1024
+          description: Server group description.
+          example: 'Production server group for application services'
+        node_attestation:
+          type: object
+          description: Node attestation settings organized by type. Include at least one supported attestation object.
+          properties:
+            x509pop:
+              $ref: '#/components/schemas/X509PopConfigurationInput'
+            k8s_psat:
+              $ref: '#/components/schemas/K8sPsatConfigurationInput'
+
+    UpdateTrustDomainRequest:
+      type: object
+      minProperties: 1
+      properties:
+        jwt:
+          $ref: '#/components/schemas/UpdateJWTConfigurationInput'
+        x509:
+          $ref: '#/components/schemas/UpdateX509ConfigurationInput'
+
+    UpdateServerGroupRequest:
+      type: object
+      properties:
+        description:
+          type: string
+          maxLength: 1024
+          description: Optional description of the server group.
+          example: 'Production server group for application services'
+        node_attestation:
+          type: object
+          description: Node attestation settings organized by type. Include at least one supported attestation object.
+          properties:
+            x509pop:
+              $ref: '#/components/schemas/X509PopConfigurationInput'
+            k8s_psat:
+              $ref: '#/components/schemas/K8sPsatConfigurationInput'
+
+    X509PopConfigurationInput:
+      type: object
+      required:
+        - ca_certificates
+      properties:
+        ca_certificates:
+          type: string
+          minLength: 1
+          description: PEM-encoded CA certificates when you use `node_attestation.x509pop`.
+          example: '-----BEGIN CERTIFICATE-----\nMIID...\n-----END CERTIFICATE-----'
+
+    K8sPsatConfigurationInput:
+      type: object
+      properties:
+        clusters:
+          type: object
+          description: Map of operator-chosen cluster identifiers to Kubernetes PSAT cluster configurations.
+          additionalProperties:
+            $ref: '#/components/schemas/K8sPsatCluster'
+
+    K8sPsatCluster:
+      type: object
+      properties:
+        service_account_allow_list:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: Allowlist of Kubernetes service accounts.
+        kube_config_file:
+          type: string
+          description: Path to the kubeconfig file for the cluster.
+          nullable: true
+        audience:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: Audience values accepted for projected service account tokens.
+        allowed_node_label_keys:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: Node label keys that are allowed for attested workloads.
+        allowed_pod_label_keys:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: Pod label keys that are allowed for attested workloads.
+
+    TrustDomainResponse:
+      type: object
+      required:
+        - name
+        - jwt
+        - x509
+        - created_at
+        - updated_at
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 60
+          description: The trust domain name.
+          example: 'prod.example.com'
+        jwt:
+          $ref: '#/components/schemas/JWTConfiguration'
+        x509:
+          $ref: '#/components/schemas/X509Configuration'
+        created_at:
+          type: string
+          format: date-time
+          maxLength: 50
+          description: Creation timestamp in date-time format.
+          example: '2026-02-26T11:50:08.283Z'
+        updated_at:
+          type: string
+          format: date-time
+          maxLength: 50
+          description: Last update timestamp in date-time format.
+          example: '2026-02-26T11:50:08.283Z'
+
+    TrustDomainListResponse:
+      type: object
+      required:
+        - trust_domains
+        - count
+      properties:
+        trust_domains:
+          type: array
+          description: Trust domains returned in this response.
+          items:
+            $ref: '#/components/schemas/TrustDomainResponse'
+        count:
+          type: integer
+          format: int64
+          description: Number of trust domains returned in this response.
+          example: 1
+
+    ServerGroupListResponse:
+      type: object
+      required:
+        - server_groups
+        - count
+      properties:
+        server_groups:
+          type: array
+          description: Server groups returned in this response.
+          items:
+            $ref: '#/components/schemas/ServerGroupResponse'
+        count:
+          type: integer
+          format: int64
+          description: Number of server groups returned in this response.
+          example: 1
+
+    JWTConfigurationInput:
+      type: object
+      properties:
+        signing_key_type:
+          type: string
+          enum: [EC_P256, EC_P384, EC_P521, RSA_2048, RSA_4096]
+          description: Signing key type for JWT-SVIDs.
+          example: 'EC_P256'
+        signature_algorithm:
+          type: string
+          enum: [ES256, ES384, ES512, RS256, RS384, RS512]
+          description: Signature algorithm for JWT-SVIDs.
+          example: 'ES256'
+        signing_key_ttl:
+          type: integer
+          format: int32
+          minimum: 3600
+          maximum: 2592000
+          description: Signing key lifetime in seconds.
+          example: 86400
+        token_ttl:
+          type: integer
+          format: int32
+          minimum: 60
+          maximum: 86400
+          description: JWT-SVID lifetime in seconds.
+          example: 300
+    UpdateJWTConfigurationInput:
+      type: object
+      minProperties: 1
+      properties:
+        signing_key_type:
+          type: string
+          enum: [EC_P256, EC_P384, EC_P521, RSA_2048, RSA_4096]
+          description: Signing key type for JWT-SVIDs.
+          example: 'EC_P256'
+        signature_algorithm:
+          type: string
+          enum: [ES256, ES384, ES512, RS256, RS384, RS512]
+          description: Signature algorithm for JWT-SVIDs.
+          example: 'ES256'
+        signing_key_ttl:
+          type: integer
+          format: int32
+          minimum: 3600
+          maximum: 86400
+          description: Signing key lifetime in seconds.
+          example: 86400
+        token_ttl:
+          type: integer
+          format: int32
+          minimum: 60
+          maximum: 86400
+          description: JWT-SVID lifetime in seconds.
+          example: 300
+
+    JWTConfiguration:
+      type: object
+      required:
+        - discovery_endpoints
+        - signature_algorithm
+        - signing_key_type
+        - signing_key_ttl
+        - token_ttl
+      properties:
+        discovery_endpoints:
+          $ref: '#/components/schemas/DiscoveryEndpoints'
+        signature_algorithm:
+          type: string
+          enum: [ES256, ES384, ES512, RS256, RS384, RS512]
+          description: JWT-SVID signature algorithm.
+          example: 'ES256'
+        signing_key_type:
+          type: string
+          enum: [EC_P256, EC_P384, EC_P521, RSA_2048, RSA_4096]
+          description: JWT-SVID signing key type.
+          example: 'EC_P256'
+        signing_key_ttl:
+          type: integer
+          format: int32
+          minimum: 3600
+          maximum: 2592000
+          description: Signing key lifetime in seconds.
+          example: 86400
+        token_ttl:
+          type: integer
+          format: int32
+          minimum: 60
+          maximum: 86400
+          description: JWT-SVID lifetime in seconds.
+          example: 300
+
+    X509ConfigurationInput:
+      type: object
+      properties:
+        workload_ttl:
+          type: integer
+          format: int32
+          minimum: 600
+          maximum: 86400
+          description: Workload X.509 SVID lifetime in seconds.
+          example: 3600
+    UpdateX509ConfigurationInput:
+      type: object
+      required:
+        - workload_ttl
+      properties:
+        workload_ttl:
+          type: integer
+          format: int32
+          minimum: 600
+          maximum: 86400
+          description: Workload X.509 SVID lifetime in seconds.
+          example: 3600
+
+    X509Configuration:
+      type: object
+      required:
+        - workload_ttl
+      properties:
+        workload_ttl:
+          type: integer
+          format: int32
+          minimum: 600
+          maximum: 86400
+          description: Workload X.509 SVID lifetime in seconds.
+          example: 3600
+
+    SystemConfigurationInput:
+      type: object
+      properties:
+        system_ttl:
+          type: integer
+          format: int32
+          minimum: 1200
+          maximum: 86400
+          description: Time to live for Server/Agent SVIDs in seconds.
+          example: 7200
+
+    SystemConfiguration:
+      type: object
+      required:
+        - system_ttl
+      properties:
+        system_ttl:
+          type: integer
+          format: int32
+          minimum: 1200
+          maximum: 86400
+          description: Time to live for Server/Agent SVIDs in seconds.
+          example: 7200
+
+    DiscoveryEndpoints:
+      type: object
+      description: OIDC and JWKS discovery endpoint URLs for the trust domain issuer.
+      required:
+        - oidc_discovery_url
+        - jwks_uri
+      properties:
+        oidc_discovery_url:
+          type: string
+          format: uri
+          maxLength: 2048
+          description: OIDC discovery endpoint for the trust domain issuer.
+          example: 'https://prod.cyberark.cloud/api/swa/trust-domains/prod.cyberark.cloud/.well-known/openid-configuration'
+        jwks_uri:
+          type: string
+          format: uri
+          maxLength: 2048
+          description: JWKS endpoint for the trust domain issuer.
+          example: 'https://prod.cyberark.cloud/api/swa/trust-domains/prod.cyberark.cloud/.well-known/jwks'
+
+    ServerGroupResponse:
+      type: object
+      required:
+        - name
+        - trust_domain_name
+      properties:
+        name:
+          type: string
+          maxLength: 60
+          description: The server group name.
+          example: 'example_server_group_name'
+        trust_domain_name:
+          type: string
+          maxLength: 60
+          description: Associated trust domain name.
+          example: 'prod.example.com'
+        description:
+          type: string
+          maxLength: 1024
+          description: Server group description, if defined.
+          example: 'Production server group for application services'
+        node_attestation:
+          type: object
+          description: Node attestation configuration returned for the server group.
+          properties:
+            x509pop:
+              $ref: '#/components/schemas/X509PopConfigurationInput'
+            k8s_psat:
+              $ref: '#/components/schemas/K8sPsatConfigurationInput'
+        created_at:
+          type: string
+          format: date-time
+          maxLength: 50
+          description: Creation timestamp in date-time format.
+          example: '2024-01-15T10:30:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          maxLength: 50
+          description: Last update timestamp in date-time format.
+          example: '2024-01-15T10:30:00Z'
+
+    CreateServerRequest:
+      type: object
+      required:
+        - name
+        - authentication
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 51
+          pattern: '^[a-zA-Z0-9._-]+$'
+          description: >
+            The server name. This value must be 1-51 characters long and can include only letters, numbers, periods,
+            underscores, and hyphens.
+          example: "my-production-server"
+        authentication:
+          $ref: '#/components/schemas/CreateServerAuthentication'
+
+    CreateServerAuthentication:
+      type: object
+      required:
+        - type
+        - data
+      properties:
+        type:
+          type: string
+          description: Authentication type for the SWA server.
+          enum: [JWT]
+          example: "JWT"
+        data:
+          description: JWT authenticator data for the SWA server.
+          oneOf:
+            # Add other authentication data types here in the future
+            - $ref: '#/components/schemas/CreateServerJWTAuthenticationData'
+
+    JWTAuthenParams:
+      # Auto-generated from https://github.com/CyberArk-docs/conjur-cloud-api.git
+      # Do not edit manually - run 'go generate' to update
+      title: JWTAuthenParams
+      type: object
+      description: |
+        Object containing specific fields for JWT authenticators.
+
+        Mandatory variables are either `jwks_uri` or `public_keys`, which specify how the JWT Authenticator gets the JWT's signing keys. If you define `public_keys`, you must also define `issuer`.
+
+        The other variables are optional.
+
+        If you define `identity_path`, you must also define `token_app_property`. These variables are used to associate a workload with the authenticator, where:
+        * `identity_path`: the workload's policy ID (full pathname)
+        * `token_app_property`: a JWT claim name, where the claim's value must be the associated workload's ID (name).
+
+        Each field is created as a secret in Secrets Manager.
+      properties:
+        ca_cert:
+          type: string
+          description: |
+            Creates the following Secrets Manager secret: `conjur/authn-jwt/<authenticator-name>/ca-cert`.
+
+            When the JWKS provider server uses a self-signed certificate or the certificate is signed by a third-party CA, use this variable to establish a TLS connection and validate the JWKS server's identity.
+
+            The specified certificates override the default operating system CA certificate when fetching the JWKS from the URL.
+
+            Value: The X.509 public key certificate or certificate bundle. Each certificate in the bundle must be in PEM (RFC7468) format.
+
+            For Edge authentication, the JWKS provider certificate must include the server's Common Name and SAN.
+          pattern: .
+          minLength: 1
+          maxLength: 10000
+        audience:
+          type: string
+          description: |-
+            Creates the following Secrets Manager secret: `conjur/authn-jwt/<authenticator-name>/audience`.
+
+            If the JWT has an audience claim (`aud`), you can include this variable to validate the claim. The audience variable accepts a single value and must match at least one of the JWT's `aud` values.
+          pattern: '[^<> ]'
+          minLength: 1
+          maxLength: 1000
+        jwks_uri:
+          type: string
+          description: |-
+            Creates the following Secrets Manager secret: `conjur/authn-jwt/<authenticator-name>/jwks-uri`.
+
+            The resource for a set of JSON-encoded public key set (JWKS), one of which corresponds to the key used to digitally sign the JWT. The keys must be encoded as a JWK Set (RFC7517).
+
+            Value: A JWKS URL, beginning with `https://`
+
+            If you are authenticating to an Edge, make sure that the Edge has access to the JWKS URL.
+
+            When using this option, we strongly recommend that you use TLS communication with the public-keys server provider, thereby following best security practices.
+          pattern: '[^<> ?]'
+          minLength: 1
+          maxLength: 255
+        public_keys:
+          type: object
+          description: |
+            Creates the following Secrets Manager secret: `conjur/authn-jwt/<authenticator name>/public-keys`.
+
+            When Secrets Manager is unable to reach a remote JWKS URL, you can use this variable to provide a JWKS to the JWT Authenticator.
+
+            When using this variable, it is assumed that the JWT includes an `iss` claim, and you must also define the `issuer` variable (see below).
+
+            Value: A JSON object with these fields -
+            * `type` (string): must be `jwks`
+            * `value`: the JWKS
+
+            in the following format:
+
+            {"type":"jwks", "value":<JWKS>}
+
+            For example:
+
+            ```{
+              "type":"jwks",
+              "value": {
+                "keys":[
+                  {
+                    "use":"sig",
+                    "kty":"RSA",
+                    "kid":"D1wArl26HhE2bFf4o4lAnnr0xtxcKt2ElJgFQnRgXk",
+                    "alg":"RS256",   "n":"9gRcfAj1FsaX_hJ4__r6dXEs9AAETFPIG4pRti87XUyx-hi6z4dWvhkxLxZ12dKVGfWUkVRbLCUTfNlT9zueMib2HZ9mnk2oXJCBUuzi6JoIm1A5JyP-q_0GR6vCNH_Z7BVFI9cQKFprku6xpYZzdJcdAibzU12RuVsE0L3LKMolDS7Nhr6wKU1m8Ka-sNkFl1qciWO4oQcv3AUnOJvzMotCOzA_5MCyS6CGqWFXJo1KvzqrnIlJoA8tfnT5vnfSJhiWC_FYoeSPCmY3VnGvFs6PTJDa3Gfvb7U1X4S5ztnI6Y_ac3GtSdmVDnQPsOkKQI8669MHq-Bd-8C6Vp6UNQ",
+                    "e":"AQAB"
+                  }
+                ]
+              }
+            }
+          additionalProperties: {}
+        issuer:
+          type: string
+          description: |-
+            Creates the following Secrets Manager secret: `conjur/authn-jwt/<authenticator-name>/issuer`
+
+            Used to validate the JWT's `iss` claim.
+
+            Required when the JWKS is defined in the  `public-keys` variable is defined in the policy.
+
+            When the JWKS is retrieved from a JWKS URL, this variable is optional. In this case, if you do not define this variable, the issuer is taken from the `jwks-uri`.
+          pattern: '[^<> ]'
+          minLength: 1
+          maxLength: 255
+        identity:
+          type: object
+          properties:
+            claim_aliases:
+              type: object
+              description: |
+                Creates the following Secrets Manager secret: `conjur/authn-jwt/<authenticator-name>/claim-aliases`.
+
+                A comma-delimited list of JWT claim key names mapped to customized names in this format: `<claim-alias>`: `<claim-name>`.
+
+                After creating the aliases, you can use them in workload annotations instead of the actual claim name.
+
+                Example:
+
+                1. Create an `environment` alias for a JWT's `workspace` claim, set the value to:
+                `environment: workspace`
+                1. When you use the claim in a workload, set the annotation's key to:
+                `authn-jwt/<authenticator-name>/environment`
+
+                For nested claims, specify the path to the nested claim:
+                `<claim-alias>:<parent-claim-name>/<child-claim-name>`
+
+                You cannot map reserved claims to aliases (`iss`, `exp`, `nbf`, `iat`,
+                `aud`, `jti`).
+              additionalProperties:
+                type: string
+                minLength: 1
+                maxLength: 1000
+                pattern: .*
+            enforced_claims:
+              type: array
+              nullable: false
+              description: |
+                Creates the following Secrets Manager secret: `conjur/authn-jwt/<authenticator-name>/enforced-claims`.
+
+                Used to define a list of enforced claims in the authenticator. When defined, all associated workloads must include these enforced claims in their annotations.
+
+                For nested claims, specify the path to the nested claim:
+                `<claim-alias>:<parent-claim-name>/<child-claim-name>`
+
+                You cannot map reserved claims to aliases (`iss`, `exp`, `nbf`, `iat`,
+                `aud`, `jti`).
+              items:
+                type: string
+                minLength: 1
+                maxLength: 500
+            identity_path:
+              type: string
+              pattern: .
+              minLength: 1
+              maxLength: 1000
+              description: |
+                Creates the following Secrets Manager secret: `conjur/authn-jwt/<authenticator-name>/identity-path`.
+
+                When you define the `token-app-property` variable, you use the `identity-path` variable to define the workload's policy ID (full pathname) in Secrets Manager. Combined, the `identity-path` and `token-app-property` values provide the workload's ID.
+            token_app_property:
+              type: string
+              pattern: '[^<> ]'
+              minLength: 1
+              maxLength: 1000
+              description: |-
+                Creates the following Secrets Manager secret: `conjur/authn-jwt/<authenticator-name>/token-app-property`.
+
+                Use `token-app-property` to create a mapping between the JWT authenticator and a workload.
+
+                You populate `token-app-property` with the name of JWT claim, for example `app-id`. When you create a workload, its ID must match the JWT claim's value.
+
+                For example, if the JWT has the following claim: `app-id`: "app530"
+
+                You populate the token-app-property with `app-id`. When you create the workload, you define its ID as follows:
+
+                `- !host app530`
+
+                The JWT authenticator uses this mapping to validate the identity of the authenticating workload.
+
+                For nested claims, specify the path to the nested claim:
+                `<parent-claim-name>/<child-claim-name>`
+
+                Claim name values that contain a slash (/) or a colon (:) are not supported.
+
+    CreateServerJWTAuthenticationData:
+      type: object
+      description: |
+        Conjur JWT authenticator configuration. The `sub` field is the subject claim value from the workload JWT
+        that identifies the server workload. All other fields pass through to the Conjur Cloud API.
+
+        For more information, see the Conjur Cloud API documentation for supported fields and validation rules:
+        https://docs.cyberark.com/secrets-manager-saas/latest/en/content/conjurcloud/apis/ccl-api-create-auth.htm?tocpath=Developer%20reference%7CSecrets%20Manager%20REST%20APIs%7CREST%20APIs%20v2%7CManage%20authenticators%7C_____1#Requestbody:~:text=JWT%20authenticator%20data%C2%A0object
+      allOf:
+        - $ref: '#/components/schemas/JWTAuthenParams'
+        - type: object
+          required:
+            - sub
+          properties:
+            sub:
+              type: string
+              description: Expected subject claim value used to identify the server workload.
+
+    CreateServerResponse:
+      type: object
+      required:
+        - name
+        - authentication
+        - authn_id
+      properties:
+        name:
+          type: string
+          description: Display name of the registered SWA server.
+        authentication:
+          $ref: '#/components/schemas/CreateServerAuthentication'
+        authn_id:
+          type: string
+          description: Opaque Base64-encoded authenticator identifier used during server authentication setup.
+          example: "aG9zdC9kYXRhL2FwcDEK"
+        login_url:
+          type: string
+          description: "Deprecated: Use authn_id instead. Opaque Base64-encoded authenticator identifier used during server authentication setup."
+          deprecated: true
+
+    ServerResponse:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: Display name of the SWA server.
+          minLength: 1
+          maxLength: 60
+          pattern: '^[a-zA-Z0-9._-]+$'
+          example: "SWA-Server-A"
+        server_group_name:
+          type: string
+          description: Name of the server group that contains this SWA server.
+          example: "cfb22929-9f7f-4703-96ea-ddb1dc1b26a0"
+        authentication:
+          $ref: '#/components/schemas/ServerAuthentication'
+        authn_id:
+          type: string
+          description: Opaque Base64-encoded authenticator identifier used during server authentication setup.
+          example: "aG9zdC9kYXRhL2FwcDEK"
+        login_url:
+          type: string
+          description: '**NOTE**: Deprecated. Use `authn_id` instead. Opaque Base64-encoded authenticator identifier used during server authentication setup.'
+          example: "aG9zdC9kYXRhL2FwcDEK"
+          deprecated: true
+
+    ServerAuthentication:
+      type: object
+      description: Authentication configuration for an SWA server.
+      required:
+        - type
+        - name
+        - enabled
+        - data
+      properties:
+        type:
+          type: string
+          enum: ["jwt"]
+          description: Authentication type for the SWA server.
+          example: "jwt"
+        name:
+          type: string
+          description: Authentication name or identifier for the SWA server.
+          example: "serverB-auth"
+        enabled:
+          type: boolean
+          description: Indicates whether authentication is enabled for the SWA server.
+          example: true
+        data:
+          type: object
+          description: Authentication data containing issuer, audience, and related JWT fields.
+          additionalProperties: true
+          example:
+            audience: "conjur-cloud"
+            jwks_uri: "https://k8s-oidc.example.com/.well-known/jwks"
+            issuer: "https://k8s-oidc.example.com"
+            sub: "K8S service account name"
+        annotations:
+          type: object
+          additionalProperties:
+            type: string
+          description: Optional metadata annotations for the SWA server authentication configuration.
+          example:
+            env: "prod"
+            kubernetes_cluster: "prod-cluster-1"
+
+    ServerListResponse:
+      type: object
+      required:
+        - components
+        - count
+      properties:
+        components:
+          type: array
+          description: List of SWA servers.
+          items:
+            $ref: '#/components/schemas/ServerResponse'
+        count:
+          type: integer
+          format: int64
+          description: Number of servers returned in this response
+          example: 1
+
+    WorkloadConfiguration:
+      type: object
+      description: Configuration that controls workload identity issuance for the node group.
+      properties:
+        spiffe_id_template:
+          type: string
+          description: |
+            Go template for workload SPIFFE IDs. Must begin with spiffe://{{ .trustdomain }}/{{ .nodegroup }}/.
+            If you omit it, SWA uses a default template for the node group's workload_type. Kubernetes defaults use
+            namespace and service account; Unix defaults use the Unix user.
+            An empty string resets the template to the workload-type default.
+
+            For available template variables, see SPIRE workload attestor documentation:
+            - Unix: https://github.com/spiffe/spire/blob/bb85a68/doc/plugin_agent_workloadattestor_unix.md
+            - Kubernetes: https://github.com/spiffe/spire/blob/bb85a68/doc/plugin_agent_workloadattestor_k8s.md
+            - Docker: https://github.com/spiffe/spire/blob/bb85a68/doc/plugin_agent_workloadattestor_docker.md
+          example: "spiffe://{{ .trustdomain }}/{{ .nodegroup }}/workload/{{ .unix.user }}"
+        workload_registration_policies:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          description: >
+            Optional array of CEL expressions. At least one expression must evaluate to TRUE for SWA to issue an SVID.
+            If you omit workload_configuration or omit this property, SWA issues SVIDs for all workloads on attested
+            nodes in the group.
+
+            CEL expressions have access to attestation data from SPIRE workload attestors:
+            - Unix: https://github.com/spiffe/spire/blob/bb85a68/doc/plugin_agent_workloadattestor_unix.md
+            - Kubernetes: https://github.com/spiffe/spire/blob/bb85a68/doc/plugin_agent_workloadattestor_k8s.md
+            - Docker: https://github.com/spiffe/spire/blob/bb85a68/doc/plugin_agent_workloadattestor_docker.md
+
+          example:
+            - unix.uid > 1000
+            - unix.group == "servers"
+
+    NodeGroupCreateRequest:
+      type: object
+      required: [name, workload_type]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 60
+          pattern: '^[a-zA-Z0-9._-]+$'
+          description: >
+            The unique node group name. This value is case-sensitive, must contain 1-60 characters, and can include letters,
+            numbers, periods, underscores, and hyphens only. When the server group uses X.509 proof-of-possession
+            attestation, the name must match the Subject Common Name (CN) in the node's X.509 certificate. When the
+            server group uses Kubernetes attestation, the name must match the value of the swa_nodegroup pod label on
+            the SWA Agent.
+        workload_type:
+          type: string
+          enum: [kubernetes, unix]
+          description: >
+            The workload platform for this node group, either kubernetes or unix. This value sets the default SPIFFE ID
+            template and determines which attestation selectors you can use in workload_registration_policies.
+        description:
+          type: string
+          description: Node group description.
+        workload_configuration:
+          $ref: '#/components/schemas/WorkloadConfiguration'
+
+    NodeGroupUpdateRequest:
+      type: object
+      properties:
+        description:
+          type: string
+        workload_configuration:
+          $ref: '#/components/schemas/WorkloadConfiguration'
+
+    NodeGroupListResponse:
+      type: object
+      required: [node_groups, count]
+      properties:
+        node_groups:
+          type: array
+          description: Node groups returned in this response.
+          items:
+            $ref: '#/components/schemas/NodeGroupResponse'
+        count:
+          type: integer
+          format: int64
+          description: Number of node groups returned in this response.
+
+    NodeGroupResponse:
+      type: object
+      required: [name, workload_type, workload_configuration, created_at, updated_at]
+      properties:
+        name:
+          type: string
+          description: The node group name.
+        workload_type:
+          type: string
+          enum: [kubernetes, unix]
+          description: The workload platform for this node group, either kubernetes or unix.
+        description:
+          type: string
+          description: Node group description.
+        workload_configuration:
+          $ref: '#/components/schemas/WorkloadConfiguration'
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp in date-time format.
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp in date-time format.
+
+    Error:
+      type: object
+      description: |
+        Standard error response containing machine-readable code and human-readable message.
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          pattern: '^[a-z_]+$'
+          maxLength: 50
+          description: Machine-readable error code in snake_case format.
+          example: 'unprocessable_entity'
+        message:
+          type: string
+          maxLength: 1000
+          description: Human-readable error message providing context and details.
+          example: "trust domain field 'name' is invalid: must follow SPIFFE trust domain format"
+
+    OpenIDConfiguration:
+      type: object
+      description: OpenID Connect discovery document.
+      required:
+        - issuer
+        - jwks_uri
+        - response_types_supported
+        - subject_types_supported
+        - id_token_signing_alg_values_supported
+      properties:
+        issuer:
+          type: string
+          description: The issuer identifier URL.
+          example: 'https://api.example.com/api/issuers/550e8400-e29b-41d4-a716-446655440000'
+        jwks_uri:
+          type: string
+          description: URL to the JWKS endpoint.
+          example: 'https://api.example.com/api/issuers/550e8400-e29b-41d4-a716-446655440000/.well-known/jwks'
+        response_types_supported:
+          type: array
+          description: Supported OAuth 2.0 response types.
+          items:
+            type: string
+          example: ['id_token']
+        subject_types_supported:
+          type: array
+          description: Supported subject identifier types.
+          items:
+            type: string
+          example: ['public']
+        id_token_signing_alg_values_supported:
+          type: array
+          description: Supported JWT signing algorithms.
+          items:
+            type: string
+          example: ['RS256', 'RS384', 'RS512', 'ES256', 'ES384', 'ES512']
+
+    JWKS:
+      type: object
+      description: JSON Web Key Set (JWKS) document.
+      required:
+        - keys
+      properties:
+        keys:
+          type: array
+          description: Array of JSON Web Keys.
+          items:
+            $ref: '#/components/schemas/JWK'
+
+    JWK:
+      type: object
+      description: A single JSON Web Key.
+      required:
+        - kid
+        - kty
+        - use
+        - alg
+      properties:
+        kid:
+          type: string
+          description: Key ID.
+          example: '550e8400-e29b-41d4-a716-446655440000'
+        kty:
+          type: string
+          description: Key type.
+          enum: ['RSA', 'EC']
+          example: 'EC'
+        use:
+          type: string
+          description: Public key use.
+          example: 'sig'
+        alg:
+          type: string
+          description: Algorithm.
+          example: 'ES256'
+        n:
+          type: string
+          description: RSA modulus (for RSA keys).
+          example: 'xGOr-H7A...'
+        e:
+          type: string
+          description: RSA exponent (for RSA keys).
+          example: 'AQAB'
+        x:
+          type: string
+          description: EC x coordinate (for EC keys).
+          example: 'WKn-ZIGevcwGIyyrzFoZNBdaq9_TsqzGl96oc0CWuis'
+        y:
+          type: string
+          description: EC y coordinate (for EC keys).
+          example: 'nM84jDHCMOTGTh_ZdHq5dBBdo4Z5PkEOW9jA8z8IsGc'
+        crv:
+          type: string
+          description: EC curve (for EC keys).
+          enum: ['P-256', 'P-384', 'P-521']
+          example: 'P-256'
+
+    CABundleResponse:
+      type: object
+      oneOf:
+        - type: object
+          description: Concatenated PEM certificate bundle.
+          required:
+            - bundle
+          properties:
+            bundle:
+              type: string
+              description: Concatenated PEM certificate bundle.
+        - type: object
+          description: List of base64-encoded DER certificates.
+          required:
+            - bundles
+          properties:
+            bundles:
+              type: array
+              description: Base64-encoded DER certificates.
+              items:
+                type: string
+                format: byte
+
