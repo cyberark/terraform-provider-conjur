@@ -64,7 +64,7 @@ func TestMembershipResource_Create(t *testing.T) {
 			mockClientV2 := mocks.NewMockClientV2(t)
 			tt.setupMock(mockClientV2)
 
-			r := &conjurMembershipResource{
+			r := &membershipResource{
 				client: mockClientV2,
 			}
 
@@ -260,7 +260,7 @@ func TestMembershipResource_Read(t *testing.T) {
 			mockClient := mocks.NewMockClientV2(t)
 			tt.setupMock(mockClient)
 
-			r := &conjurMembershipResource{
+			r := &membershipResource{
 				client: mockClient,
 			}
 
@@ -422,7 +422,7 @@ func TestMembershipResource_Delete(t *testing.T) {
 			mockClient := mocks.NewMockClientV2(t)
 			tt.setupMock(mockClient)
 
-			r := &conjurMembershipResource{
+			r := &membershipResource{
 				client: mockClient,
 			}
 
@@ -465,7 +465,7 @@ func TestMembershipResource_Delete(t *testing.T) {
 }
 
 func getMembershipTestSchema() schema.Schema {
-	r := &conjurMembershipResource{}
+	r := &membershipResource{}
 	var schemaResp resource.SchemaResponse
 	r.Schema(context.Background(), resource.SchemaRequest{}, &schemaResp)
 	return schemaResp.Schema

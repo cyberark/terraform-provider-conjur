@@ -12,11 +12,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestConjurHostResource_Schema(t *testing.T) {
+func TestHostResource_Schema(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	ds := NewConjurHostResource()
+	ds := NewHostResource()
 
 	schemaRequest := resource.SchemaRequest{}
 	schemaResponse := &resource.SchemaResponse{}
@@ -31,15 +31,15 @@ func TestConjurHostResource_Schema(t *testing.T) {
 	}
 }
 
-func TestConjurHostResource_buildHostPayload(t *testing.T) {
-	r := &ConjurHostResource{}
+func TestHostResource_buildHostPayload(t *testing.T) {
+	r := &HostResource{}
 
 	t.Run("Minimum host fields provided", func(t *testing.T) {
-		data := &ConjurHostResourceModel{
+		data := &HostResourceModel{
 			Name:   types.StringValue("test-host"),
 			Branch: types.StringValue("data"),
 			Type:   types.StringNull(),
-			AuthnDescriptors: []ConjurHostAuthnDescriptor{
+			AuthnDescriptors: []HostAuthnDescriptor{
 				{
 					Type:      types.StringValue("api_key"),
 					ServiceID: types.StringNull(),
@@ -74,20 +74,20 @@ func TestConjurHostResource_buildHostPayload(t *testing.T) {
 		}
 		restrictedToList, _ := types.ListValueFrom(nil, types.StringType, restrictedToElements)
 
-		data := &ConjurHostResourceModel{
+		data := &HostResourceModel{
 			Name:         types.StringValue("test-host"),
 			Branch:       types.StringValue("data/production"),
 			Type:         types.StringValue("jenkins"),
 			RestrictedTo: restrictedToList,
-			Owner: &ConjurHostOwnerModel{
+			Owner: &HostOwnerModel{
 				Kind: types.StringValue("group"),
 				ID:   types.StringValue("jenkins-admins"),
 			},
-			AuthnDescriptors: []ConjurHostAuthnDescriptor{
+			AuthnDescriptors: []HostAuthnDescriptor{
 				{
 					Type:      types.StringValue("jwt"),
 					ServiceID: types.StringValue("jwt-service"),
-					Data: &ConjurHostAuthnDescriptorData{
+					Data: &HostAuthnDescriptorData{
 						Claims: map[string]string{
 							"sub": "test-subject",
 							"aud": "test-audience",
@@ -146,11 +146,11 @@ func TestConjurHostResource_buildHostPayload(t *testing.T) {
 	})
 
 	t.Run("Authn descriptor with empty service ID", func(t *testing.T) {
-		data := &ConjurHostResourceModel{
+		data := &HostResourceModel{
 			Name:   types.StringValue("test-host"),
 			Branch: types.StringValue("data"),
 			Type:   types.StringNull(),
-			AuthnDescriptors: []ConjurHostAuthnDescriptor{
+			AuthnDescriptors: []HostAuthnDescriptor{
 				{
 					Type:      types.StringValue("api_key"),
 					ServiceID: types.StringValue(""),
@@ -172,15 +172,15 @@ func TestConjurHostResource_buildHostPayload(t *testing.T) {
 	})
 
 	t.Run("Authn descriptor with empty claims", func(t *testing.T) {
-		data := &ConjurHostResourceModel{
+		data := &HostResourceModel{
 			Name:   types.StringValue("test-host"),
 			Branch: types.StringValue("data"),
 			Type:   types.StringNull(),
-			AuthnDescriptors: []ConjurHostAuthnDescriptor{
+			AuthnDescriptors: []HostAuthnDescriptor{
 				{
 					Type:      types.StringValue("jwt"),
 					ServiceID: types.StringValue("jwt-service"),
-					Data: &ConjurHostAuthnDescriptorData{
+					Data: &HostAuthnDescriptorData{
 						Claims: map[string]string{},
 					},
 				},
@@ -201,11 +201,11 @@ func TestConjurHostResource_buildHostPayload(t *testing.T) {
 	})
 
 	t.Run("Unknown fields are empty", func(t *testing.T) {
-		data := &ConjurHostResourceModel{
+		data := &HostResourceModel{
 			Name:   types.StringValue("test-host"),
 			Branch: types.StringValue("data"),
 			Type:   types.StringUnknown(),
-			AuthnDescriptors: []ConjurHostAuthnDescriptor{
+			AuthnDescriptors: []HostAuthnDescriptor{
 				{
 					Type:      types.StringValue("jwt"),
 					ServiceID: types.StringUnknown(),
@@ -229,11 +229,11 @@ func TestConjurHostResource_buildHostPayload(t *testing.T) {
 	t.Run("Empty restricted_to list", func(t *testing.T) {
 		emptyList, _ := types.ListValue(types.StringType, []attr.Value{})
 
-		data := &ConjurHostResourceModel{
+		data := &HostResourceModel{
 			Name:   types.StringValue("test-host"),
 			Branch: types.StringValue("data"),
 			Type:   types.StringNull(),
-			AuthnDescriptors: []ConjurHostAuthnDescriptor{
+			AuthnDescriptors: []HostAuthnDescriptor{
 				{
 					Type:      types.StringValue("jwt"),
 					ServiceID: types.StringNull(),
@@ -256,11 +256,11 @@ func TestConjurHostResource_buildHostPayload(t *testing.T) {
 		restrictedToElements := []types.String{types.StringValue("127.0.0.1/32")}
 		restrictedToList, _ := types.ListValueFrom(context.Background(), types.StringType, restrictedToElements)
 
-		data := &ConjurHostResourceModel{
+		data := &HostResourceModel{
 			Name:   types.StringValue("test-host"),
 			Branch: types.StringValue("data"),
 			Type:   types.StringNull(),
-			AuthnDescriptors: []ConjurHostAuthnDescriptor{
+			AuthnDescriptors: []HostAuthnDescriptor{
 				{
 					Type:      types.StringValue("jwt"),
 					ServiceID: types.StringNull(),
@@ -281,11 +281,11 @@ func TestConjurHostResource_buildHostPayload(t *testing.T) {
 	})
 
 	t.Run("Empty annotations", func(t *testing.T) {
-		data := &ConjurHostResourceModel{
+		data := &HostResourceModel{
 			Name:   types.StringValue("test-host"),
 			Branch: types.StringValue("data"),
 			Type:   types.StringNull(),
-			AuthnDescriptors: []ConjurHostAuthnDescriptor{
+			AuthnDescriptors: []HostAuthnDescriptor{
 				{
 					Type:      types.StringValue("jwt"),
 					ServiceID: types.StringNull(),
@@ -305,15 +305,15 @@ func TestConjurHostResource_buildHostPayload(t *testing.T) {
 	})
 
 	t.Run("Multiple authn descriptors", func(t *testing.T) {
-		data := &ConjurHostResourceModel{
+		data := &HostResourceModel{
 			Name:   types.StringValue("test-host"),
 			Branch: types.StringValue("data"),
 			Type:   types.StringNull(),
-			AuthnDescriptors: []ConjurHostAuthnDescriptor{
+			AuthnDescriptors: []HostAuthnDescriptor{
 				{
 					Type:      types.StringValue("jwt"),
 					ServiceID: types.StringValue("jwt-service"),
-					Data: &ConjurHostAuthnDescriptorData{
+					Data: &HostAuthnDescriptorData{
 						Claims: map[string]string{"sub": "user1"},
 					},
 				},
@@ -325,7 +325,7 @@ func TestConjurHostResource_buildHostPayload(t *testing.T) {
 				{
 					Type:      types.StringValue("ldap"),
 					ServiceID: types.StringValue("ldap-service"),
-					Data: &ConjurHostAuthnDescriptorData{
+					Data: &HostAuthnDescriptorData{
 						Claims: map[string]string{}, // Empty claims
 					},
 				},

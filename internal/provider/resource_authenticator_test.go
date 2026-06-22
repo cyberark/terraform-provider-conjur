@@ -13,11 +13,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestConjurAuthenticatorResource_Schema(t *testing.T) {
+func TestAuthenticatorResource_Schema(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	ds := NewConjurAuthenticatorResource()
+	ds := NewAuthenticatorResource()
 
 	schemaRequest := resource.SchemaRequest{}
 	schemaResponse := &resource.SchemaResponse{}
@@ -32,11 +32,11 @@ func TestConjurAuthenticatorResource_Schema(t *testing.T) {
 	}
 }
 
-func TestConjurAuthenticatorResource_buildAuthenticatorPayload(t *testing.T) {
-	r := &ConjurAuthenticatorResource{}
+func TestAuthenticatorResource_buildAuthenticatorPayload(t *testing.T) {
+	r := &AuthenticatorResource{}
 
 	t.Run("Minimum authenticator fields", func(t *testing.T) {
-		data := &ConjurAuthenticatorResourceModel{
+		data := &AuthenticatorResourceModel{
 			Type:        types.StringValue("jwt"),
 			Name:        types.StringValue("test-auth"),
 			Subtype:     types.StringNull(),
@@ -67,7 +67,7 @@ func TestConjurAuthenticatorResource_buildAuthenticatorPayload(t *testing.T) {
 			"id":   types.StringValue("admin-group"),
 		}
 
-		data := &ConjurAuthenticatorResourceModel{
+		data := &AuthenticatorResourceModel{
 			Type:    types.StringValue("jwt"),
 			Name:    types.StringValue("test-auth"),
 			Subtype: types.StringValue("github"),
@@ -76,13 +76,13 @@ func TestConjurAuthenticatorResource_buildAuthenticatorPayload(t *testing.T) {
 				"kind": types.StringType,
 				"id":   types.StringType,
 			}, ownerAttrs),
-			Data: &ConjurAuthenticatorDataModel{
+			Data: &AuthenticatorDataModel{
 				Audience:   types.StringValue("test-audience"),
 				JwksURI:    types.StringValue("https://example.com/jwks"),
 				Issuer:     types.StringValue("test-issuer"),
 				CACert:     types.StringValue("-----BEGIN CERTIFICATE-----"),
 				PublicKeys: types.StringValue(`{"key1": "value1", "key2": "value2"}`),
-				Identity: &ConjurAuthenticatorIdentityModel{
+				Identity: &AuthenticatorIdentityModel{
 					IdentityPath:     types.StringValue("/identity/path"),
 					TokenAppProperty: types.StringValue("app_property"),
 					ClaimAliases: map[string]string{
@@ -153,7 +153,7 @@ func TestConjurAuthenticatorResource_buildAuthenticatorPayload(t *testing.T) {
 	})
 
 	t.Run("Unknown fields omitted", func(t *testing.T) {
-		data := &ConjurAuthenticatorResourceModel{
+		data := &AuthenticatorResourceModel{
 			Type:        types.StringValue("jwt"),
 			Name:        types.StringValue("test-auth"),
 			Subtype:     types.StringUnknown(),
@@ -172,10 +172,10 @@ func TestConjurAuthenticatorResource_buildAuthenticatorPayload(t *testing.T) {
 	})
 
 	t.Run("Invalid public keys", func(t *testing.T) {
-		data := &ConjurAuthenticatorResourceModel{
+		data := &AuthenticatorResourceModel{
 			Type: types.StringValue("jwt"),
 			Name: types.StringValue("test-auth"),
-			Data: &ConjurAuthenticatorDataModel{
+			Data: &AuthenticatorDataModel{
 				PublicKeys: types.StringValue("invalid-json"),
 			},
 		}
@@ -188,10 +188,10 @@ func TestConjurAuthenticatorResource_buildAuthenticatorPayload(t *testing.T) {
 	})
 
 	t.Run("Partial authenticator data", func(t *testing.T) {
-		data := &ConjurAuthenticatorResourceModel{
+		data := &AuthenticatorResourceModel{
 			Type: types.StringValue("jwt"),
 			Name: types.StringValue("test-auth"),
-			Data: &ConjurAuthenticatorDataModel{
+			Data: &AuthenticatorDataModel{
 				Audience:   types.StringValue("test-audience"),
 				JwksURI:    types.StringNull(),
 				Issuer:     types.StringValue("test-issuer"),
@@ -215,11 +215,11 @@ func TestConjurAuthenticatorResource_buildAuthenticatorPayload(t *testing.T) {
 	})
 
 	t.Run("EmptyIdentityFields", func(t *testing.T) {
-		data := &ConjurAuthenticatorResourceModel{
+		data := &AuthenticatorResourceModel{
 			Type: types.StringValue("jwt"),
 			Name: types.StringValue("test-auth"),
-			Data: &ConjurAuthenticatorDataModel{
-				Identity: &ConjurAuthenticatorIdentityModel{
+			Data: &AuthenticatorDataModel{
+				Identity: &AuthenticatorIdentityModel{
 					IdentityPath:     types.StringNull(),
 					TokenAppProperty: types.StringNull(),
 					ClaimAliases:     map[string]string{},
@@ -237,8 +237,8 @@ func TestConjurAuthenticatorResource_buildAuthenticatorPayload(t *testing.T) {
 	})
 }
 
-func TestConjurAuthenticatorResource_parseAuthenticatorResponse(t *testing.T) {
-	r := &ConjurAuthenticatorResource{}
+func TestAuthenticatorResource_parseAuthenticatorResponse(t *testing.T) {
+	r := &AuthenticatorResource{}
 
 	t.Run("Minimal fields in response", func(t *testing.T) {
 		authenticator := &conjurapi.AuthenticatorResponse{
@@ -254,7 +254,7 @@ func TestConjurAuthenticatorResource_parseAuthenticatorResponse(t *testing.T) {
 			Branch: "conjur/authn-jwt",
 		}
 
-		data := &ConjurAuthenticatorResourceModel{}
+		data := &AuthenticatorResourceModel{}
 		err := r.parseAuthenticatorResponse(authenticator, data)
 
 		require.NoError(t, err)
@@ -309,7 +309,7 @@ func TestConjurAuthenticatorResource_parseAuthenticatorResponse(t *testing.T) {
 			Branch: "conjur/authn-jwt",
 		}
 
-		data := &ConjurAuthenticatorResourceModel{}
+		data := &AuthenticatorResourceModel{}
 		err := r.parseAuthenticatorResponse(authenticator, data)
 
 		require.NoError(t, err)

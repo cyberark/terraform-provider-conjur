@@ -18,20 +18,20 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-var _ resource.Resource = &ConjurPolicyBranchResource{}
-var _ resource.ResourceWithConfigure = &ConjurPolicyBranchResource{}
-var _ resource.ResourceWithImportState = &ConjurPolicyBranchResource{}
-var _ resource.ResourceWithValidateConfig = &ConjurPolicyBranchResource{}
+var _ resource.Resource = &PolicyBranchResource{}
+var _ resource.ResourceWithConfigure = &PolicyBranchResource{}
+var _ resource.ResourceWithImportState = &PolicyBranchResource{}
+var _ resource.ResourceWithValidateConfig = &PolicyBranchResource{}
 
-func NewConjurPolicyBranchResource() resource.Resource {
-	return &ConjurPolicyBranchResource{}
+func NewPolicyBranchResource() resource.Resource {
+	return &PolicyBranchResource{}
 }
 
-type ConjurPolicyBranchResource struct {
+type PolicyBranchResource struct {
 	client api.ClientV2
 }
 
-type ConjurPolicyBranchResourceModel struct {
+type PolicyBranchResourceModel struct {
 	Name        types.String `tfsdk:"name"`
 	Branch      types.String `tfsdk:"branch"`
 	Owner       types.Object `tfsdk:"owner"`
@@ -39,11 +39,11 @@ type ConjurPolicyBranchResourceModel struct {
 	FullID      types.String `tfsdk:"full_id"`
 }
 
-func (r *ConjurPolicyBranchResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+func (r *PolicyBranchResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_policy_branch"
 }
 
-func (r *ConjurPolicyBranchResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *PolicyBranchResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "CyberArk Secrets Manager Policy Branch resource",
 		Attributes: map[string]schema.Attribute{
@@ -104,8 +104,8 @@ func (r *ConjurPolicyBranchResource) Schema(ctx context.Context, req resource.Sc
 	}
 }
 
-func (r *ConjurPolicyBranchResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	var data ConjurPolicyBranchResourceModel
+func (r *PolicyBranchResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var data PolicyBranchResourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -115,7 +115,7 @@ func (r *ConjurPolicyBranchResource) ValidateConfig(ctx context.Context, req res
 	ValidateBranch(data.Branch, &resp.Diagnostics, "branch")
 }
 
-func (r *ConjurPolicyBranchResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *PolicyBranchResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -127,12 +127,12 @@ func (r *ConjurPolicyBranchResource) Configure(ctx context.Context, req resource
 	r.client = client
 }
 
-func (r *ConjurPolicyBranchResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *PolicyBranchResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if r.client == nil {
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
 	}
-	var data ConjurPolicyBranchResourceModel
+	var data PolicyBranchResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -188,12 +188,12 @@ func (r *ConjurPolicyBranchResource) Create(ctx context.Context, req resource.Cr
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *ConjurPolicyBranchResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *PolicyBranchResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	if r.client == nil {
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
 	}
-	var data ConjurPolicyBranchResourceModel
+	var data PolicyBranchResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -234,7 +234,7 @@ func (r *ConjurPolicyBranchResource) Read(ctx context.Context, req resource.Read
 }
 
 // Not supported in CC - requires resource recreation via planmodifiers since there's no PATCH support in the API
-func (r *ConjurPolicyBranchResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *PolicyBranchResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	if r.client == nil {
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
@@ -245,12 +245,12 @@ func (r *ConjurPolicyBranchResource) Update(ctx context.Context, req resource.Up
 	)
 }
 
-func (r *ConjurPolicyBranchResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *PolicyBranchResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	if r.client == nil {
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
 	}
-	var data ConjurPolicyBranchResourceModel
+	var data PolicyBranchResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -270,7 +270,7 @@ func (r *ConjurPolicyBranchResource) Delete(ctx context.Context, req resource.De
 	resp.State.RemoveResource(ctx)
 }
 
-func (r *ConjurPolicyBranchResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *PolicyBranchResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	id := strings.Trim(req.ID, "/")
 	if id == "" || !strings.Contains(id, "/") {
 		resp.Diagnostics.AddError("Unexpected Import Identifier", "Expected format: <parent-branch>/<name>, e.g. apps/my-app/backend")

@@ -22,14 +22,14 @@ import (
 func TestSecretResource_Create(t *testing.T) {
 	tests := []struct {
 		name          string
-		data          ConjurSecretResourceModel
+		data          SecretResourceModel
 		setupMock     func(*mocks.MockClientV2)
 		expectedError bool
 		errorContains string
 	}{
 		{
 			name: "successful creation with minimal fields",
-			data: ConjurSecretResourceModel{
+			data: SecretResourceModel{
 				Name:   types.StringValue("db-password"),
 				Branch: types.StringValue("/data/test"),
 			},
@@ -42,15 +42,15 @@ func TestSecretResource_Create(t *testing.T) {
 		},
 		{
 			name: "creation with optional fields",
-			data: ConjurSecretResourceModel{
+			data: SecretResourceModel{
 				Name:        types.StringValue("api-key"),
 				Branch:      types.StringValue("/data/production"),
 				Value:       types.StringValue("supersecret"),
 				MimeType:    types.StringValue("application/json"),
 				Annotations: map[string]string{"env": "prod", "team": "platform"},
-				Permissions: []ConjurSecretPermission{
+				Permissions: []SecretPermission{
 					{
-						Subject: ConjurSecretSubject{
+						Subject: SecretSubject{
 							Id:   types.StringValue("user:bob"),
 							Kind: types.StringValue("user"),
 						},
@@ -75,7 +75,7 @@ func TestSecretResource_Create(t *testing.T) {
 		},
 		{
 			name: "creation with value_wo and value_wo_version",
-			data: ConjurSecretResourceModel{
+			data: SecretResourceModel{
 				Name:           types.StringValue("api-key"),
 				Branch:         types.StringValue("/data/production"),
 				ValueWO:        types.StringValue("supersecret_wo"),
@@ -92,7 +92,7 @@ func TestSecretResource_Create(t *testing.T) {
 		},
 		{
 			name: "API error during creation",
-			data: ConjurSecretResourceModel{
+			data: SecretResourceModel{
 				Name:   types.StringValue("error-secret"),
 				Branch: types.StringValue("/data/test"),
 				Value:  types.StringValue("secret123"),
@@ -110,7 +110,7 @@ func TestSecretResource_Create(t *testing.T) {
 			mockV2 := mocks.NewMockClientV2(t)
 			tt.setupMock(mockV2)
 
-			r := &ConjurSecretResource{
+			r := &SecretResource{
 				client: mockV2,
 			}
 
@@ -162,14 +162,14 @@ func TestSecretResource_Create(t *testing.T) {
 func TestSecretResource_Read(t *testing.T) {
 	tests := []struct {
 		name          string
-		data          ConjurSecretResourceModel
+		data          SecretResourceModel
 		setupMock     func(*mocks.MockClientV2)
 		expectedError bool
 		errorContains string
 	}{
 		{
 			name: "secret exists and value is in model",
-			data: ConjurSecretResourceModel{
+			data: SecretResourceModel{
 				Name:   types.StringValue("test-secret"),
 				Branch: types.StringValue("/data/test"),
 				Value:  types.StringValue("secret-value"),
@@ -182,7 +182,7 @@ func TestSecretResource_Read(t *testing.T) {
 		},
 		{
 			name: "secret exists and value is NOT in model",
-			data: ConjurSecretResourceModel{
+			data: SecretResourceModel{
 				Name:   types.StringValue("test-secret"),
 				Branch: types.StringValue("/data/test"),
 			},
@@ -193,7 +193,7 @@ func TestSecretResource_Read(t *testing.T) {
 		},
 		{
 			name: "secret exists and value_wo is in model",
-			data: ConjurSecretResourceModel{
+			data: SecretResourceModel{
 				Name:    types.StringValue("test-secret"),
 				Branch:  types.StringValue("/data/test"),
 				ValueWO: types.StringValue("secret-value-wo"),
@@ -205,7 +205,7 @@ func TestSecretResource_Read(t *testing.T) {
 		},
 		{
 			name: "API error reading secret",
-			data: ConjurSecretResourceModel{
+			data: SecretResourceModel{
 				Name:   types.StringValue("error-secret"),
 				Branch: types.StringValue("/data/test"),
 			},
@@ -218,7 +218,7 @@ func TestSecretResource_Read(t *testing.T) {
 		},
 		{
 			name: "secret exists but value cannot be retrieved",
-			data: ConjurSecretResourceModel{
+			data: SecretResourceModel{
 				Name:   types.StringValue("restricted-secret"),
 				Branch: types.StringValue("/data/test"),
 				Value:  types.StringValue("secret-value"),
@@ -237,7 +237,7 @@ func TestSecretResource_Read(t *testing.T) {
 			mockV2 := mocks.NewMockClientV2(t)
 			tt.setupMock(mockV2)
 
-			r := &ConjurSecretResource{
+			r := &SecretResource{
 				client: mockV2,
 			}
 
@@ -288,14 +288,14 @@ func TestSecretResource_Read(t *testing.T) {
 func TestSecretResource_Update(t *testing.T) {
 	tests := []struct {
 		name          string
-		data          ConjurSecretResourceModel
+		data          SecretResourceModel
 		setupMock     func(*mocks.MockClientV2)
 		expectedError bool
 		errorContains string
 	}{
 		{
 			name: "successful value update",
-			data: ConjurSecretResourceModel{
+			data: SecretResourceModel{
 				Name:   types.StringValue("test-secret"),
 				Branch: types.StringValue("/data/test"),
 				Value:  types.StringValue("new-secret-value"),
@@ -307,7 +307,7 @@ func TestSecretResource_Update(t *testing.T) {
 		},
 		{
 			name: "update secret with value_wo and value_wo_version",
-			data: ConjurSecretResourceModel{
+			data: SecretResourceModel{
 				Name:           types.StringValue("api-key"),
 				Branch:         types.StringValue("/data/production/app"),
 				ValueWO:        types.StringValue("updated-key-wo"),
@@ -320,7 +320,7 @@ func TestSecretResource_Update(t *testing.T) {
 		},
 		{
 			name: "API error during update",
-			data: ConjurSecretResourceModel{
+			data: SecretResourceModel{
 				Name:   types.StringValue("error-secret"),
 				Branch: types.StringValue("/data/test"),
 				Value:  types.StringValue("new-value"),
@@ -339,7 +339,7 @@ func TestSecretResource_Update(t *testing.T) {
 			mockV2 := mocks.NewMockClientV2(t)
 			tt.setupMock(mockV2)
 
-			r := &ConjurSecretResource{
+			r := &SecretResource{
 				client: mockV2,
 			}
 
@@ -390,14 +390,14 @@ func TestSecretResource_Update(t *testing.T) {
 func TestSecretResource_Delete(t *testing.T) {
 	tests := []struct {
 		name          string
-		data          ConjurSecretResourceModel
+		data          SecretResourceModel
 		setupMock     func(*mocks.MockClientV2)
 		expectedError bool
 		errorContains string
 	}{
 		{
 			name: "successful deletion",
-			data: ConjurSecretResourceModel{
+			data: SecretResourceModel{
 				Name:   types.StringValue("test-secret"),
 				Branch: types.StringValue("/data/test"),
 			},
@@ -414,7 +414,7 @@ func TestSecretResource_Delete(t *testing.T) {
 		},
 		{
 			name: "API error during deletion",
-			data: ConjurSecretResourceModel{
+			data: SecretResourceModel{
 				Name:   types.StringValue("error-secret"),
 				Branch: types.StringValue("/data/test"),
 			},
@@ -427,7 +427,7 @@ func TestSecretResource_Delete(t *testing.T) {
 		},
 		{
 			name: "deletion from nested branch",
-			data: ConjurSecretResourceModel{
+			data: SecretResourceModel{
 				Name:   types.StringValue("api-key"),
 				Branch: types.StringValue("/data/production/app"),
 			},
@@ -448,7 +448,7 @@ func TestSecretResource_Delete(t *testing.T) {
 			mockV2 := mocks.NewMockClientV2(t)
 			tt.setupMock(mockV2)
 
-			r := &ConjurSecretResource{
+			r := &SecretResource{
 				client: mockV2,
 			}
 
@@ -499,13 +499,13 @@ func TestSecretResource_Delete(t *testing.T) {
 func TestSecretResource_ValidateConfig(t *testing.T) {
 	tests := []struct {
 		name          string
-		data          ConjurSecretResourceModel
+		data          SecretResourceModel
 		expectError   bool
 		errorContains string
 	}{
 		{
 			name: "value and value_wo both set should conflict",
-			data: ConjurSecretResourceModel{
+			data: SecretResourceModel{
 				Name:    types.StringValue("test-secret"),
 				Branch:  types.StringValue("/data/test"),
 				Value:   types.StringValue("secret123"),
@@ -516,7 +516,7 @@ func TestSecretResource_ValidateConfig(t *testing.T) {
 		},
 		{
 			name: "only value set should be valid",
-			data: ConjurSecretResourceModel{
+			data: SecretResourceModel{
 				Name:   types.StringValue("test-secret"),
 				Branch: types.StringValue("/data/test"),
 				Value:  types.StringValue("secret123"),
@@ -525,7 +525,7 @@ func TestSecretResource_ValidateConfig(t *testing.T) {
 		},
 		{
 			name: "only value_wo set should be valid",
-			data: ConjurSecretResourceModel{
+			data: SecretResourceModel{
 				Name:    types.StringValue("test-secret"),
 				Branch:  types.StringValue("/data/test"),
 				ValueWO: types.StringValue("secret123"),
@@ -534,7 +534,7 @@ func TestSecretResource_ValidateConfig(t *testing.T) {
 		},
 		{
 			name: "value_wo with version should be valid",
-			data: ConjurSecretResourceModel{
+			data: SecretResourceModel{
 				Name:           types.StringValue("test-secret"),
 				Branch:         types.StringValue("/data/test"),
 				ValueWO:        types.StringValue("secret123"),
@@ -544,7 +544,7 @@ func TestSecretResource_ValidateConfig(t *testing.T) {
 		},
 		{
 			name: "neither value nor value_wo set should be valid",
-			data: ConjurSecretResourceModel{
+			data: SecretResourceModel{
 				Name:   types.StringValue("test-secret"),
 				Branch: types.StringValue("/data/test"),
 			},
@@ -552,7 +552,7 @@ func TestSecretResource_ValidateConfig(t *testing.T) {
 		},
 		{
 			name: "value_wo_version without value_wo should produce error",
-			data: ConjurSecretResourceModel{
+			data: SecretResourceModel{
 				Name:           types.StringValue("test-secret"),
 				Branch:         types.StringValue("/data/test"),
 				ValueWOVersion: types.Int32Value(1),
@@ -562,7 +562,7 @@ func TestSecretResource_ValidateConfig(t *testing.T) {
 		},
 		{
 			name: "value_wo_version with value but not value_wo should produce error",
-			data: ConjurSecretResourceModel{
+			data: SecretResourceModel{
 				Name:           types.StringValue("test-secret"),
 				Branch:         types.StringValue("/data/test"),
 				Value:          types.StringValue("secret123"),
@@ -575,7 +575,7 @@ func TestSecretResource_ValidateConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := &ConjurSecretResource{}
+			r := &SecretResource{}
 
 			// Create a config request with the test data
 			req := resource.ValidateConfigRequest{
@@ -612,7 +612,7 @@ func TestSecretResource_ValidateConfig(t *testing.T) {
 	}
 }
 
-func buildConfigFromModel(data ConjurSecretResourceModel) tfsdk.Config {
+func buildConfigFromModel(data SecretResourceModel) tfsdk.Config {
 	// Create Config by setting Plan first, then copying Raw value
 	// This ensures req.Config.Get() works properly in ValidateConfig tests
 	plan := tfsdk.Plan{
@@ -629,7 +629,7 @@ func buildConfigFromModel(data ConjurSecretResourceModel) tfsdk.Config {
 }
 
 func getSecretTestSchema() schema.Schema {
-	r := &ConjurSecretResource{}
+	r := &SecretResource{}
 	var schemaResp resource.SchemaResponse
 	r.Schema(context.Background(), resource.SchemaRequest{}, &schemaResp)
 	return schemaResp.Schema

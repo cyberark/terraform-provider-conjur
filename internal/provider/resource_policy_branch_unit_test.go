@@ -20,7 +20,7 @@ import (
 func TestPolicyBranchResource_Create(t *testing.T) {
 	tests := []struct {
 		name          string
-		data          ConjurPolicyBranchResourceModel
+		data          PolicyBranchResourceModel
 		setupMock     func(*mocks.MockClientV2)
 		expectedError bool
 		errorContains string
@@ -28,7 +28,7 @@ func TestPolicyBranchResource_Create(t *testing.T) {
 
 		{
 			name: "successful branch creation",
-			data: ConjurPolicyBranchResourceModel{
+			data: PolicyBranchResourceModel{
 				Name:   types.StringValue("my-branch"),
 				Branch: types.StringValue("data/test"),
 				Owner: types.ObjectNull(map[string]attr.Type{
@@ -49,7 +49,7 @@ func TestPolicyBranchResource_Create(t *testing.T) {
 		},
 		{
 			name: "API error during branch creation",
-			data: ConjurPolicyBranchResourceModel{
+			data: PolicyBranchResourceModel{
 				Name:   types.StringValue("error-branch"),
 				Branch: types.StringValue("data/error"),
 				Owner: types.ObjectNull(map[string]attr.Type{
@@ -71,7 +71,7 @@ func TestPolicyBranchResource_Create(t *testing.T) {
 			mockV2 := mocks.NewMockClientV2(t)
 			tt.setupMock(mockV2)
 
-			r := &ConjurPolicyBranchResource{
+			r := &PolicyBranchResource{
 				client: mockV2,
 			}
 
@@ -117,14 +117,14 @@ func TestPolicyBranchResource_Create(t *testing.T) {
 func TestPolicyBranchResource_Read(t *testing.T) {
 	tests := []struct {
 		name          string
-		data          ConjurPolicyBranchResourceModel
+		data          PolicyBranchResourceModel
 		setupMock     func(*mocks.MockClientV2)
 		expectedError bool
 		errorContains string
 	}{
 		{
 			name: "branch exists",
-			data: ConjurPolicyBranchResourceModel{
+			data: PolicyBranchResourceModel{
 				Name:   types.StringValue("valid"),
 				Branch: types.StringValue("data/test"),
 				Owner: types.ObjectNull(map[string]attr.Type{
@@ -139,7 +139,7 @@ func TestPolicyBranchResource_Read(t *testing.T) {
 		},
 		{
 			name: "branch does not exist, no error",
-			data: ConjurPolicyBranchResourceModel{
+			data: PolicyBranchResourceModel{
 				Name:   types.StringValue("nonexistent"),
 				Branch: types.StringValue("data/test"),
 				Owner: types.ObjectNull(map[string]attr.Type{
@@ -154,7 +154,7 @@ func TestPolicyBranchResource_Read(t *testing.T) {
 		},
 		{
 			name: "API error checking policy branch",
-			data: ConjurPolicyBranchResourceModel{
+			data: PolicyBranchResourceModel{
 				Name:   types.StringValue("error-branch"),
 				Branch: types.StringValue("data/test"),
 				Owner: types.ObjectNull(map[string]attr.Type{
@@ -176,7 +176,7 @@ func TestPolicyBranchResource_Read(t *testing.T) {
 			mockV2 := mocks.NewMockClientV2(t)
 			tt.setupMock(mockV2)
 
-			r := &ConjurPolicyBranchResource{client: mockV2}
+			r := &PolicyBranchResource{client: mockV2}
 
 			req := resource.ReadRequest{
 				State: tfsdk.State{
@@ -219,14 +219,14 @@ func TestPolicyBranchResource_Read(t *testing.T) {
 func TestPolicyBranchResource_Delete(t *testing.T) {
 	tests := []struct {
 		name          string
-		data          ConjurPolicyBranchResourceModel
+		data          PolicyBranchResourceModel
 		setupMock     func(*mocks.MockClientV2)
 		expectedError bool
 		errorContains string
 	}{
 		{
 			name: "successful branch deletion",
-			data: ConjurPolicyBranchResourceModel{
+			data: PolicyBranchResourceModel{
 				Name:   types.StringValue("my-branch"),
 				Branch: types.StringValue("data/test"),
 				Owner: types.ObjectNull(map[string]attr.Type{
@@ -243,7 +243,7 @@ func TestPolicyBranchResource_Delete(t *testing.T) {
 		},
 		{
 			name: "API error during deletion",
-			data: ConjurPolicyBranchResourceModel{
+			data: PolicyBranchResourceModel{
 				Name:   types.StringValue("error-branch"),
 				Branch: types.StringValue("data/test"),
 				Owner: types.ObjectNull(map[string]attr.Type{
@@ -264,7 +264,7 @@ func TestPolicyBranchResource_Delete(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockV2 := mocks.NewMockClientV2(t)
 			tt.setupMock(mockV2)
-			r := &ConjurPolicyBranchResource{client: mockV2}
+			r := &PolicyBranchResource{client: mockV2}
 
 			req := resource.DeleteRequest{
 				State: tfsdk.State{
@@ -305,7 +305,7 @@ func TestPolicyBranchResource_Delete(t *testing.T) {
 }
 
 func getPolicyBranchTestSchema() schema.Schema {
-	r := &ConjurPolicyBranchResource{}
+	r := &PolicyBranchResource{}
 	var schemaResp resource.SchemaResponse
 	r.Schema(context.Background(), resource.SchemaRequest{}, &schemaResp)
 	return schemaResp.Schema

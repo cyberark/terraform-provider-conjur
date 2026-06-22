@@ -23,23 +23,23 @@ import (
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var (
-	_ resource.Resource                   = &ConjurPermissionResource{}
-	_ resource.ResourceWithConfigure      = &ConjurPermissionResource{}
-	_ resource.ResourceWithImportState    = &ConjurPermissionResource{}
-	_ resource.ResourceWithValidateConfig = &ConjurPermissionResource{}
+	_ resource.Resource                   = &PermissionResource{}
+	_ resource.ResourceWithConfigure      = &PermissionResource{}
+	_ resource.ResourceWithImportState    = &PermissionResource{}
+	_ resource.ResourceWithValidateConfig = &PermissionResource{}
 )
 
-func NewConjurPermissionResource() resource.Resource {
-	return &ConjurPermissionResource{}
+func NewPermissionResource() resource.Resource {
+	return &PermissionResource{}
 }
 
-// ConjurPermissionResource defines the resource implementation.
-type ConjurPermissionResource struct {
+// PermissionResource defines the resource implementation.
+type PermissionResource struct {
 	client api.ClientV2
 }
 
-// ConjurPermissionResourceModel describes the resource data model.
-type ConjurPermissionResourceModel struct {
+// PermissionResourceModel describes the resource data model.
+type PermissionResourceModel struct {
 	Role       RoleModel     `tfsdk:"role"`
 	Resource   ResourceModel `tfsdk:"resource"`
 	Privileges types.List    `tfsdk:"privileges"`
@@ -59,11 +59,11 @@ type ResourceModel struct {
 	Branch types.String `tfsdk:"branch"`
 }
 
-func (r *ConjurPermissionResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+func (r *PermissionResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_permission"
 }
 
-func (r *ConjurPermissionResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *PermissionResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "CyberArk Secrets Manager permission resource",
 		Attributes: map[string]schema.Attribute{
@@ -122,8 +122,8 @@ func (r *ConjurPermissionResource) Schema(ctx context.Context, req resource.Sche
 	}
 }
 
-func (r *ConjurPermissionResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	var data ConjurPermissionResourceModel
+func (r *PermissionResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var data PermissionResourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -143,7 +143,7 @@ func (r *ConjurPermissionResource) ValidateConfig(ctx context.Context, req resou
 	ValidatePrivileges(data.Privileges, &resp.Diagnostics, "privileges")
 }
 
-func (r *ConjurPermissionResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *PermissionResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -155,12 +155,12 @@ func (r *ConjurPermissionResource) Configure(ctx context.Context, req resource.C
 	r.client = client
 }
 
-func (r *ConjurPermissionResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *PermissionResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if r.client == nil {
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
 	}
-	var data ConjurPermissionResourceModel
+	var data PermissionResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -184,12 +184,12 @@ func (r *ConjurPermissionResource) Create(ctx context.Context, req resource.Crea
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *ConjurPermissionResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *PermissionResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	if r.client == nil {
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
 	}
-	var data ConjurPermissionResourceModel
+	var data PermissionResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
 	// for each supported privilege, check if it exists and update the state accordingly
@@ -200,8 +200,8 @@ func (r *ConjurPermissionResource) Read(ctx context.Context, req resource.ReadRe
 
 	for _, priv := range privs {
 		hasPriv, err := r.client.CheckPermissionForRole(
-			fmt.Sprintf("%s:%s", data.Resource.Kind.ValueString(), joinConjurID(data.Resource.Branch.ValueString(), data.Resource.Name.ValueString())),
-			fmt.Sprintf("%s:%s", data.Role.Kind.ValueString(), joinConjurID(data.Role.Branch.ValueString(), data.Role.Name.ValueString())),
+			fmt.Sprintf("%s:%s", data.Resource.Kind.ValueString(), joinID(data.Resource.Branch.ValueString(), data.Resource.Name.ValueString())),
+			fmt.Sprintf("%s:%s", data.Role.Kind.ValueString(), joinID(data.Role.Branch.ValueString(), data.Role.Name.ValueString())),
 			priv,
 		)
 		if err != nil {
@@ -220,12 +220,12 @@ func (r *ConjurPermissionResource) Read(ctx context.Context, req resource.ReadRe
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *ConjurPermissionResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *PermissionResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	if r.client == nil {
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
 	}
-	var data ConjurPermissionResourceModel
+	var data PermissionResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 
 	branch, permissionPolicy, err := r.generatePermissionPolicy(&data)
@@ -244,12 +244,12 @@ func (r *ConjurPermissionResource) Update(ctx context.Context, req resource.Upda
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *ConjurPermissionResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *PermissionResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	if r.client == nil {
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
 	}
-	var data ConjurPermissionResourceModel
+	var data PermissionResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -272,7 +272,7 @@ func (r *ConjurPermissionResource) Delete(ctx context.Context, req resource.Dele
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *ConjurPermissionResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *PermissionResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	parts := strings.SplitN(req.ID, ":", 2)
 	if len(parts) != 2 {
 		resp.Diagnostics.AddError(
@@ -285,7 +285,7 @@ func (r *ConjurPermissionResource) ImportState(ctx context.Context, req resource
 	roleInput := parts[0]
 	resourceInput := parts[1]
 
-	roleKind, roleBranch, roleName, err := splitConjurID(roleInput)
+	roleKind, roleBranch, roleName, err := splitID(roleInput)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Invalid Role Identifier",
@@ -294,7 +294,7 @@ func (r *ConjurPermissionResource) ImportState(ctx context.Context, req resource
 		return
 	}
 
-	resourceKind, resourceBranch, resourceName, err := splitConjurID(resourceInput)
+	resourceKind, resourceBranch, resourceName, err := splitID(resourceInput)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Invalid Resource Identifier",
@@ -335,7 +335,7 @@ func (r *ConjurPermissionResource) ImportState(ctx context.Context, req resource
 }
 
 // generatePermissionPolicy creates a policy that grants privileges explicitly added via the resource data, and denies all others
-func (r *ConjurPermissionResource) generatePermissionPolicy(data *ConjurPermissionResourceModel) (string, string, error) {
+func (r *PermissionResource) generatePermissionPolicy(data *PermissionResourceModel) (string, string, error) {
 	granted, notGranted, err := parsePrivileges(data)
 	if err != nil {
 		return "", "", err
@@ -369,7 +369,7 @@ func (r *ConjurPermissionResource) generatePermissionPolicy(data *ConjurPermissi
 }
 
 // generatePermissionDenyPolicy creates a policy that denies previously granted privileges
-func (r *ConjurPermissionResource) generatePermissionDenyPolicy(data *ConjurPermissionResourceModel) (string, string, error) {
+func (r *PermissionResource) generatePermissionDenyPolicy(data *PermissionResourceModel) (string, string, error) {
 	granted, _, err := parsePrivileges(data)
 	if err != nil {
 		return "", "", err
@@ -398,7 +398,7 @@ func (r *ConjurPermissionResource) generatePermissionDenyPolicy(data *ConjurPerm
 }
 
 // parsePrivileges returns a list of granted and not-granted privileges
-func parsePrivileges(data *ConjurPermissionResourceModel) ([]conjurpolicy.Privilege, []conjurpolicy.Privilege, error) {
+func parsePrivileges(data *PermissionResourceModel) ([]conjurpolicy.Privilege, []conjurpolicy.Privilege, error) {
 	privilegeMap := map[string]conjurpolicy.Privilege{
 		"read":    conjurpolicy.PrivilegeRead,
 		"update":  conjurpolicy.PrivilegeUpdate,
@@ -426,7 +426,7 @@ func parsePrivileges(data *ConjurPermissionResourceModel) ([]conjurpolicy.Privil
 }
 
 // validateKinds returns the resolved kinds for role and resource
-func validateKinds(data *ConjurPermissionResourceModel) (conjurpolicy.Kind, conjurpolicy.Kind, error) {
+func validateKinds(data *PermissionResourceModel) (conjurpolicy.Kind, conjurpolicy.Kind, error) {
 	kindMap := map[string]conjurpolicy.Kind{
 		"user":     conjurpolicy.KindUser,
 		"group":    conjurpolicy.KindGroup,
@@ -443,13 +443,13 @@ func validateKinds(data *ConjurPermissionResourceModel) (conjurpolicy.Kind, conj
 }
 
 // derivePolicyContext calculates the lowest shared branch, plus relative role/resource IDs
-func derivePolicyContext(data *ConjurPermissionResourceModel) (branch, roleID, resourceID string) {
+func derivePolicyContext(data *PermissionResourceModel) (branch, roleID, resourceID string) {
 	// Find common ancestor branch
 	branch = mergePolicyBranch(data.Role.Branch.ValueString(), data.Resource.Branch.ValueString())
 
 	// Build full IDs
-	fullRoleID := joinConjurID(data.Role.Branch.ValueString(), data.Role.Name.ValueString())
-	fullResourceID := joinConjurID(data.Resource.Branch.ValueString(), data.Resource.Name.ValueString())
+	fullRoleID := joinID(data.Role.Branch.ValueString(), data.Role.Name.ValueString())
+	fullResourceID := joinID(data.Resource.Branch.ValueString(), data.Resource.Name.ValueString())
 
 	// Trim shared ancestor branch to make relative IDs
 	roleID = strings.TrimPrefix(fullRoleID, branch+"/")
@@ -458,8 +458,8 @@ func derivePolicyContext(data *ConjurPermissionResourceModel) (branch, roleID, r
 	return branch, roleID, resourceID
 }
 
-// joinConjurID creates a full Conjur ID by joining branch (if it exists) and name
-func joinConjurID(branch, name string) string {
+// joinID creates a full Conjur ID by joining branch (if it exists) and name
+func joinID(branch, name string) string {
 	branch = strings.Trim(branch, "/")
 	if branch == "" {
 		return name
@@ -484,8 +484,8 @@ func mergePolicyBranch(a, b string) string {
 	return strings.Join(shared, "/")
 }
 
-// splitConjurID splits a full Conjur ID into kind, branch, and name components
-func splitConjurID(fullID string) (kind, branch, name string, err error) {
+// splitID splits a full Conjur ID into kind, branch, and name components
+func splitID(fullID string) (kind, branch, name string, err error) {
 	segments := strings.Split(fullID, "/")
 	if len(segments) < 2 {
 		// At minimum we expect kind + name

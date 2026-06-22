@@ -22,11 +22,11 @@ type certificateIssuer interface {
 	CertificateIssue(issuerName string, issue conjurapi.Issue) (*conjurapi.CertificateResponse, error)
 }
 
-type conjurAPIWrapper struct {
+type apiWrapper struct {
 	client api.ClientV2
 }
 
-func (c *conjurAPIWrapper) CertificateIssue(issuerName string, issue conjurapi.Issue) (*conjurapi.CertificateResponse, error) {
+func (c *apiWrapper) CertificateIssue(issuerName string, issue conjurapi.Issue) (*conjurapi.CertificateResponse, error) {
 	return c.client.V2().CertificateIssue(issuerName, issue)
 }
 
@@ -126,7 +126,7 @@ func (d *certificateIssueDataSource) Configure(ctx context.Context, req datasour
 		AddUnexpectedConfigureTypeError(&resp.Diagnostics, "*conjurapi.certificateIssueClient", req.ProviderData)
 		return
 	}
-	d.client = &conjurAPIWrapper{client}
+	d.client = &apiWrapper{client}
 }
 
 func (d *certificateIssueDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {

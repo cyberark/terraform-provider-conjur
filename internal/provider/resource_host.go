@@ -18,51 +18,51 @@ import (
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var (
-	_ resource.Resource                   = &ConjurHostResource{}
-	_ resource.ResourceWithConfigure      = &ConjurHostResource{}
-	_ resource.ResourceWithValidateConfig = &ConjurHostResource{}
+	_ resource.Resource                   = &HostResource{}
+	_ resource.ResourceWithConfigure      = &HostResource{}
+	_ resource.ResourceWithValidateConfig = &HostResource{}
 )
 
-func NewConjurHostResource() resource.Resource {
-	return &ConjurHostResource{}
+func NewHostResource() resource.Resource {
+	return &HostResource{}
 }
 
-// ConjurHostResource defines the resource implementation.
-type ConjurHostResource struct {
+// HostResource defines the resource implementation.
+type HostResource struct {
 	client api.ClientV2
 }
 
-// ConjurHostResourceModel describes the resource data model.
-type ConjurHostResourceModel struct {
+// HostResourceModel describes the resource data model.
+type HostResourceModel struct {
 	Name             types.String                `tfsdk:"name"`
 	Branch           types.String                `tfsdk:"branch"`
 	Type             types.String                `tfsdk:"type"`
-	Owner            *ConjurHostOwnerModel       `tfsdk:"owner"`
+	Owner            *HostOwnerModel       `tfsdk:"owner"`
 	RestrictedTo     types.List                  `tfsdk:"restricted_to"`
-	AuthnDescriptors []ConjurHostAuthnDescriptor `tfsdk:"authn_descriptors"`
+	AuthnDescriptors []HostAuthnDescriptor `tfsdk:"authn_descriptors"`
 	Annotations      map[string]string           `tfsdk:"annotations"`
 }
 
-type ConjurHostOwnerModel struct {
+type HostOwnerModel struct {
 	Kind types.String `tfsdk:"kind"`
 	ID   types.String `tfsdk:"id"`
 }
 
-type ConjurHostAuthnDescriptorData struct {
+type HostAuthnDescriptorData struct {
 	Claims map[string]string `tfsdk:"claims"`
 }
 
-type ConjurHostAuthnDescriptor struct {
+type HostAuthnDescriptor struct {
 	Type      types.String                   `tfsdk:"type"`
 	ServiceID types.String                   `tfsdk:"service_id"`
-	Data      *ConjurHostAuthnDescriptorData `tfsdk:"data"`
+	Data      *HostAuthnDescriptorData `tfsdk:"data"`
 }
 
-func (r *ConjurHostResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+func (r *HostResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_host"
 }
 
-func (r *ConjurHostResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *HostResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "CyberArk Secrets Manager host resource",
 
@@ -164,8 +164,8 @@ func (r *ConjurHostResource) Schema(ctx context.Context, req resource.SchemaRequ
 	}
 }
 
-func (r *ConjurHostResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	var data ConjurHostResourceModel
+func (r *HostResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var data HostResourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -183,7 +183,7 @@ func (r *ConjurHostResource) ValidateConfig(ctx context.Context, req resource.Va
 	}
 }
 
-func (r *ConjurHostResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *HostResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -197,12 +197,12 @@ func (r *ConjurHostResource) Configure(ctx context.Context, req resource.Configu
 	r.client = client
 }
 
-func (r *ConjurHostResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *HostResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if r.client == nil {
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
 	}
-	var data ConjurHostResourceModel
+	var data HostResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -225,12 +225,12 @@ func (r *ConjurHostResource) Create(ctx context.Context, req resource.CreateRequ
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *ConjurHostResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *HostResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	if r.client == nil {
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
 	}
-	var data ConjurHostResourceModel
+	var data HostResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
 	// Just validate the host exists in Conjur since we can't fully hydrate the state via API currently
@@ -257,7 +257,7 @@ func (r *ConjurHostResource) Read(ctx context.Context, req resource.ReadRequest,
 }
 
 // Update replaces the host by deleting and recreating it since there's no PATCH support
-func (r *ConjurHostResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *HostResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	if r.client == nil {
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
@@ -267,12 +267,12 @@ func (r *ConjurHostResource) Update(ctx context.Context, req resource.UpdateRequ
 	resp.Diagnostics.AddWarning("Update not supported", "Host resources require replacement for any changes, so update is not supported. Please recreate the resource with the desired changes.")
 }
 
-func (r *ConjurHostResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *HostResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	if r.client == nil {
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
 	}
-	var data ConjurHostResourceModel
+	var data HostResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -290,7 +290,7 @@ func (r *ConjurHostResource) Delete(ctx context.Context, req resource.DeleteRequ
 }
 
 // buildHostPayload maps the resource model to an API payload
-func (r *ConjurHostResource) buildHostPayload(data *ConjurHostResourceModel) (*conjurapi.Workload, error) {
+func (r *HostResource) buildHostPayload(data *HostResourceModel) (*conjurapi.Workload, error) {
 
 	// Initialize with required fields
 	host := conjurapi.Workload{

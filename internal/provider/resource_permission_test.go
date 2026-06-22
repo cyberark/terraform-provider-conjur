@@ -13,11 +13,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestConjurPermissionResource_Schema(t *testing.T) {
+func TestPermissionResource_Schema(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	ds := NewConjurPermissionResource()
+	ds := NewPermissionResource()
 
 	schemaRequest := resource.SchemaRequest{}
 	schemaResponse := &resource.SchemaResponse{}
@@ -32,11 +32,11 @@ func TestConjurPermissionResource_Schema(t *testing.T) {
 	}
 }
 
-func TestConjurPermissionResource_generatePermissionPolicy(t *testing.T) {
-	r := &ConjurPermissionResource{}
+func TestPermissionResource_generatePermissionPolicy(t *testing.T) {
+	r := &PermissionResource{}
 
 	t.Run("All permission fields provided", func(t *testing.T) {
-		data := &ConjurPermissionResourceModel{
+		data := &PermissionResourceModel{
 			Role: RoleModel{
 				Name:   types.StringValue("my-role"),
 				Kind:   types.StringValue("host"),
@@ -76,11 +76,11 @@ func TestConjurPermissionResource_generatePermissionPolicy(t *testing.T) {
 	})
 }
 
-func TestConjurPermissionResource_generatePermissionDenyPolicy(t *testing.T) {
-	r := &ConjurPermissionResource{}
+func TestPermissionResource_generatePermissionDenyPolicy(t *testing.T) {
+	r := &PermissionResource{}
 
 	t.Run("All permission fields provided", func(t *testing.T) {
-		data := &ConjurPermissionResourceModel{
+		data := &PermissionResourceModel{
 			Role: RoleModel{
 				Name:   types.StringValue("my-role"),
 				Kind:   types.StringValue("host"),
@@ -200,7 +200,7 @@ func TestDerivePolicyContext(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			data := &ConjurPermissionResourceModel{
+			data := &PermissionResourceModel{
 				Role: RoleModel{
 					Name:   types.StringValue(tt.roleName),
 					Branch: types.StringValue(tt.roleBranch),
@@ -220,7 +220,7 @@ func TestDerivePolicyContext(t *testing.T) {
 	}
 }
 
-func TestSplitConjurID(t *testing.T) {
+func TestSplitID(t *testing.T) {
 	tests := []struct {
 		name       string
 		fullID     string
@@ -283,7 +283,7 @@ func TestSplitConjurID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			kind, branch, name, err := splitConjurID(tt.fullID)
+			kind, branch, name, err := splitID(tt.fullID)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -298,7 +298,7 @@ func TestSplitConjurID(t *testing.T) {
 
 // TestGeneratePermissionPolicy_YAMLInjection tests that user input cannot inject additional YAML statements
 func TestGeneratePermissionPolicy_YAMLInjection(t *testing.T) {
-	r := &ConjurPermissionResource{}
+	r := &PermissionResource{}
 
 	testCases := []struct {
 		name           string
@@ -376,7 +376,7 @@ func TestGeneratePermissionPolicy_YAMLInjection(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			data := &ConjurPermissionResourceModel{
+			data := &PermissionResourceModel{
 				Role: RoleModel{
 					Name:   types.StringValue(tc.roleName),
 					Kind:   types.StringValue("host"),
@@ -424,7 +424,7 @@ func TestGeneratePermissionPolicy_YAMLInjection(t *testing.T) {
 
 // TestGeneratePermissionDenyPolicy_YAMLInjection tests that user input cannot inject additional YAML statements
 func TestGeneratePermissionDenyPolicy_YAMLInjection(t *testing.T) {
-	r := &ConjurPermissionResource{}
+	r := &PermissionResource{}
 
 	testCases := []struct {
 		name           string
@@ -502,7 +502,7 @@ func TestGeneratePermissionDenyPolicy_YAMLInjection(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			data := &ConjurPermissionResourceModel{
+			data := &PermissionResourceModel{
 				Role: RoleModel{
 					Name:   types.StringValue(tc.roleName),
 					Kind:   types.StringValue("host"),

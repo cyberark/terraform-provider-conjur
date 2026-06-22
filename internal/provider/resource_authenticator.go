@@ -23,53 +23,53 @@ import (
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var (
-	_ resource.Resource                   = &ConjurAuthenticatorResource{}
-	_ resource.ResourceWithImportState    = &ConjurAuthenticatorResource{}
-	_ resource.ResourceWithConfigure      = &ConjurAuthenticatorResource{}
-	_ resource.ResourceWithValidateConfig = &ConjurAuthenticatorResource{}
+	_ resource.Resource                   = &AuthenticatorResource{}
+	_ resource.ResourceWithImportState    = &AuthenticatorResource{}
+	_ resource.ResourceWithConfigure      = &AuthenticatorResource{}
+	_ resource.ResourceWithValidateConfig = &AuthenticatorResource{}
 )
 
-func NewConjurAuthenticatorResource() resource.Resource {
-	return &ConjurAuthenticatorResource{}
+func NewAuthenticatorResource() resource.Resource {
+	return &AuthenticatorResource{}
 }
 
-// ConjurAuthenticatorResource defines the resource implementation.
-type ConjurAuthenticatorResource struct {
+// AuthenticatorResource defines the resource implementation.
+type AuthenticatorResource struct {
 	client api.ClientV2
 }
 
-// ConjurAuthenticatorResourceModel describes the resource data model.
-type ConjurAuthenticatorResourceModel struct {
+// AuthenticatorResourceModel describes the resource data model.
+type AuthenticatorResourceModel struct {
 	Type        types.String                  `tfsdk:"type"`
 	Name        types.String                  `tfsdk:"name"`
 	Subtype     types.String                  `tfsdk:"subtype"`
 	Enabled     types.Bool                    `tfsdk:"enabled"`
 	Owner       types.Object                  `tfsdk:"owner"`
-	Data        *ConjurAuthenticatorDataModel `tfsdk:"data"`
+	Data        *AuthenticatorDataModel `tfsdk:"data"`
 	Annotations map[string]string             `tfsdk:"annotations"`
 }
 
-type ConjurAuthenticatorDataModel struct {
+type AuthenticatorDataModel struct {
 	Audience   types.String                      `tfsdk:"audience"`
 	JwksURI    types.String                      `tfsdk:"jwks_uri"`
 	Issuer     types.String                      `tfsdk:"issuer"`
 	CACert     types.String                      `tfsdk:"ca_cert"`
 	PublicKeys types.String                      `tfsdk:"public_keys"`
-	Identity   *ConjurAuthenticatorIdentityModel `tfsdk:"identity"`
+	Identity   *AuthenticatorIdentityModel `tfsdk:"identity"`
 }
 
-type ConjurAuthenticatorIdentityModel struct {
+type AuthenticatorIdentityModel struct {
 	IdentityPath     types.String      `tfsdk:"identity_path"`
 	TokenAppProperty types.String      `tfsdk:"token_app_property"`
 	ClaimAliases     map[string]string `tfsdk:"claim_aliases"`
 	EnforcedClaims   []string          `tfsdk:"enforced_claims"`
 }
 
-func (r *ConjurAuthenticatorResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+func (r *AuthenticatorResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_authenticator"
 }
 
-func (r *ConjurAuthenticatorResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *AuthenticatorResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "CyberArk Secrets Manager authenticator resource",
 
@@ -212,8 +212,8 @@ func (r *ConjurAuthenticatorResource) Schema(ctx context.Context, req resource.S
 	}
 }
 
-func (r *ConjurAuthenticatorResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	var data ConjurAuthenticatorResourceModel
+func (r *AuthenticatorResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var data AuthenticatorResourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -224,7 +224,7 @@ func (r *ConjurAuthenticatorResource) ValidateConfig(ctx context.Context, req re
 	ValidateContainedIn(data.Subtype, &resp.Diagnostics, "Authenticator subtype", []string{"gitlab", "github_actions", "kubernetes", "jenkins"}, true)
 }
 
-func (r *ConjurAuthenticatorResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *AuthenticatorResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return
 	}
@@ -236,12 +236,12 @@ func (r *ConjurAuthenticatorResource) Configure(ctx context.Context, req resourc
 	r.client = client
 }
 
-func (r *ConjurAuthenticatorResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *AuthenticatorResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if r.client == nil {
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
 	}
-	var data ConjurAuthenticatorResourceModel
+	var data AuthenticatorResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -271,12 +271,12 @@ func (r *ConjurAuthenticatorResource) Create(ctx context.Context, req resource.C
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *ConjurAuthenticatorResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *AuthenticatorResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	if r.client == nil {
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
 	}
-	var data ConjurAuthenticatorResourceModel
+	var data AuthenticatorResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -300,12 +300,12 @@ func (r *ConjurAuthenticatorResource) Read(ctx context.Context, req resource.Rea
 
 }
 
-func (r *ConjurAuthenticatorResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *AuthenticatorResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	if r.client == nil {
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
 	}
-	var data ConjurAuthenticatorResourceModel
+	var data AuthenticatorResourceModel
 
 	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
@@ -314,7 +314,7 @@ func (r *ConjurAuthenticatorResource) Update(ctx context.Context, req resource.U
 	}
 
 	// Read the stated data into the model
-	var state ConjurAuthenticatorResourceModel
+	var state AuthenticatorResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -332,12 +332,12 @@ func (r *ConjurAuthenticatorResource) Update(ctx context.Context, req resource.U
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *ConjurAuthenticatorResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *AuthenticatorResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	if r.client == nil {
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
 	}
-	var data ConjurAuthenticatorResourceModel
+	var data AuthenticatorResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -354,7 +354,7 @@ func (r *ConjurAuthenticatorResource) Delete(ctx context.Context, req resource.D
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *ConjurAuthenticatorResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *AuthenticatorResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	parts := strings.SplitN(req.ID, ":", 2)
 	if len(parts) != 2 {
 		resp.Diagnostics.AddError(
@@ -369,7 +369,7 @@ func (r *ConjurAuthenticatorResource) ImportState(ctx context.Context, req resou
 }
 
 // buildAuthenticatorPayload maps the resource model to an API payload
-func (r *ConjurAuthenticatorResource) buildAuthenticatorPayload(data *ConjurAuthenticatorResourceModel) (*conjurapi.AuthenticatorBase, error) {
+func (r *AuthenticatorResource) buildAuthenticatorPayload(data *AuthenticatorResourceModel) (*conjurapi.AuthenticatorBase, error) {
 	authenticator := conjurapi.AuthenticatorBase{
 		Type: data.Type.ValueString(),
 		Name: data.Name.ValueString(),
@@ -404,7 +404,7 @@ func (r *ConjurAuthenticatorResource) buildAuthenticatorPayload(data *ConjurAuth
 }
 
 // buildDataPayload creates a nested Authenticator.Data object if provided
-func buildDataPayload(d *ConjurAuthenticatorDataModel) (map[string]interface{}, error) {
+func buildDataPayload(d *AuthenticatorDataModel) (map[string]interface{}, error) {
 	if d == nil {
 		return nil, nil
 	}
@@ -431,7 +431,7 @@ func buildDataPayload(d *ConjurAuthenticatorDataModel) (map[string]interface{}, 
 }
 
 // buildDataPayload creates a nested Authenticator.Data.Identity object if provided
-func buildIdentityPayload(identity *ConjurAuthenticatorIdentityModel) map[string]interface{} {
+func buildIdentityPayload(identity *AuthenticatorIdentityModel) map[string]interface{} {
 	if identity == nil {
 		return nil
 	}
@@ -450,7 +450,7 @@ func buildIdentityPayload(identity *ConjurAuthenticatorIdentityModel) map[string
 }
 
 // parseAuthenticatorResponse maps the API response to the resource model
-func (r *ConjurAuthenticatorResource) parseAuthenticatorResponse(authenticator *conjurapi.AuthenticatorResponse, data *ConjurAuthenticatorResourceModel) error {
+func (r *AuthenticatorResource) parseAuthenticatorResponse(authenticator *conjurapi.AuthenticatorResponse, data *AuthenticatorResourceModel) error {
 	data.Type = types.StringValue(authenticator.Type)
 	data.Name = types.StringValue(authenticator.Name)
 	data.Subtype = stringOrNull(authenticator.Subtype)
@@ -483,12 +483,12 @@ func (r *ConjurAuthenticatorResource) parseAuthenticatorResponse(authenticator *
 }
 
 // parseDataFromMap maps the API response nested Authenticator.Data object to the resource model
-func parseDataFromMap(data map[string]interface{}) (*ConjurAuthenticatorDataModel, error) {
+func parseDataFromMap(data map[string]interface{}) (*AuthenticatorDataModel, error) {
 	if data == nil {
 		return nil, nil
 	}
 
-	authenticatorData := &ConjurAuthenticatorDataModel{
+	authenticatorData := &AuthenticatorDataModel{
 		Audience: stringFromMap(data, "audience"),
 		JwksURI:  stringFromMap(data, "jwks_uri"),
 		Issuer:   stringFromMap(data, "issuer"),
@@ -511,13 +511,13 @@ func parseDataFromMap(data map[string]interface{}) (*ConjurAuthenticatorDataMode
 }
 
 // parseIdentityFromMap maps the API response nested Authenticator.Data.Identity object to the resource model
-func parseIdentityFromMap(data map[string]interface{}) *ConjurAuthenticatorIdentityModel {
+func parseIdentityFromMap(data map[string]interface{}) *AuthenticatorIdentityModel {
 	raw, ok := data["identity"].(map[string]interface{})
 	if !ok {
 		return nil
 	}
 
-	im := ConjurAuthenticatorIdentityModel{
+	im := AuthenticatorIdentityModel{
 		IdentityPath:     stringFromMap(raw, "identity_path"),
 		TokenAppProperty: stringFromMap(raw, "token_app_property"),
 	}
