@@ -146,25 +146,6 @@ pipeline {
           }
         }
       }
-      post {
-        always {
-          script {
-            unstash 'output-xml'
-            junit 'output/junit.xml'
-            recordCoverage(
-              tools: [[parser: 'COBERTURA', pattern: 'output/coverage.xml']],
-              sourceCodeEncoding: 'ASCII',
-              qualityGates: [
-                  [threshold: 65.0, metric: 'LINE', baseline: 'PROJECT', unstable: true],
-                  [threshold: 70.0, metric: 'BRANCH', baseline: 'PROJECT', unstable: true],
-                  [threshold: 70.0, metric: 'METHOD', baseline: 'PROJECT', unstable: true]
-              ],
-              skipPublishingChecks: false
-            )
-            codacy action: 'reportCoverage', filePath: "output/coverage.xml"
-          }
-        }
-      }
     }
     
     stage('Run integration tests (OSS) for Api Key') {
