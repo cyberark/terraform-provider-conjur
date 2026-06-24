@@ -121,12 +121,12 @@ func (d *certificateIssueDataSource) Configure(ctx context.Context, req datasour
 	if req.ProviderData == nil {
 		return
 	}
-	client, ok := req.ProviderData.(api.ClientV2)
+	client, ok := req.ProviderData.(*providerClients)
 	if !ok {
 		AddUnexpectedConfigureTypeError(&resp.Diagnostics, "*conjurapi.certificateIssueClient", req.ProviderData)
 		return
 	}
-	d.client = &apiWrapper{client}
+	d.client = &apiWrapper{client.conjurClient}
 }
 
 func (d *certificateIssueDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {

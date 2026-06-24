@@ -40,21 +40,21 @@ type AuthenticatorResource struct {
 
 // AuthenticatorResourceModel describes the resource data model.
 type AuthenticatorResourceModel struct {
-	Type        types.String                  `tfsdk:"type"`
-	Name        types.String                  `tfsdk:"name"`
-	Subtype     types.String                  `tfsdk:"subtype"`
-	Enabled     types.Bool                    `tfsdk:"enabled"`
-	Owner       types.Object                  `tfsdk:"owner"`
+	Type        types.String            `tfsdk:"type"`
+	Name        types.String            `tfsdk:"name"`
+	Subtype     types.String            `tfsdk:"subtype"`
+	Enabled     types.Bool              `tfsdk:"enabled"`
+	Owner       types.Object            `tfsdk:"owner"`
 	Data        *AuthenticatorDataModel `tfsdk:"data"`
-	Annotations map[string]string             `tfsdk:"annotations"`
+	Annotations map[string]string       `tfsdk:"annotations"`
 }
 
 type AuthenticatorDataModel struct {
-	Audience   types.String                      `tfsdk:"audience"`
-	JwksURI    types.String                      `tfsdk:"jwks_uri"`
-	Issuer     types.String                      `tfsdk:"issuer"`
-	CACert     types.String                      `tfsdk:"ca_cert"`
-	PublicKeys types.String                      `tfsdk:"public_keys"`
+	Audience   types.String                `tfsdk:"audience"`
+	JwksURI    types.String                `tfsdk:"jwks_uri"`
+	Issuer     types.String                `tfsdk:"issuer"`
+	CACert     types.String                `tfsdk:"ca_cert"`
+	PublicKeys types.String                `tfsdk:"public_keys"`
 	Identity   *AuthenticatorIdentityModel `tfsdk:"identity"`
 }
 
@@ -228,12 +228,12 @@ func (r *AuthenticatorResource) Configure(ctx context.Context, req resource.Conf
 	if req.ProviderData == nil {
 		return
 	}
-	client, ok := req.ProviderData.(api.ClientV2)
+	client, ok := req.ProviderData.(*providerClients)
 	if !ok {
 		AddUnexpectedConfigureTypeError(&resp.Diagnostics, "api.ClientV2", req.ProviderData)
 		return
 	}
-	r.client = client
+	r.client = client.conjurClient
 }
 
 func (r *AuthenticatorResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

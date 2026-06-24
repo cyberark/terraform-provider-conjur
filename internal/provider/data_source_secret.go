@@ -61,12 +61,12 @@ func (d *SecretDataSource) Configure(_ context.Context, req datasource.Configure
 	if req.ProviderData == nil {
 		return
 	}
-	client, ok := req.ProviderData.(api.ClientV2)
+	client, ok := req.ProviderData.(*providerClients)
 	if !ok {
 		AddUnexpectedConfigureTypeError(&resp.Diagnostics, "api.ClientV2", req.ProviderData)
 		return
 	}
-	d.client = client
+	d.client = client.conjurClient
 }
 
 func (d *SecretDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {

@@ -34,13 +34,13 @@ type HostResource struct {
 
 // HostResourceModel describes the resource data model.
 type HostResourceModel struct {
-	Name             types.String                `tfsdk:"name"`
-	Branch           types.String                `tfsdk:"branch"`
-	Type             types.String                `tfsdk:"type"`
+	Name             types.String          `tfsdk:"name"`
+	Branch           types.String          `tfsdk:"branch"`
+	Type             types.String          `tfsdk:"type"`
 	Owner            *HostOwnerModel       `tfsdk:"owner"`
-	RestrictedTo     types.List                  `tfsdk:"restricted_to"`
+	RestrictedTo     types.List            `tfsdk:"restricted_to"`
 	AuthnDescriptors []HostAuthnDescriptor `tfsdk:"authn_descriptors"`
-	Annotations      map[string]string           `tfsdk:"annotations"`
+	Annotations      map[string]string     `tfsdk:"annotations"`
 }
 
 type HostOwnerModel struct {
@@ -53,8 +53,8 @@ type HostAuthnDescriptorData struct {
 }
 
 type HostAuthnDescriptor struct {
-	Type      types.String                   `tfsdk:"type"`
-	ServiceID types.String                   `tfsdk:"service_id"`
+	Type      types.String             `tfsdk:"type"`
+	ServiceID types.String             `tfsdk:"service_id"`
 	Data      *HostAuthnDescriptorData `tfsdk:"data"`
 }
 
@@ -188,13 +188,13 @@ func (r *HostResource) Configure(ctx context.Context, req resource.ConfigureRequ
 		return
 	}
 
-	client, ok := req.ProviderData.(api.ClientV2)
+	client, ok := req.ProviderData.(*providerClients)
 	if !ok {
 		AddUnexpectedConfigureTypeError(&resp.Diagnostics, "api.ClientV2", req.ProviderData)
 		return
 	}
 
-	r.client = client
+	r.client = client.conjurClient
 }
 
 func (r *HostResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

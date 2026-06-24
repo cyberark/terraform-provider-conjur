@@ -49,19 +49,19 @@ type SecretResource struct {
 }
 
 type SecretResourceModel struct {
-	Branch         types.String             `tfsdk:"branch"`
-	Name           types.String             `tfsdk:"name"`
-	MimeType       types.String             `tfsdk:"mime_type"`
-	Value          types.String             `tfsdk:"value"`
-	ValueWO        types.String             `tfsdk:"value_wo"`
-	ValueWOVersion types.Int32              `tfsdk:"value_wo_version"`
-	Annotations    map[string]string        `tfsdk:"annotations"`
+	Branch         types.String       `tfsdk:"branch"`
+	Name           types.String       `tfsdk:"name"`
+	MimeType       types.String       `tfsdk:"mime_type"`
+	Value          types.String       `tfsdk:"value"`
+	ValueWO        types.String       `tfsdk:"value_wo"`
+	ValueWOVersion types.Int32        `tfsdk:"value_wo_version"`
+	Annotations    map[string]string  `tfsdk:"annotations"`
 	Permissions    []SecretPermission `tfsdk:"permissions"`
 }
 
 type SecretPermission struct {
 	Subject    SecretSubject `tfsdk:"subject"`
-	Privileges types.List          `tfsdk:"privileges"`
+	Privileges types.List    `tfsdk:"privileges"`
 }
 
 type SecretSubject struct {
@@ -170,12 +170,12 @@ func (r *SecretResource) Configure(ctx context.Context, req resource.ConfigureRe
 	if req.ProviderData == nil {
 		return
 	}
-	client, ok := req.ProviderData.(api.ClientV2)
+	client, ok := req.ProviderData.(*providerClients)
 	if !ok {
 		AddUnexpectedConfigureTypeError(&resp.Diagnostics, "api.ClientV2", req.ProviderData)
 		return
 	}
-	r.client = client
+	r.client = client.conjurClient
 }
 
 func (r *SecretResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {

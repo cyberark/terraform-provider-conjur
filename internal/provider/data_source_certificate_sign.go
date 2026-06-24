@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 
-	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -92,13 +91,13 @@ func (d *certificateSignDataSource) Configure(ctx context.Context, req datasourc
 	if req.ProviderData == nil {
 		return
 	}
-	client, ok := req.ProviderData.(api.ClientV2)
+	client, ok := req.ProviderData.(*providerClients)
 	if !ok {
 		AddUnexpectedConfigureTypeError(&resp.Diagnostics, "certificateSignClient", req.ProviderData)
 		return
 	}
 
-	d.client = &apiWrapper{client}
+	d.client = &apiWrapper{client.conjurClient}
 }
 
 func (d *certificateSignDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {

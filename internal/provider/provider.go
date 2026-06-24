@@ -3,10 +3,12 @@ package provider
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 
 	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api"
+	swaclient "github.com/cyberark/terraform-provider-conjur/internal/swa/client"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/ephemeral"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -17,6 +19,23 @@ import (
 	"github.com/cyberark/conjur-api-go/conjurapi"
 	"github.com/cyberark/conjur-api-go/conjurapi/authn"
 )
+
+// providerClients holds both the Conjur API client and the SWA client.
+// It is passed as ProviderData to all resources and data sources.
+type providerClients struct {
+	conjurClient api.ClientV2
+	swaClient    swaclient.ClientWithResponsesInterface
+}
+
+// AuthTransport is an http.RoundTripper that delegates to a conjur-api-go
+// Client, giving the SWA HTTP client automatic token refresh for all authn types.
+type AuthTransport struct {
+	ConjurClient *conjurapi.Client
+}
+
+func (t *AuthTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return t.ConjurClient.SubmitRequest(req)
+}
 
 // IntegrationVersion is injected at build time via ldflags.
 // Defaults for local builds so `go build` still works.
@@ -213,15 +232,27 @@ func (p *providerImpl) Configure(ctx context.Context, req provider.ConfigureRequ
 		return
 	}
 
-	client, err := p.createClient(config, &data)
+	conjurClient, err := p.createClient(config, &data)
 	if err != nil {
 		resp.Diagnostics.AddError("Client initialization failed", err.Error())
 		return
 	}
 
-	resp.DataSourceData = client
-	resp.ResourceData = client
-	resp.EphemeralResourceData = client
+	applianceURL := strings.TrimSuffix(strings.TrimSuffix(conjurClient.GetConfig().ApplianceURL, "/"), "/api")
+	swaC, err := swaclient.NewSWAClientWithTransport(applianceURL, &AuthTransport{ConjurClient: conjurClient})
+	if err != nil {
+		resp.Diagnostics.AddError("SWA client initialization failed", err.Error())
+		return
+	}
+
+	clients := &providerClients{
+		conjurClient: conjurClient.V2(),
+		swaClient:    swaC,
+	}
+
+	resp.DataSourceData = clients
+	resp.ResourceData = clients
+	resp.EphemeralResourceData = clients
 }
 
 // resolveAuthnJWT returns the JWT from config or TFC_WORKLOAD_IDENTITY_TOKEN env var.
@@ -269,7 +300,7 @@ func (p *providerImpl) applyConfigOverrides(config *conjurapi.Config, data *prov
 	config.CredentialStorage = conjurapi.CredentialStorageNone
 }
 
-func (p *providerImpl) createClient(config *conjurapi.Config, data *providerModel) (api.ClientV2, error) {
+func (p *providerImpl) createClient(config *conjurapi.Config, data *providerModel) (*conjurapi.Client, error) {
 	authnType := data.AuthnType.ValueString()
 
 	switch authnType {
@@ -288,21 +319,16 @@ func (p *providerImpl) createClient(config *conjurapi.Config, data *providerMode
 	}
 }
 
-func (p *providerImpl) createJWTClient(config *conjurapi.Config, data *providerModel) (api.ClientV2, error) {
+func (p *providerImpl) createJWTClient(config *conjurapi.Config, data *providerModel) (*conjurapi.Client, error) {
 	config.ServiceID = data.ServiceID.ValueString()
 	config.JWTHostID = data.HostID.ValueString()
 	config.AuthnType = data.AuthnType.ValueString()
 	config.JWTContent = data.AuthnJWT.ValueString()
 
-	client, err := conjurapi.NewClientFromJwt(*config, telemetryData)
-	if err != nil {
-		return nil, err
-	}
-
-	return client.V2(), nil
+	return conjurapi.NewClientFromJwt(*config, telemetryData)
 }
 
-func (p *providerImpl) createGCPClient(config *conjurapi.Config, data *providerModel) (api.ClientV2, error) {
+func (p *providerImpl) createGCPClient(config *conjurapi.Config, data *providerModel) (*conjurapi.Client, error) {
 	config.ServiceID = data.ServiceID.ValueString()
 	config.AuthnType = "gcp"
 	config.JWTHostID = strings.TrimPrefix(data.HostID.ValueString(), "host/")
@@ -313,15 +339,10 @@ func (p *providerImpl) createGCPClient(config *conjurapi.Config, data *providerM
 		config.JWTContent = gcpToken
 	}
 
-	client, err := conjurapi.NewClientFromGCPCredentials(*config, "", telemetryData)
-	if err != nil {
-		return nil, err
-	}
-
-	return client.V2(), nil
+	return conjurapi.NewClientFromGCPCredentials(*config, "", telemetryData)
 }
 
-func (p *providerImpl) createAzureClient(config *conjurapi.Config, data *providerModel) (api.ClientV2, error) {
+func (p *providerImpl) createAzureClient(config *conjurapi.Config, data *providerModel) (*conjurapi.Client, error) {
 	config.ServiceID = data.ServiceID.ValueString()
 	config.AuthnType = "azure"
 	config.JWTHostID = strings.TrimPrefix(data.HostID.ValueString(), "host/")
@@ -329,48 +350,28 @@ func (p *providerImpl) createAzureClient(config *conjurapi.Config, data *provide
 		config.AzureClientID = data.ClientID.ValueString()
 	}
 
-	client, err := conjurapi.NewClientFromAzureCredentials(*config, telemetryData)
-	if err != nil {
-		return nil, err
-	}
-
-	return client.V2(), nil
+	return conjurapi.NewClientFromAzureCredentials(*config, telemetryData)
 }
 
-func (p *providerImpl) createIAMClient(config *conjurapi.Config, data *providerModel) (api.ClientV2, error) {
+func (p *providerImpl) createIAMClient(config *conjurapi.Config, data *providerModel) (*conjurapi.Client, error) {
 	config.ServiceID = data.ServiceID.ValueString()
 	config.AuthnType = "iam"
 	config.JWTHostID = strings.TrimPrefix(data.HostID.ValueString(), "host/")
 
-	client, err := conjurapi.NewClientFromAWSCredentials(*config, telemetryData)
-	if err != nil {
-		return nil, err
-	}
-
-	return client.V2(), nil
+	return conjurapi.NewClientFromAWSCredentials(*config, telemetryData)
 }
 
-func (p *providerImpl) createAPIKeyClient(config *conjurapi.Config, data *providerModel) (api.ClientV2, error) {
+func (p *providerImpl) createAPIKeyClient(config *conjurapi.Config, data *providerModel) (*conjurapi.Client, error) {
 	login := data.Login.ValueString()
 	apiKey := data.APIKey.ValueString()
 
-	var client *conjurapi.Client
-	var err error
-
 	if login != "" && apiKey != "" {
-		client, err = conjurapi.NewClientFromKey(*config, authn.LoginPair{
+		return conjurapi.NewClientFromKey(*config, authn.LoginPair{
 			Login:  login,
 			APIKey: apiKey,
 		}, telemetryData)
-	} else {
-		client, err = conjurapi.NewClientFromEnvironment(*config, telemetryData)
 	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	return client.V2(), nil
+	return conjurapi.NewClientFromEnvironment(*config, telemetryData)
 }
 
 func (p *providerImpl) DataSources(_ context.Context) []func() datasource.DataSource {
@@ -398,6 +399,10 @@ func (p *providerImpl) Resources(_ context.Context) []func() resource.Resource {
 		NewMembershipResource,
 		NewSecretResource,
 		NewPolicyBranchResource,
+		//NewTrustDomainResource,
+		//NewServerGroupResource,
+		//NewServerResource,
+		//NewNodeGroupResource,
 	}
 }
 
