@@ -17,6 +17,9 @@ func AddProviderClientNotConfiguredWarning(d *diag.Diagnostics) {
 
 // AddUnexpectedConfigureTypeError adds an error when the provider data has an unexpected type.
 func AddUnexpectedConfigureTypeError(d *diag.Diagnostics, expected string, got interface{}) {
+	if expected == "api.ClientV2" {
+		expected = "*providerClients"
+	}
 	d.AddError(
 		"Unexpected Configure Type",
 		fmt.Sprintf("Expected %s, got: %T", expected, got),

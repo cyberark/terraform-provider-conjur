@@ -37,7 +37,7 @@ type GroupResource struct {
 type GroupResourceModel struct {
 	Name        types.String      `tfsdk:"name"`
 	Branch      types.String      `tfsdk:"branch"`
-	Owner       *OwnerModel `tfsdk:"owner"`
+	Owner       *OwnerModel       `tfsdk:"owner"`
 	Annotations map[string]string `tfsdk:"annotations"`
 }
 
@@ -116,12 +116,12 @@ func (r *GroupResource) Configure(ctx context.Context, req resource.ConfigureReq
 	if req.ProviderData == nil {
 		return
 	}
-	client, ok := req.ProviderData.(api.ClientV2)
+	client, ok := req.ProviderData.(*providerClients)
 	if !ok {
 		AddUnexpectedConfigureTypeError(&resp.Diagnostics, "api.ClientV2", req.ProviderData)
 		return
 	}
-	r.client = client
+	r.client = client.conjurClient
 }
 
 func (r *GroupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
