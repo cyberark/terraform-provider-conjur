@@ -470,17 +470,3 @@ func getMembershipTestSchema() schema.Schema {
 	r.Schema(context.Background(), resource.SchemaRequest{}, &schemaResp)
 	return schemaResp.Schema
 }
-
-func contains(str, substr string) bool {
-	return len(str) >= len(substr) && (str == substr || len(substr) == 0 ||
-		(len(str) > 0 && len(substr) > 0 && hasSubstring(str, substr)))
-}
-
-func hasSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}
