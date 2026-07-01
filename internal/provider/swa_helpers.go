@@ -28,12 +28,6 @@ func configureSWAClient(req resource.ConfigureRequest, resp *resource.ConfigureR
 	return clients.swaClient, true
 }
 
-// ptr returns a pointer to v. It is a convenience helper for building API
-// request bodies that require pointer fields from plain Go values.
-func ptr[T any](v T) *T {
-	return &v
-}
-
 // optionalStringValue normalizes nullable API string fields for Terraform state.
 func optionalStringValue(s *string) types.String {
 	if s == nil || *s == "" {

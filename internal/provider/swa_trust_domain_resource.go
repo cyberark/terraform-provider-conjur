@@ -238,10 +238,10 @@ func (r *TrustDomainResource) Create(ctx context.Context, req resource.CreateReq
 			return
 		}
 		createReq.Jwt = &swaclient.JWTConfigurationInput{
-			SignatureAlgorithm: ptr(swaclient.JWTConfigurationInputSignatureAlgorithm(jwtCfg.SignatureAlgorithm.ValueString())),
-			SigningKeyType:     ptr(swaclient.JWTConfigurationInputSigningKeyType(jwtCfg.SigningKeyType.ValueString())),
-			SigningKeyTtl:      ptr(int32(jwtCfg.SigningKeyTTL.ValueInt64())),
-			TokenTtl:           ptr(int32(jwtCfg.TokenTTL.ValueInt64())),
+			SignatureAlgorithm: new(swaclient.JWTConfigurationInputSignatureAlgorithm(jwtCfg.SignatureAlgorithm.ValueString())),
+			SigningKeyType:     new(swaclient.JWTConfigurationInputSigningKeyType(jwtCfg.SigningKeyType.ValueString())),
+			SigningKeyTtl:      new(int32(jwtCfg.SigningKeyTTL.ValueInt64())),
+			TokenTtl:           new(int32(jwtCfg.TokenTTL.ValueInt64())),
 		}
 	}
 
@@ -250,7 +250,7 @@ func (r *TrustDomainResource) Create(ctx context.Context, req resource.CreateReq
 			return
 		}
 		createReq.X509 = &swaclient.X509ConfigurationInput{
-			WorkloadTtl: ptr(int32(x509Cfg.WorkloadTTL.ValueInt64())),
+			WorkloadTtl: new(int32(x509Cfg.WorkloadTTL.ValueInt64())),
 		}
 	}
 
@@ -349,10 +349,10 @@ func (r *TrustDomainResource) Update(ctx context.Context, req resource.UpdateReq
 			return
 		}
 		updateReq.Jwt = &swaclient.UpdateJWTConfigurationInput{
-			SignatureAlgorithm: ptr(swaclient.UpdateJWTConfigurationInputSignatureAlgorithm(jwtCfg.SignatureAlgorithm.ValueString())),
-			SigningKeyType:     ptr(swaclient.UpdateJWTConfigurationInputSigningKeyType(jwtCfg.SigningKeyType.ValueString())),
-			SigningKeyTtl:      ptr(int32(jwtCfg.SigningKeyTTL.ValueInt64())),
-			TokenTtl:           ptr(int32(jwtCfg.TokenTTL.ValueInt64())),
+			SignatureAlgorithm: new(swaclient.UpdateJWTConfigurationInputSignatureAlgorithm(jwtCfg.SignatureAlgorithm.ValueString())),
+			SigningKeyType:     new(swaclient.UpdateJWTConfigurationInputSigningKeyType(jwtCfg.SigningKeyType.ValueString())),
+			SigningKeyTtl:      new(int32(jwtCfg.SigningKeyTTL.ValueInt64())),
+			TokenTtl:           new(int32(jwtCfg.TokenTTL.ValueInt64())),
 		}
 	}
 

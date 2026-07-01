@@ -230,7 +230,7 @@ func (r *AuthenticatorResource) Configure(ctx context.Context, req resource.Conf
 	}
 	client, ok := req.ProviderData.(*providerClients)
 	if !ok {
-		AddUnexpectedConfigureTypeError(&resp.Diagnostics, "api.ClientV2", req.ProviderData)
+		AddUnexpectedConfigureTypeError(&resp.Diagnostics, "*providerClients", req.ProviderData)
 		return
 	}
 	r.client = client.conjurClient

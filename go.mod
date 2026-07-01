@@ -97,7 +97,7 @@ require (
 
 // Automated release process replaces
 // DO NOT EDIT: CHANGES TO THE BELOW LINES WILL BREAK AUTOMATED RELEASES
-replace github.com/cyberark/conjur-api-go => github.com/cyberark/conjur-api-go v0.14.1
+replace github.com/cyberark/conjur-api-go => github.com/cyberark/conjur-api-go latest
 
 // Security fixes to ensure we don't have old vulnerable packages in our
 // dependency tree. We're often not vulnerable, but removing them to ensure
