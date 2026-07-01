@@ -123,7 +123,7 @@ func (d *certificateIssueDataSource) Configure(ctx context.Context, req datasour
 	}
 	client, ok := req.ProviderData.(*providerClients)
 	if !ok {
-		AddUnexpectedConfigureTypeError(&resp.Diagnostics, "*conjurapi.certificateIssueClient", req.ProviderData)
+		AddUnexpectedConfigureTypeError(&resp.Diagnostics, "*providerClients", req.ProviderData)
 		return
 	}
 	d.client = &apiWrapper{client.conjurClient}

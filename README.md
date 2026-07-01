@@ -1252,12 +1252,16 @@ By adding support for AWS IAM roles, Azure, and GCP authentication, the risk is 
 This provider can manage the following Secrets Manager resource types:
 
 * `conjur_authenticator` - Manage the lifecycle of an authenticator ([example usage](docs/resources/authenticator.md))
-* `conjur_branch` - Manage the lifecycle of a policy branch ([example usage](docs/resources/branch.md))
+* `conjur_policy_branch` - Manage the lifecycle of a policy branch ([example usage](docs/resources/policy_branch.md))
 * `conjur_group` - Manage the lifecycle of a group ([example usage](docs/resources/group.md))
 * `conjur_host` - Manage the lifecycle of a host/workload ([example usage](docs/resources/host.md))
 * `conjur_membership` - Manage role memberships ([example usage](docs/resources/membership.md))
+* `conjur_node_group` - Manage the lifecycle of an SWA node group ([example usage](docs/resources/node_group.md))
 * `conjur_permission` - Manage permissions for a role on a resource ([example usage](docs/resources/permission.md))
 * `conjur_secret` - Manage the lifecycle of a secret variable ([example usage](docs/resources/secret.md))
+* `conjur_server` - Manage the lifecycle of an SWA server (agent) ([example usage](docs/resources/server.md))
+* `conjur_server_group` - Manage the lifecycle of an SWA server group ([example usage](docs/resources/server_group.md))
+* `conjur_trust_domain` - Manage the lifecycle of an SWA trust domain ([example usage](docs/resources/trust_domain.md))
 
 ## Contributing
 

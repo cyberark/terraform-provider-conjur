@@ -93,7 +93,7 @@ func (d *certificateSignDataSource) Configure(ctx context.Context, req datasourc
 	}
 	client, ok := req.ProviderData.(*providerClients)
 	if !ok {
-		AddUnexpectedConfigureTypeError(&resp.Diagnostics, "certificateSignClient", req.ProviderData)
+		AddUnexpectedConfigureTypeError(&resp.Diagnostics, "*providerClients", req.ProviderData)
 		return
 	}
 

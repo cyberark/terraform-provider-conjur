@@ -17,9 +17,6 @@ const (
 // SWAClient wraps the generated client with authentication
 type SWAClient struct {
 	*ClientWithResponses
-	baseURL     string
-	accessToken string
-	timeout     time.Duration
 }
 
 var _ ClientWithResponsesInterface = (*SWAClient)(nil)
@@ -43,9 +40,5 @@ func NewSWAClientWithTransport(baseURL string, transport http.RoundTripper) (*SW
 		return nil, err
 	}
 
-	return &SWAClient{
-		ClientWithResponses: client,
-		baseURL:             baseURL,
-		timeout:             DefaultTimeout,
-	}, nil
+	return &SWAClient{ClientWithResponses: client}, nil
 }

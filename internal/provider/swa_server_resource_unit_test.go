@@ -592,7 +592,7 @@ func TestServerResource_Read(t *testing.T) {
 						HTTPResponse: makeHTTPResponse(http.StatusOK),
 						ApplicationxSecretsmgrV2JSON200: &swaclient.ServerResponse{
 							Name:            "my-server",
-							ServerGroupName: ptr("prod-servers"),
+							ServerGroupName: new("prod-servers"),
 							AuthnId:         &authnID,
 							Authentication: &swaclient.ServerAuthentication{
 								Type: "JWT",
