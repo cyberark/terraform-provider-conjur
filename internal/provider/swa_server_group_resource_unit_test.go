@@ -27,6 +27,110 @@ func makeServerGroupResponse(name, trustDomain string) *swaclient.ServerGroupRes
 	}
 }
 
+// TestUpdateNodeAttestationFromResponse verifies that updateNodeAttestationFromResponse fully
+// reconciles state from the API response (rather than merging into whatever was already in the
+// model), so attestation methods or clusters removed server-side actually disappear from state
+// on the next Read instead of persisting indefinitely.
+func TestUpdateNodeAttestationFromResponse(t *testing.T) {
+	ctx := context.Background()
+
+	mustStringList := func(t *testing.T, values ...string) types.List {
+		t.Helper()
+		list, diags := types.ListValueFrom(ctx, types.StringType, values)
+		require.False(t, diags.HasError(), "failed to build test list: %v", diags)
+		return list
+	}
+
+	t.Run("nil response clears node attestation", func(t *testing.T) {
+		model := &ServerGroupResourceModel{
+			NodeAttestation: &NodeAttestationModel{
+				X509Pop: &X509PopModel{CaCertificates: types.StringValue("stale-cert")},
+			},
+		}
+		diags := updateNodeAttestationFromResponse(ctx, model, nil)
+		assert.False(t, diags.HasError())
+		assert.Nil(t, model.NodeAttestation)
+	})
+
+	t.Run("x509pop removed server-side is removed from state", func(t *testing.T) {
+		model := &ServerGroupResourceModel{
+			NodeAttestation: &NodeAttestationModel{
+				X509Pop: &X509PopModel{CaCertificates: types.StringValue("stale-cert")},
+			},
+		}
+		na := &struct {
+			K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
+			X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
+		}{
+			K8sPsat: &swaclient.K8sPsatConfigurationInput{
+				Clusters: &map[string]swaclient.K8sPsatCluster{
+					"cluster-a": {},
+				},
+			},
+		}
+
+		diags := updateNodeAttestationFromResponse(ctx, model, na)
+		assert.False(t, diags.HasError())
+		require.NotNil(t, model.NodeAttestation)
+		assert.Nil(t, model.NodeAttestation.X509Pop, "x509pop should be cleared once the server no longer reports it")
+		require.NotNil(t, model.NodeAttestation.K8sPsat)
+		assert.Contains(t, model.NodeAttestation.K8sPsat.Clusters, "cluster-a")
+	})
+
+	t.Run("cluster removed server-side is removed from state", func(t *testing.T) {
+		model := &ServerGroupResourceModel{
+			NodeAttestation: &NodeAttestationModel{
+				K8sPsat: &K8sPsatModel{
+					Clusters: map[string]K8sPsatClusterModel{
+						"cluster-a": {ServiceAccountAllowList: mustStringList(t, "ns/sa")},
+						"cluster-b": {ServiceAccountAllowList: mustStringList(t, "ns2/sa2")},
+					},
+				},
+			},
+		}
+		na := &struct {
+			K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
+			X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
+		}{
+			K8sPsat: &swaclient.K8sPsatConfigurationInput{
+				Clusters: &map[string]swaclient.K8sPsatCluster{
+					"cluster-a": {},
+				},
+			},
+		}
+
+		diags := updateNodeAttestationFromResponse(ctx, model, na)
+		assert.False(t, diags.HasError())
+		require.NotNil(t, model.NodeAttestation.K8sPsat)
+		assert.Contains(t, model.NodeAttestation.K8sPsat.Clusters, "cluster-a")
+		assert.NotContains(t, model.NodeAttestation.K8sPsat.Clusters, "cluster-b", "cluster-b was removed server-side and must not persist in state")
+	})
+
+	t.Run("k8s_psat removed server-side is removed from state", func(t *testing.T) {
+		model := &ServerGroupResourceModel{
+			NodeAttestation: &NodeAttestationModel{
+				X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
+				K8sPsat: &K8sPsatModel{
+					Clusters: map[string]K8sPsatClusterModel{
+						"cluster-a": {},
+					},
+				},
+			},
+		}
+		na := &struct {
+			K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
+			X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
+		}{
+			X509pop: &swaclient.X509PopConfigurationInput{CaCertificates: "cert"},
+		}
+
+		diags := updateNodeAttestationFromResponse(ctx, model, na)
+		assert.False(t, diags.HasError())
+		require.NotNil(t, model.NodeAttestation)
+		assert.Nil(t, model.NodeAttestation.K8sPsat, "k8s_psat should be cleared once the server no longer reports it")
+	})
+}
+
 func TestBuildK8sPsatClusters(t *testing.T) {
 	ctx := context.Background()
 

@@ -60,34 +60,31 @@ func NewServerGroupResource() resource.Resource {
 	return &ServerGroupResource{}
 }
 
-// updateNodeAttestationFromResponse updates the model's NodeAttestation from the API response.
+// updateNodeAttestationFromResponse replaces the model's NodeAttestation with exactly what the
+// API response describes. This is a full reconciliation rather than a merge: attestation
+// methods or clusters that are no longer present in the response are removed from state, so
+// that out-of-band or server-side changes are surfaced on the next Read instead of silently
+// persisting stale values from a prior plan or state.
 func updateNodeAttestationFromResponse(ctx context.Context, model *ServerGroupResourceModel, na *struct {
 	K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
 	X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
 }) diag.Diagnostics {
 	var diags diag.Diagnostics
 	if na == nil {
+		model.NodeAttestation = nil
 		return diags
 	}
 
-	if model.NodeAttestation == nil {
-		model.NodeAttestation = &NodeAttestationModel{}
-	}
+	attestation := &NodeAttestationModel{}
 
 	if na.X509pop != nil {
-		if model.NodeAttestation.X509Pop == nil {
-			model.NodeAttestation.X509Pop = &X509PopModel{}
+		attestation.X509Pop = &X509PopModel{
+			CaCertificates: types.StringValue(na.X509pop.CaCertificates),
 		}
-		model.NodeAttestation.X509Pop.CaCertificates = types.StringValue(na.X509pop.CaCertificates)
 	}
 
 	if na.K8sPsat != nil && na.K8sPsat.Clusters != nil {
-		if model.NodeAttestation.K8sPsat == nil {
-			model.NodeAttestation.K8sPsat = &K8sPsatModel{}
-		}
-		if model.NodeAttestation.K8sPsat.Clusters == nil {
-			model.NodeAttestation.K8sPsat.Clusters = make(map[string]K8sPsatClusterModel)
-		}
+		clusters := make(map[string]K8sPsatClusterModel, len(*na.K8sPsat.Clusters))
 		for clusterName, clusterConfig := range *na.K8sPsat.Clusters {
 			cluster := K8sPsatClusterModel{}
 
@@ -96,9 +93,12 @@ func updateNodeAttestationFromResponse(ctx context.Context, model *ServerGroupRe
 			appendOptionalStringList(ctx, clusterConfig.AllowedPodLabelKeys, &cluster.AllowedPodLabelKeys, &diags)
 			appendOptionalStringList(ctx, clusterConfig.AllowedNodeLabelKeys, &cluster.AllowedNodeLabelKeys, &diags)
 
-			model.NodeAttestation.K8sPsat.Clusters[clusterName] = cluster
+			clusters[clusterName] = cluster
 		}
+		attestation.K8sPsat = &K8sPsatModel{Clusters: clusters}
 	}
+
+	model.NodeAttestation = attestation
 	return diags
 }
 
