@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	swaclient "github.com/cyberark/terraform-provider-conjur/internal/swa/client"
 )
@@ -277,6 +278,7 @@ func (r *TrustDomainResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
+	tflog.Trace(ctx, "created trust domain resource")
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
@@ -385,6 +387,7 @@ func (r *TrustDomainResource) Update(ctx context.Context, req resource.UpdateReq
 		}
 	}
 
+	tflog.Trace(ctx, "updated trust domain resource")
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
@@ -411,7 +414,10 @@ func (r *TrustDomainResource) Delete(ctx context.Context, req resource.DeleteReq
 	if result.StatusCode() != http.StatusNoContent && result.StatusCode() != http.StatusNotFound {
 		summary, detail := apiStatusError("deleting trust domain", result.StatusCode(), result.Body)
 		resp.Diagnostics.AddError(summary, detail)
+		return
 	}
+
+	tflog.Trace(ctx, "deleted trust domain resource")
 }
 
 func (r *TrustDomainResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

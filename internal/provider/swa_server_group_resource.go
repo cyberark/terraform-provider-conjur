@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	swaclient "github.com/cyberark/terraform-provider-conjur/internal/swa/client"
 )
@@ -339,6 +340,7 @@ func (r *ServerGroupResource) Create(ctx context.Context, req resource.CreateReq
 	plan.Description = optionalStringValue(sgResp.Description)
 	resp.Diagnostics.Append(updateNodeAttestationFromResponse(ctx, &plan, sgResp.NodeAttestation)...)
 
+	tflog.Trace(ctx, "created server group resource")
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
@@ -442,6 +444,7 @@ func (r *ServerGroupResource) Update(ctx context.Context, req resource.UpdateReq
 		resp.Diagnostics.Append(updateNodeAttestationFromResponse(ctx, &plan, result.ApplicationxSecretsmgrV2JSON200.NodeAttestation)...)
 	}
 
+	tflog.Trace(ctx, "updated server group resource")
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
@@ -468,7 +471,10 @@ func (r *ServerGroupResource) Delete(ctx context.Context, req resource.DeleteReq
 	if result.StatusCode() != http.StatusNoContent && result.StatusCode() != http.StatusNotFound {
 		summary, detail := apiStatusError("deleting server group", result.StatusCode(), result.Body)
 		resp.Diagnostics.AddError(summary, detail)
+		return
 	}
+
+	tflog.Trace(ctx, "deleted server group resource")
 }
 
 func (r *ServerGroupResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
