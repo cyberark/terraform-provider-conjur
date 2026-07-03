@@ -21,10 +21,12 @@ import (
 	swaclient "github.com/cyberark/terraform-provider-conjur/internal/swa/client"
 )
 
+// Ensure provider defined types fully satisfy framework interfaces.
 var (
-	_ resource.Resource                = &TrustDomainResource{}
-	_ resource.ResourceWithConfigure   = &TrustDomainResource{}
-	_ resource.ResourceWithImportState = &TrustDomainResource{}
+	_ resource.Resource                   = &TrustDomainResource{}
+	_ resource.ResourceWithConfigure      = &TrustDomainResource{}
+	_ resource.ResourceWithImportState    = &TrustDomainResource{}
+	_ resource.ResourceWithValidateConfig = &TrustDomainResource{}
 )
 
 // jwtAttrTypes and x509AttrTypes define the attribute type maps for the
@@ -139,24 +141,24 @@ func (r *TrustDomainResource) Metadata(ctx context.Context, req resource.Metadat
 
 func (r *TrustDomainResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages an SWA Trust Domain.",
+		MarkdownDescription:"Manages an SWA Trust Domain.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description: "The unique identifier of the trust domain.",
+				MarkdownDescription:"The unique identifier of the trust domain.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"name": schema.StringAttribute{
-				Description: "The name of the trust domain (e.g., 'prod.example.org').",
+				MarkdownDescription:"The name of the trust domain (e.g., 'prod.example.org').",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"jwt": schema.SingleNestedAttribute{
-				Description: "JWT SVID configuration for the trust domain.",
+				MarkdownDescription:"JWT SVID configuration for the trust domain.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.Object{
@@ -164,25 +166,25 @@ func (r *TrustDomainResource) Schema(ctx context.Context, req resource.SchemaReq
 				},
 				Attributes: map[string]schema.Attribute{
 					"signature_algorithm": schema.StringAttribute{
-						Description: "The signature algorithm for JWTs (e.g., 'ES256', 'RS256').",
+						MarkdownDescription:"The signature algorithm for JWTs (e.g., 'ES256', 'RS256').",
 						Optional:    true,
 						Computed:    true,
 						Default:     stringdefault.StaticString("RS512"),
 					},
 					"signing_key_type": schema.StringAttribute{
-						Description: "The type of signing key (e.g., 'EC_P256', 'RSA_2048').",
+						MarkdownDescription:"The type of signing key (e.g., 'EC_P256', 'RSA_2048').",
 						Optional:    true,
 						Computed:    true,
 						Default:     stringdefault.StaticString("RSA_4096"),
 					},
 					"signing_key_ttl": schema.Int64Attribute{
-						Description: "TTL for signing keys in seconds.",
+						MarkdownDescription:"TTL for signing keys in seconds.",
 						Optional:    true,
 						Computed:    true,
 						Default:     int64default.StaticInt64(86400),
 					},
 					"token_ttl": schema.Int64Attribute{
-						Description: "TTL for JWT tokens in seconds.",
+						MarkdownDescription:"TTL for JWT tokens in seconds.",
 						Optional:    true,
 						Computed:    true,
 						Default:     int64default.StaticInt64(300),
@@ -190,7 +192,7 @@ func (r *TrustDomainResource) Schema(ctx context.Context, req resource.SchemaReq
 				},
 			},
 			"x509": schema.SingleNestedAttribute{
-				Description: "X.509 SVID configuration for the trust domain.",
+				MarkdownDescription:"X.509 SVID configuration for the trust domain.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.Object{
@@ -198,7 +200,7 @@ func (r *TrustDomainResource) Schema(ctx context.Context, req resource.SchemaReq
 				},
 				Attributes: map[string]schema.Attribute{
 					"workload_ttl": schema.Int64Attribute{
-						Description: "TTL for workload X.509 SVIDs in seconds.",
+						MarkdownDescription:"TTL for workload X.509 SVIDs in seconds.",
 						Optional:    true,
 						Computed:    true,
 						Default:     int64default.StaticInt64(3600),
@@ -206,6 +208,20 @@ func (r *TrustDomainResource) Schema(ctx context.Context, req resource.SchemaReq
 				},
 			},
 		},
+	}
+}
+
+func (r *TrustDomainResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var data TrustDomainResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if data.JWT.IsNull() && data.X509.IsNull() {
+		resp.Diagnostics.AddError(
+			"Invalid trust domain configuration",
+			"At least one of jwt or x509 must be set.",
+		)
 	}
 }
 

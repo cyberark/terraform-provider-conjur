@@ -22,10 +22,12 @@ import (
 	swaclient "github.com/cyberark/terraform-provider-conjur/internal/swa/client"
 )
 
+// Ensure provider defined types fully satisfy framework interfaces.
 var (
-	_ resource.Resource                = &ServerResource{}
-	_ resource.ResourceWithConfigure   = &ServerResource{}
-	_ resource.ResourceWithImportState = &ServerResource{}
+	_ resource.Resource                   = &ServerResource{}
+	_ resource.ResourceWithConfigure      = &ServerResource{}
+	_ resource.ResourceWithImportState    = &ServerResource{}
+	_ resource.ResourceWithValidateConfig = &ServerResource{}
 )
 
 type ServerResource struct {
@@ -398,17 +400,17 @@ func (r *ServerResource) Metadata(ctx context.Context, req resource.MetadataRequ
 
 func (r *ServerResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages an SWA Server (agent).",
+		MarkdownDescription:"Manages an SWA Server (agent).",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description: "The unique identifier of the server.",
+				MarkdownDescription:"The unique identifier of the server.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"name": schema.StringAttribute{
-				Description: "The name of the server.",
+				MarkdownDescription:"The name of the server.",
 				Required:    true,
 				Validators: []validator.String{
 					stringvalidator.LengthBetween(1, 51),
@@ -418,74 +420,75 @@ func (r *ServerResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				},
 			},
 			"server_group_id": schema.StringAttribute{
-				Description: "The ID of the server group this server belongs to.",
+				MarkdownDescription:"The ID of the server group this server belongs to.",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"authn_id": schema.StringAttribute{
-				Description: "Opaque Base64-encoded authenticator identifier for this server.",
+				MarkdownDescription:"Opaque Base64-encoded authenticator identifier for this server.",
 				Computed:    true,
+				Sensitive:   true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"auth": schema.SingleNestedAttribute{
-				Description: "Authentication configuration for the server.",
+				MarkdownDescription:"Authentication configuration for the server.",
 				Required:    true,
 				PlanModifiers: []planmodifier.Object{
 					objectplanmodifier.RequiresReplace(),
 				},
 				Attributes: map[string]schema.Attribute{
 					"type": schema.StringAttribute{
-						Description: "The authentication type (e.g., 'JWT').",
+						MarkdownDescription:"The authentication type (e.g., 'JWT').",
 						Required:    true,
 					},
 					"subject": schema.StringAttribute{
-						Description: "The expected subject claim value from the workload JWT.",
+						MarkdownDescription:"The expected subject claim value from the workload JWT.",
 						Required:    true,
 					},
 					"audience": schema.StringAttribute{
-						Description: "The expected audience for JWT authentication.",
+						MarkdownDescription:"The expected audience for JWT authentication.",
 						Optional:    true,
 					},
 					"jwks_uri": schema.StringAttribute{
-						Description: "The JWKS URI for JWT verification.",
+						MarkdownDescription:"The JWKS URI for JWT verification.",
 						Optional:    true,
 					},
 					"issuer": schema.StringAttribute{
-						Description: "The expected issuer for JWT authentication.",
+						MarkdownDescription:"The expected issuer for JWT authentication.",
 						Optional:    true,
 					},
 					"ca_cert": schema.StringAttribute{
-						Description: "PEM-encoded CA certificate for validating the JWKS provider's TLS certificate.",
+						MarkdownDescription:"PEM-encoded CA certificate for validating the JWKS provider's TLS certificate.",
 						Optional:    true,
 					},
 					"public_keys": schema.StringAttribute{
-						Description: `Inline JWKS as a JSON string. Format: {"type":"jwks","value":{"keys":[...]}}.`,
+						MarkdownDescription:`Inline JWKS as a JSON string. Format: {"type":"jwks","value":{"keys":[...]}}.`,
 						Optional:    true,
 					},
 					"identity": schema.SingleNestedAttribute{
-						Description: "Identity mapping configuration for the JWT authenticator.",
+						MarkdownDescription:"Identity mapping configuration for the JWT authenticator.",
 						Optional:    true,
 						Attributes: map[string]schema.Attribute{
 							"claim_aliases": schema.MapAttribute{
-								Description: "A map of claim aliases to JWT claim names.",
+								MarkdownDescription:"A map of claim aliases to JWT claim names.",
 								Optional:    true,
 								ElementType: types.StringType,
 							},
 							"enforced_claims": schema.ListAttribute{
-								Description: "A list of enforced claims.",
+								MarkdownDescription:"A list of enforced claims.",
 								Optional:    true,
 								ElementType: types.StringType,
 							},
 							"identity_path": schema.StringAttribute{
-								Description: "The workload's policy ID in Secrets Manager.",
+								MarkdownDescription:"The workload's policy ID in Secrets Manager.",
 								Optional:    true,
 							},
 							"token_app_property": schema.StringAttribute{
-								Description: "The name of the JWT claim whose value identifies the workload.",
+								MarkdownDescription:"The name of the JWT claim whose value identifies the workload.",
 								Optional:    true,
 							},
 						},
@@ -494,6 +497,15 @@ func (r *ServerResource) Schema(ctx context.Context, req resource.SchemaRequest,
 			},
 		},
 	}
+}
+
+func (r *ServerResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var data ServerResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	validateCreateServerAuthConfig(data.Auth, &resp.Diagnostics)
 }
 
 func (r *ServerResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -651,6 +663,10 @@ func (r *ServerResource) Read(ctx context.Context, req resource.ReadRequest, res
 }
 
 func (r *ServerResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	if r.client == nil {
+		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
+		return
+	}
 	resp.Diagnostics.AddError(
 		"Update Not Supported",
 		"Servers cannot be updated. Delete and recreate the resource instead.",

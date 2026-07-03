@@ -24,6 +24,7 @@ import (
 // 1-60 characters, letters, numbers, periods, underscores, and hyphens only.
 var nodeGroupNamePattern = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
 
+// Ensure provider defined types fully satisfy framework interfaces.
 var (
 	_ resource.Resource                = &NodeGroupResource{}
 	_ resource.ResourceWithConfigure   = &NodeGroupResource{}
@@ -79,17 +80,17 @@ func (r *NodeGroupResource) Metadata(ctx context.Context, req resource.MetadataR
 
 func (r *NodeGroupResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages an SWA Node Group.",
+		MarkdownDescription:"Manages an SWA Node Group.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description: "The unique identifier of the node group.",
+				MarkdownDescription:"The unique identifier of the node group.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"name": schema.StringAttribute{
-				Description: "The name of the node group. Must be 1-60 characters and may include letters, numbers, periods, underscores, and hyphens only.",
+				MarkdownDescription:"The name of the node group. Must be 1-60 characters and may include letters, numbers, periods, underscores, and hyphens only.",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -100,25 +101,25 @@ func (r *NodeGroupResource) Schema(ctx context.Context, req resource.SchemaReque
 				},
 			},
 			"description": schema.StringAttribute{
-				Description: "A description of the node group.",
+				MarkdownDescription:"A description of the node group.",
 				Optional:    true,
 			},
 			"trust_domain_name": schema.StringAttribute{
-				Description: "The name of the trust domain.",
+				MarkdownDescription:"The name of the trust domain.",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"server_group_name": schema.StringAttribute{
-				Description: "The name of the server group.",
+				MarkdownDescription:"The name of the server group.",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"workload_type": schema.StringAttribute{
-				Description: "Type of workload for this node group. Valid values: 'unix', 'kubernetes'.",
+				MarkdownDescription:"Type of workload for this node group. Valid values: 'unix', 'kubernetes'.",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -128,15 +129,15 @@ func (r *NodeGroupResource) Schema(ctx context.Context, req resource.SchemaReque
 				},
 			},
 			"workload_configuration": schema.SingleNestedAttribute{
-				Description: "Workload configuration for the node group.",
+				MarkdownDescription:"Workload configuration for the node group.",
 				Optional:    true,
 				Attributes: map[string]schema.Attribute{
 					"spiffe_id_template": schema.StringAttribute{
-						Description: "SPIFFE ID template for workload identification. Uses Go template syntax.",
+						MarkdownDescription:"SPIFFE ID template for workload identification. Uses Go template syntax.",
 						Optional:    true,
 					},
 					"workload_registration_policies": schema.ListAttribute{
-						Description: "List of CEL expressions for workload registration policies.",
+						MarkdownDescription:"List of CEL expressions for workload registration policies.",
 						Optional:    true,
 						ElementType: types.StringType,
 					},
