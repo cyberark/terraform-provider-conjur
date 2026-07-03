@@ -74,7 +74,7 @@ func buildWorkloadConfiguration(ctx context.Context, wc *WorkloadConfigurationMo
 }
 
 func (r *NodeGroupResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_node_group"
+	resp.TypeName = req.ProviderTypeName + "_swa_node_group"
 }
 
 func (r *NodeGroupResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
