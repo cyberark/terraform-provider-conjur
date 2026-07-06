@@ -134,7 +134,7 @@ func NewTrustDomainResource() resource.Resource {
 }
 
 func (r *TrustDomainResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_trust_domain"
+	resp.TypeName = req.ProviderTypeName + "_swa_trust_domain"
 }
 
 func (r *TrustDomainResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {

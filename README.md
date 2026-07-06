@@ -1256,12 +1256,12 @@ This provider can manage the following Secrets Manager resource types:
 * `conjur_group` - Manage the lifecycle of a group ([example usage](docs/resources/group.md))
 * `conjur_host` - Manage the lifecycle of a host/workload ([example usage](docs/resources/host.md))
 * `conjur_membership` - Manage role memberships ([example usage](docs/resources/membership.md))
-* `conjur_node_group` - Manage the lifecycle of an SWA node group ([example usage](docs/resources/node_group.md))
 * `conjur_permission` - Manage permissions for a role on a resource ([example usage](docs/resources/permission.md))
 * `conjur_secret` - Manage the lifecycle of a secret variable ([example usage](docs/resources/secret.md))
-* `conjur_server` - Manage the lifecycle of an SWA server (agent) ([example usage](docs/resources/server.md))
-* `conjur_server_group` - Manage the lifecycle of an SWA server group ([example usage](docs/resources/server_group.md))
-* `conjur_trust_domain` - Manage the lifecycle of an SWA trust domain ([example usage](docs/resources/trust_domain.md))
+* `conjur_swa_node_group` - Manage the lifecycle of an SWA node group ([example usage](docs/resources/swa_node_group.md))
+* `conjur_swa_server` - Manage the lifecycle of an SWA server (agent) ([example usage](docs/resources/swa_server.md))
+* `conjur_swa_server_group` - Manage the lifecycle of an SWA server group ([example usage](docs/resources/swa_server_group.md))
+* `conjur_swa_trust_domain` - Manage the lifecycle of an SWA trust domain ([example usage](docs/resources/swa_trust_domain.md))
 
 ## Contributing
 
