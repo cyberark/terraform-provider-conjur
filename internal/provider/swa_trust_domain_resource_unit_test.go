@@ -11,6 +11,7 @@ import (
 	swamocks "github.com/cyberark/terraform-provider-conjur/internal/swa/client/mocks"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/stretchr/testify/assert"
@@ -727,6 +728,76 @@ func TestTrustDomainResource_Delete(t *testing.T) {
 				assert.False(t, resp.Diagnostics.HasError())
 			}
 		})
+	}
+}
+
+func TestTrustDomainResource_ValidateConfig(t *testing.T) {
+	tests := []struct {
+		name          string
+		data          TrustDomainResourceModel
+		expectedError bool
+		errorContains string
+	}{
+		{
+			name: "valid with jwt",
+			data: TrustDomainResourceModel{
+				Name: types.StringValue("prod.example.org"),
+				JWT:  mustJWTObject(context.Background(), "RS512", "RSA_4096", 86400, 300),
+				X509: nullX509Object,
+			},
+			expectedError: false,
+		},
+		{
+			name: "valid with x509",
+			data: TrustDomainResourceModel{
+				Name: types.StringValue("prod.example.org"),
+				JWT:  nullJWTObject,
+				X509: mustX509Object(context.Background(), 3600),
+			},
+			expectedError: false,
+		},
+		{
+			name: "invalid without jwt or x509",
+			data: TrustDomainResourceModel{
+				Name: types.StringValue("prod.example.org"),
+				JWT:  nullJWTObject,
+				X509: nullX509Object,
+			},
+			expectedError: true,
+			errorContains: "Invalid trust domain configuration",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			r := &TrustDomainResource{}
+			s := getTrustDomainSchema()
+			plan := newPlanWithSchema(s)
+			plan.Set(ctx, &tt.data)
+
+			req := resource.ValidateConfigRequest{
+				Config: buildTrustDomainConfigFromPlan(plan, s),
+			}
+			resp := &resource.ValidateConfigResponse{}
+			r.ValidateConfig(ctx, req, resp)
+
+			if tt.expectedError {
+				assert.True(t, resp.Diagnostics.HasError())
+				if tt.errorContains != "" {
+					assertDiagContains(t, resp.Diagnostics, tt.errorContains)
+				}
+			} else {
+				assert.False(t, resp.Diagnostics.HasError())
+			}
+		})
+	}
+}
+
+func buildTrustDomainConfigFromPlan(plan tfsdk.Plan, s schema.Schema) tfsdk.Config {
+	return tfsdk.Config{
+		Raw:    plan.Raw,
+		Schema: s,
 	}
 }
 

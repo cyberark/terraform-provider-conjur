@@ -17,6 +17,7 @@ import (
 	swaclient "github.com/cyberark/terraform-provider-conjur/internal/swa/client"
 )
 
+// Ensure provider defined types fully satisfy framework interfaces.
 var (
 	_ resource.Resource                   = &ServerGroupResource{}
 	_ resource.ResourceWithConfigure      = &ServerGroupResource{}
@@ -172,73 +173,73 @@ func (r *ServerGroupResource) Metadata(ctx context.Context, req resource.Metadat
 
 func (r *ServerGroupResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages an SWA Server Group.",
+		MarkdownDescription:"Manages an SWA Server Group.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description: "The unique identifier of the server group.",
+				MarkdownDescription:"The unique identifier of the server group.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"name": schema.StringAttribute{
-				Description: "The name of the server group.",
+				MarkdownDescription:"The name of the server group.",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"description": schema.StringAttribute{
-				Description: "A description of the server group.",
+				MarkdownDescription:"A description of the server group.",
 				Optional:    true,
 			},
 			"trust_domain_name": schema.StringAttribute{
-				Description: "The name of the trust domain this server group belongs to.",
+				MarkdownDescription:"The name of the trust domain this server group belongs to.",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"node_attestation": schema.SingleNestedAttribute{
-				Description: "Node attestation configuration. At least one of x509pop or k8s_psat must be specified.",
+				MarkdownDescription:"Node attestation configuration. At least one of x509pop or k8s_psat must be specified.",
 				Required:    true,
 				Attributes: map[string]schema.Attribute{
 					"x509pop": schema.SingleNestedAttribute{
-						Description: "X.509 Proof of Possession attestation configuration.",
+						MarkdownDescription:"X.509 Proof of Possession attestation configuration.",
 						Optional:    true,
 						Attributes: map[string]schema.Attribute{
 							"ca_certificates": schema.StringAttribute{
-								Description: "PEM-encoded CA certificates for X.509 POP node attestation.",
+								MarkdownDescription:"PEM-encoded CA certificates for X.509 POP node attestation.",
 								Required:    true,
 							},
 						},
 					},
 					"k8s_psat": schema.SingleNestedAttribute{
-						Description: "Kubernetes Projected Service Account Token attestation configuration.",
+						MarkdownDescription:"Kubernetes Projected Service Account Token attestation configuration.",
 						Optional:    true,
 						Attributes: map[string]schema.Attribute{
 							"clusters": schema.MapNestedAttribute{
-								Description: "Map of cluster names to cluster configurations.",
+								MarkdownDescription:"Map of cluster names to cluster configurations.",
 								Required:    true,
 								NestedObject: schema.NestedAttributeObject{
 									Attributes: map[string]schema.Attribute{
 										"service_account_allow_list": schema.ListAttribute{
-											Description: "List of allowed service accounts in namespace/name format.",
+											MarkdownDescription:"List of allowed service accounts in namespace/name format.",
 											Optional:    true,
 											ElementType: types.StringType,
 										},
 										"audience": schema.ListAttribute{
-											Description: "Expected audience values for the PSAT token.",
+											MarkdownDescription:"Expected audience values for the PSAT token.",
 											Optional:    true,
 											ElementType: types.StringType,
 										},
 										"allowed_pod_label_keys": schema.ListAttribute{
-											Description: "Pod label keys to include in attestation.",
+											MarkdownDescription:"Pod label keys to include in attestation.",
 											Optional:    true,
 											ElementType: types.StringType,
 										},
 										"allowed_node_label_keys": schema.ListAttribute{
-											Description: "Node label keys to include in attestation.",
+											MarkdownDescription:"Node label keys to include in attestation.",
 											Optional:    true,
 											ElementType: types.StringType,
 										},

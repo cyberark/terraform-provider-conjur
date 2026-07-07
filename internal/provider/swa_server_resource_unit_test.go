@@ -11,6 +11,7 @@ import (
 	swamocks "github.com/cyberark/terraform-provider-conjur/internal/swa/client/mocks"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -535,6 +536,13 @@ func TestServerResource_Delete(t *testing.T) {
 	}
 }
 
+func buildServerConfigFromPlan(plan tfsdk.Plan, s schema.Schema) tfsdk.Config {
+	return tfsdk.Config{
+		Raw:    plan.Raw,
+		Schema: s,
+	}
+}
+
 func getServerTestSchema() schema.Schema {
 	r := &ServerResource{}
 	var schemaResp resource.SchemaResponse
@@ -544,7 +552,7 @@ func getServerTestSchema() schema.Schema {
 
 func TestServerResource_Update(t *testing.T) {
 	ctx := context.Background()
-	r := &ServerResource{}
+	r := &ServerResource{client: swamocks.NewMockClientWithResponsesInterface(t)}
 
 	req := resource.UpdateRequest{
 		Plan:  newPlanWithSchema(getServerTestSchema()),
@@ -557,6 +565,114 @@ func TestServerResource_Update(t *testing.T) {
 	r.Update(ctx, req, resp)
 	assert.True(t, resp.Diagnostics.HasError())
 	assertDiagContains(t, resp.Diagnostics, "Update Not Supported")
+}
+
+func TestServerResource_NilClientWarning(t *testing.T) {
+	ctx := context.Background()
+	r := &ServerResource{}
+	s := getServerTestSchema()
+
+	t.Run("create", func(t *testing.T) {
+		req := resource.CreateRequest{Plan: newPlanWithSchema(s)}
+		resp := &resource.CreateResponse{State: newStateWithSchema(s)}
+		r.Create(ctx, req, resp)
+		assert.False(t, resp.Diagnostics.HasError())
+		assertWarningContains(t, resp.Diagnostics, "Provider client not configured")
+	})
+
+	t.Run("read", func(t *testing.T) {
+		req := resource.ReadRequest{State: newStateWithSchema(s)}
+		resp := &resource.ReadResponse{State: newStateWithSchema(s)}
+		r.Read(ctx, req, resp)
+		assert.False(t, resp.Diagnostics.HasError())
+		assertWarningContains(t, resp.Diagnostics, "Provider client not configured")
+	})
+
+	t.Run("update", func(t *testing.T) {
+		req := resource.UpdateRequest{Plan: newPlanWithSchema(s), State: newStateWithSchema(s)}
+		resp := &resource.UpdateResponse{State: newStateWithSchema(s)}
+		r.Update(ctx, req, resp)
+		assert.False(t, resp.Diagnostics.HasError())
+		assertWarningContains(t, resp.Diagnostics, "Provider client not configured")
+	})
+
+	t.Run("delete", func(t *testing.T) {
+		req := resource.DeleteRequest{State: newStateWithSchema(s)}
+		resp := &resource.DeleteResponse{State: newStateWithSchema(s)}
+		r.Delete(ctx, req, resp)
+		assert.False(t, resp.Diagnostics.HasError())
+		assertWarningContains(t, resp.Diagnostics, "Provider client not configured")
+	})
+}
+
+func TestServerResource_ValidateConfig(t *testing.T) {
+	tests := []struct {
+		name          string
+		data          ServerResourceModel
+		expectedError bool
+		errorContains string
+	}{
+		{
+			name: "valid config with jwks_uri",
+			data: ServerResourceModel{
+				Name:          types.StringValue("my-server"),
+				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
+				Auth: &ServerAuthenticationModel{
+					Type:       types.StringValue("JWT"),
+					Subject:    types.StringValue("sub"),
+					Issuer:     types.StringNull(),
+					Audience:   types.StringNull(),
+					JWKSURI:    types.StringValue("https://issuer.example.org/.well-known/jwks.json"),
+					CACert:     types.StringNull(),
+					PublicKeys: types.StringNull(),
+				},
+			},
+			expectedError: false,
+		},
+		{
+			name: "missing jwks_uri and public_keys caught at plan time",
+			data: ServerResourceModel{
+				Name:          types.StringValue("my-server"),
+				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
+				Auth: &ServerAuthenticationModel{
+					Type:       types.StringValue("JWT"),
+					Subject:    types.StringValue("sub"),
+					Issuer:     types.StringNull(),
+					Audience:   types.StringNull(),
+					JWKSURI:    types.StringNull(),
+					CACert:     types.StringNull(),
+					PublicKeys: types.StringNull(),
+				},
+			},
+			expectedError: true,
+			errorContains: "Invalid auth configuration",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &ServerResource{}
+			s := getServerTestSchema()
+			plan := newPlanWithSchema(s)
+			plan.Set(context.Background(), &tt.data)
+
+			req := resource.ValidateConfigRequest{
+				Config: buildServerConfigFromPlan(plan, s),
+			}
+			resp := &resource.ValidateConfigResponse{}
+
+			r.ValidateConfig(context.Background(), req, resp)
+
+			if tt.expectedError {
+				assert.True(t, resp.Diagnostics.HasError())
+				if tt.errorContains != "" {
+					assertDiagContains(t, resp.Diagnostics, tt.errorContains)
+				}
+			} else {
+				assert.False(t, resp.Diagnostics.HasError())
+			}
+		})
+	}
 }
 
 func TestServerResource_Read(t *testing.T) {
