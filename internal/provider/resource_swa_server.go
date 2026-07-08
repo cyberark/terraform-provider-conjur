@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -118,6 +119,19 @@ func knownStringValue(v types.String) bool {
 	return !v.IsNull() && !v.IsUnknown()
 }
 
+// jsonSemanticallyEqual reports whether two JSON documents are equal ignoring
+// insignificant differences such as whitespace and object key order.
+func jsonSemanticallyEqual(a, b string) bool {
+	var av, bv any
+	if err := json.Unmarshal([]byte(a), &av); err != nil {
+		return false
+	}
+	if err := json.Unmarshal([]byte(b), &bv); err != nil {
+		return false
+	}
+	return reflect.DeepEqual(av, bv)
+}
+
 func nonEmptyKnownStringValue(v types.String) bool {
 	return knownStringValue(v) && v.ValueString() != ""
 }
@@ -228,7 +242,14 @@ func validateCreateServerAuthConfig(auth *ServerAuthenticationModel, diags *diag
 	hasPublicKeys := nonEmptyKnownStringValue(auth.PublicKeys)
 	hasIssuer := nonEmptyKnownStringValue(auth.Issuer)
 
-	if !hasJWKSURI && !hasPublicKeys {
+	// During ValidateConfig, values sourced from variables or other resources are
+	// unknown. Skip cross-field requirement checks when a relevant value is unknown
+	// to avoid false positives; Create runs the same checks once values are resolved.
+	jwksUnknown := auth.JWKSURI.IsUnknown()
+	publicKeysUnknown := auth.PublicKeys.IsUnknown()
+	issuerUnknown := auth.Issuer.IsUnknown()
+
+	if !hasJWKSURI && !hasPublicKeys && !jwksUnknown && !publicKeysUnknown {
 		diags.AddError(
 			"Invalid auth configuration",
 			"At least one of auth.jwks_uri or auth.public_keys must be set.",
@@ -236,7 +257,7 @@ func validateCreateServerAuthConfig(auth *ServerAuthenticationModel, diags *diag
 		return false
 	}
 
-	if hasPublicKeys && !hasIssuer {
+	if hasPublicKeys && !hasIssuer && !issuerUnknown {
 		diags.AddError(
 			"Invalid auth configuration",
 			"auth.issuer is required when auth.public_keys is set.",
@@ -346,7 +367,14 @@ func syncServerAuthFromResponse(ctx context.Context, state *ServerResourceModel,
 		if err != nil {
 			return fmt.Errorf("failed to marshal auth.public_keys from response: %w", err)
 		}
-		state.Auth.PublicKeys = types.StringValue(string(publicKeysJSON))
+		// Terraform requires the stored value to match the user's config exactly,
+		// so when the server echoes back semantically-equivalent but reformatted
+		// JSON, keep the prior config string.
+		if prior := state.Auth.PublicKeys; knownStringValue(prior) && jsonSemanticallyEqual(prior.ValueString(), string(publicKeysJSON)) {
+			state.Auth.PublicKeys = prior
+		} else {
+			state.Auth.PublicKeys = types.StringValue(string(publicKeysJSON))
+		}
 	} else {
 		state.Auth.PublicKeys = types.StringNull()
 	}
@@ -400,18 +428,18 @@ func (r *ServerResource) Metadata(ctx context.Context, req resource.MetadataRequ
 
 func (r *ServerResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription:"Manages an SWA Server (agent).",
+		MarkdownDescription: "Manages an SWA Server (agent).",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				MarkdownDescription:"The unique identifier of the server.",
-				Computed:    true,
+				MarkdownDescription: "The unique identifier of the server.",
+				Computed:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"name": schema.StringAttribute{
-				MarkdownDescription:"The name of the server.",
-				Required:    true,
+				MarkdownDescription: "The name of the server.",
+				Required:            true,
 				Validators: []validator.String{
 					stringvalidator.LengthBetween(1, 51),
 				},
@@ -420,76 +448,76 @@ func (r *ServerResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				},
 			},
 			"server_group_id": schema.StringAttribute{
-				MarkdownDescription:"The ID of the server group this server belongs to.",
-				Required:    true,
+				MarkdownDescription: "The ID of the server group this server belongs to.",
+				Required:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"authn_id": schema.StringAttribute{
-				MarkdownDescription:"Opaque Base64-encoded authenticator identifier for this server.",
-				Computed:    true,
-				Sensitive:   true,
+				MarkdownDescription: "Opaque Base64-encoded authenticator identifier for this server.",
+				Computed:            true,
+				Sensitive:           true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"auth": schema.SingleNestedAttribute{
-				MarkdownDescription:"Authentication configuration for the server.",
-				Required:    true,
+				MarkdownDescription: "Authentication configuration for the server.",
+				Required:            true,
 				PlanModifiers: []planmodifier.Object{
 					objectplanmodifier.RequiresReplace(),
 				},
 				Attributes: map[string]schema.Attribute{
 					"type": schema.StringAttribute{
-						MarkdownDescription:"The authentication type (e.g., 'JWT').",
-						Required:    true,
+						MarkdownDescription: "The authentication type (e.g., 'JWT').",
+						Required:            true,
 					},
 					"subject": schema.StringAttribute{
-						MarkdownDescription:"The expected subject claim value from the workload JWT.",
-						Required:    true,
+						MarkdownDescription: "The expected subject claim value from the workload JWT.",
+						Required:            true,
 					},
 					"audience": schema.StringAttribute{
-						MarkdownDescription:"The expected audience for JWT authentication.",
-						Optional:    true,
+						MarkdownDescription: "The expected audience for JWT authentication.",
+						Optional:            true,
 					},
 					"jwks_uri": schema.StringAttribute{
-						MarkdownDescription:"The JWKS URI for JWT verification.",
-						Optional:    true,
+						MarkdownDescription: "The JWKS URI for JWT verification.",
+						Optional:            true,
 					},
 					"issuer": schema.StringAttribute{
-						MarkdownDescription:"The expected issuer for JWT authentication.",
-						Optional:    true,
+						MarkdownDescription: "The expected issuer for JWT authentication.",
+						Optional:            true,
 					},
 					"ca_cert": schema.StringAttribute{
-						MarkdownDescription:"PEM-encoded CA certificate for validating the JWKS provider's TLS certificate.",
-						Optional:    true,
+						MarkdownDescription: "PEM-encoded CA certificate for validating the JWKS provider's TLS certificate.",
+						Optional:            true,
 					},
 					"public_keys": schema.StringAttribute{
-						MarkdownDescription:`Inline JWKS as a JSON string. Format: {"type":"jwks","value":{"keys":[...]}}.`,
-						Optional:    true,
+						MarkdownDescription: `Inline JWKS as a JSON string. Sent to the server as compact, canonical JSON.`,
+						Optional:            true,
 					},
 					"identity": schema.SingleNestedAttribute{
-						MarkdownDescription:"Identity mapping configuration for the JWT authenticator.",
-						Optional:    true,
+						MarkdownDescription: "Identity mapping configuration for the JWT authenticator.",
+						Optional:            true,
 						Attributes: map[string]schema.Attribute{
 							"claim_aliases": schema.MapAttribute{
-								MarkdownDescription:"A map of claim aliases to JWT claim names.",
-								Optional:    true,
-								ElementType: types.StringType,
+								MarkdownDescription: "A map of claim aliases to JWT claim names.",
+								Optional:            true,
+								ElementType:         types.StringType,
 							},
 							"enforced_claims": schema.ListAttribute{
-								MarkdownDescription:"A list of enforced claims.",
-								Optional:    true,
-								ElementType: types.StringType,
+								MarkdownDescription: "A list of enforced claims.",
+								Optional:            true,
+								ElementType:         types.StringType,
 							},
 							"identity_path": schema.StringAttribute{
-								MarkdownDescription:"The workload's policy ID in Secrets Manager.",
-								Optional:    true,
+								MarkdownDescription: "The workload's policy ID in Secrets Manager.",
+								Optional:            true,
 							},
 							"token_app_property": schema.StringAttribute{
-								MarkdownDescription:"The name of the JWT claim whose value identifies the workload.",
-								Optional:    true,
+								MarkdownDescription: "The name of the JWT claim whose value identifies the workload.",
+								Optional:            true,
 							},
 						},
 					},
