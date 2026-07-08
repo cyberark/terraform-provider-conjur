@@ -647,6 +647,44 @@ func TestServerResource_ValidateConfig(t *testing.T) {
 			expectedError: true,
 			errorContains: "Invalid auth configuration",
 		},
+		{
+			// public_keys sourced from a variable is unknown during ValidateConfig;
+			// the presence check must not fire a false positive.
+			name: "unknown public_keys does not trigger missing-key error",
+			data: ServerResourceModel{
+				Name:          types.StringValue("my-server"),
+				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
+				Auth: &ServerAuthenticationModel{
+					Type:       types.StringValue("JWT"),
+					Subject:    types.StringValue("sub"),
+					Issuer:     types.StringValue("https://issuer.example.org"),
+					Audience:   types.StringNull(),
+					JWKSURI:    types.StringNull(),
+					CACert:     types.StringNull(),
+					PublicKeys: types.StringUnknown(),
+				},
+			},
+			expectedError: false,
+		},
+		{
+			// issuer sourced from a variable is unknown; the "issuer required when
+			// public_keys is set" check must not fire a false positive.
+			name: "unknown issuer does not trigger issuer-required error",
+			data: ServerResourceModel{
+				Name:          types.StringValue("my-server"),
+				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
+				Auth: &ServerAuthenticationModel{
+					Type:       types.StringValue("JWT"),
+					Subject:    types.StringValue("sub"),
+					Issuer:     types.StringUnknown(),
+					Audience:   types.StringNull(),
+					JWKSURI:    types.StringNull(),
+					CACert:     types.StringNull(),
+					PublicKeys: types.StringValue(`{"keys":[]}`),
+				},
+			},
+			expectedError: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -957,6 +995,70 @@ func TestSyncServerAuthFromResponse_FullMapping(t *testing.T) {
 	assert.Equal(t, []string{"sub", "iss"}, enforcedClaims)
 	assert.Equal(t, "/data/workload", state.Auth.Identity.IdentityPath.ValueString())
 	assert.Equal(t, "sub", state.Auth.Identity.TokenAppProperty.ValueString())
+}
+
+// TestSyncServerAuthFromResponse_PreservesPriorPublicKeysFormatting verifies that when the
+// server echoes back semantically-equivalent but reformatted JSON (whitespace / key order),
+// the prior config string is preserved byte-for-byte so Terraform does not report an
+// inconsistent result after apply.
+func TestSyncServerAuthFromResponse_PreservesPriorPublicKeysFormatting(t *testing.T) {
+	ctx := context.Background()
+
+	priorJSON := "{\n  \"type\": \"jwks\",\n  \"value\": {\"keys\": [{\"kid\": \"abc\"}]}\n}"
+	state := &ServerResourceModel{
+		Auth: &ServerAuthenticationModel{
+			PublicKeys: types.StringValue(priorJSON),
+		},
+	}
+
+	// Server returns the same content, differently formatted / key-ordered.
+	auth := &swaclient.ServerAuthentication{
+		Type: "jwt",
+		Data: map[string]any{
+			"sub": "workload-sub",
+			"public_keys": map[string]any{
+				"value": map[string]any{"keys": []any{map[string]any{"kid": "abc"}}},
+				"type":  "jwks",
+			},
+		},
+	}
+
+	err := syncServerAuthFromResponse(ctx, state, auth)
+	assert.NoError(t, err)
+	assert.Equal(t, priorJSON, state.Auth.PublicKeys.ValueString(), "prior formatting must be preserved when semantically equal")
+}
+
+// TestSyncServerAuthFromResponse_UpdatesPublicKeysWhenChanged verifies that a genuinely
+// different response value replaces the prior state value.
+func TestSyncServerAuthFromResponse_UpdatesPublicKeysWhenChanged(t *testing.T) {
+	ctx := context.Background()
+
+	state := &ServerResourceModel{
+		Auth: &ServerAuthenticationModel{
+			PublicKeys: types.StringValue(`{"type":"jwks","value":{"keys":[{"kid":"old"}]}}`),
+		},
+	}
+
+	auth := &swaclient.ServerAuthentication{
+		Type: "jwt",
+		Data: map[string]any{
+			"sub": "workload-sub",
+			"public_keys": map[string]any{
+				"type":  "jwks",
+				"value": map[string]any{"keys": []any{map[string]any{"kid": "new"}}},
+			},
+		},
+	}
+
+	err := syncServerAuthFromResponse(ctx, state, auth)
+	assert.NoError(t, err)
+
+	var publicKeys map[string]any
+	err = json.Unmarshal([]byte(state.Auth.PublicKeys.ValueString()), &publicKeys)
+	assert.NoError(t, err)
+	value := publicKeys["value"].(map[string]any)
+	keys := value["keys"].([]any)
+	assert.Equal(t, "new", keys[0].(map[string]any)["kid"])
 }
 
 func TestSyncServerAuthFromResponse_MissingFieldsClearExistingValues(t *testing.T) {
