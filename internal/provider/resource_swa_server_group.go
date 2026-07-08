@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -47,7 +48,7 @@ type X509PopModel struct {
 }
 
 type K8sPsatModel struct {
-	Clusters map[string]K8sPsatClusterModel `tfsdk:"clusters"`
+	Clusters types.Map `tfsdk:"clusters"`
 }
 
 type K8sPsatClusterModel struct {
@@ -55,6 +56,15 @@ type K8sPsatClusterModel struct {
 	Audience                types.List `tfsdk:"audience"`
 	AllowedPodLabelKeys     types.List `tfsdk:"allowed_pod_label_keys"`
 	AllowedNodeLabelKeys    types.List `tfsdk:"allowed_node_label_keys"`
+}
+
+func k8sPsatClusterAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"service_account_allow_list": types.ListType{ElemType: types.StringType},
+		"audience":                   types.ListType{ElemType: types.StringType},
+		"allowed_pod_label_keys":     types.ListType{ElemType: types.StringType},
+		"allowed_node_label_keys":    types.ListType{ElemType: types.StringType},
+	}
 }
 
 func NewServerGroupResource() resource.Resource {
@@ -85,18 +95,23 @@ func updateNodeAttestationFromResponse(ctx context.Context, model *ServerGroupRe
 	}
 
 	if na.K8sPsat != nil && na.K8sPsat.Clusters != nil {
-		clusters := make(map[string]K8sPsatClusterModel, len(*na.K8sPsat.Clusters))
+		clusterObjs := make(map[string]attr.Value, len(*na.K8sPsat.Clusters))
 		for clusterName, clusterConfig := range *na.K8sPsat.Clusters {
 			cluster := K8sPsatClusterModel{}
-
 			appendOptionalStringList(ctx, clusterConfig.ServiceAccountAllowList, &cluster.ServiceAccountAllowList, &diags)
 			appendOptionalStringList(ctx, clusterConfig.Audience, &cluster.Audience, &diags)
 			appendOptionalStringList(ctx, clusterConfig.AllowedPodLabelKeys, &cluster.AllowedPodLabelKeys, &diags)
 			appendOptionalStringList(ctx, clusterConfig.AllowedNodeLabelKeys, &cluster.AllowedNodeLabelKeys, &diags)
-
-			clusters[clusterName] = cluster
+			obj, objDiags := types.ObjectValueFrom(ctx, k8sPsatClusterAttrTypes(), cluster)
+			diags.Append(objDiags...)
+			clusterObjs[clusterName] = obj
 		}
-		attestation.K8sPsat = &K8sPsatModel{Clusters: clusters}
+		clustersMap, mapDiags := types.MapValue(
+			types.ObjectType{AttrTypes: k8sPsatClusterAttrTypes()},
+			clusterObjs,
+		)
+		diags.Append(mapDiags...)
+		attestation.K8sPsat = &K8sPsatModel{Clusters: clustersMap}
 	}
 
 	model.NodeAttestation = attestation
@@ -106,12 +121,18 @@ func updateNodeAttestationFromResponse(ctx context.Context, model *ServerGroupRe
 // buildK8sPsatClusters converts the Terraform model to the API client cluster map.
 func buildK8sPsatClusters(ctx context.Context, k8sPsat *K8sPsatModel) (map[string]swaclient.K8sPsatCluster, diag.Diagnostics) {
 	var diags diag.Diagnostics
-	if k8sPsat == nil || k8sPsat.Clusters == nil {
+	if k8sPsat == nil || k8sPsat.Clusters.IsNull() || k8sPsat.Clusters.IsUnknown() {
 		return nil, diags
 	}
 
-	clusters := make(map[string]swaclient.K8sPsatCluster)
-	for clusterName, clusterConfig := range k8sPsat.Clusters {
+	clusterModels := make(map[string]K8sPsatClusterModel)
+	diags.Append(k8sPsat.Clusters.ElementsAs(ctx, &clusterModels, false)...)
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	clusters := make(map[string]swaclient.K8sPsatCluster, len(clusterModels))
+	for clusterName, clusterConfig := range clusterModels {
 		cluster := swaclient.K8sPsatCluster{}
 
 		if !clusterConfig.ServiceAccountAllowList.IsNull() {
@@ -173,75 +194,75 @@ func (r *ServerGroupResource) Metadata(ctx context.Context, req resource.Metadat
 
 func (r *ServerGroupResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription:"Manages an SWA Server Group.",
+		MarkdownDescription: "Manages an SWA Server Group.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				MarkdownDescription:"The unique identifier of the server group.",
-				Computed:    true,
+				MarkdownDescription: "The unique identifier of the server group.",
+				Computed:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"name": schema.StringAttribute{
-				MarkdownDescription:"The name of the server group.",
-				Required:    true,
+				MarkdownDescription: "The name of the server group.",
+				Required:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"description": schema.StringAttribute{
-				MarkdownDescription:"A description of the server group.",
-				Optional:    true,
+				MarkdownDescription: "A description of the server group.",
+				Optional:            true,
 			},
 			"trust_domain_name": schema.StringAttribute{
-				MarkdownDescription:"The name of the trust domain this server group belongs to.",
-				Required:    true,
+				MarkdownDescription: "The name of the trust domain this server group belongs to.",
+				Required:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"node_attestation": schema.SingleNestedAttribute{
-				MarkdownDescription:"Node attestation configuration. At least one of x509pop or k8s_psat must be specified.",
-				Required:    true,
+				MarkdownDescription: "Node attestation configuration. At least one of x509pop or k8s_psat must be specified.",
+				Required:            true,
 				Attributes: map[string]schema.Attribute{
 					"x509pop": schema.SingleNestedAttribute{
-						MarkdownDescription:"X.509 Proof of Possession attestation configuration.",
-						Optional:    true,
+						MarkdownDescription: "X.509 Proof of Possession attestation configuration.",
+						Optional:            true,
 						Attributes: map[string]schema.Attribute{
 							"ca_certificates": schema.StringAttribute{
-								MarkdownDescription:"PEM-encoded CA certificates for X.509 POP node attestation.",
-								Required:    true,
+								MarkdownDescription: "PEM-encoded CA certificates for X.509 POP node attestation.",
+								Required:            true,
 							},
 						},
 					},
 					"k8s_psat": schema.SingleNestedAttribute{
-						MarkdownDescription:"Kubernetes Projected Service Account Token attestation configuration.",
-						Optional:    true,
+						MarkdownDescription: "Kubernetes Projected Service Account Token attestation configuration.",
+						Optional:            true,
 						Attributes: map[string]schema.Attribute{
 							"clusters": schema.MapNestedAttribute{
-								MarkdownDescription:"Map of cluster names to cluster configurations.",
-								Required:    true,
+								MarkdownDescription: "Map of cluster names to cluster configurations.",
+								Required:            true,
 								NestedObject: schema.NestedAttributeObject{
 									Attributes: map[string]schema.Attribute{
 										"service_account_allow_list": schema.ListAttribute{
-											MarkdownDescription:"List of allowed service accounts in namespace/name format.",
-											Optional:    true,
-											ElementType: types.StringType,
+											MarkdownDescription: "List of allowed service accounts in namespace/name format.",
+											Optional:            true,
+											ElementType:         types.StringType,
 										},
 										"audience": schema.ListAttribute{
-											MarkdownDescription:"Expected audience values for the PSAT token.",
-											Optional:    true,
-											ElementType: types.StringType,
+											MarkdownDescription: "Expected audience values for the PSAT token.",
+											Optional:            true,
+											ElementType:         types.StringType,
 										},
 										"allowed_pod_label_keys": schema.ListAttribute{
-											MarkdownDescription:"Pod label keys to include in attestation.",
-											Optional:    true,
-											ElementType: types.StringType,
+											MarkdownDescription: "Pod label keys to include in attestation.",
+											Optional:            true,
+											ElementType:         types.StringType,
 										},
 										"allowed_node_label_keys": schema.ListAttribute{
-											MarkdownDescription:"Node label keys to include in attestation.",
-											Optional:    true,
-											ElementType: types.StringType,
+											MarkdownDescription: "Node label keys to include in attestation.",
+											Optional:            true,
+											ElementType:         types.StringType,
 										},
 									},
 								},
