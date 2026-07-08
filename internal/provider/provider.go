@@ -297,7 +297,11 @@ func (p *providerImpl) applyConfigOverrides(config *conjurapi.Config, data *prov
 		config.SSLCertPath = certPath
 	}
 
-	config.CredentialStorage = conjurapi.CredentialStorageNone
+	// Reuse credentials cached by `conjur login` but do not persist new ones from
+	// Terraform runs. Skip the override when the user set the storage mode via env.
+	if os.Getenv("CONJUR_CREDENTIAL_STORAGE_MODE") == "" {
+		config.CredentialStorageMode = conjurapi.CredentialStorageModeReadOnly
+	}
 }
 
 func (p *providerImpl) createClient(config *conjurapi.Config, data *providerModel) (*conjurapi.Client, error) {
