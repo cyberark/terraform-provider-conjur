@@ -166,6 +166,7 @@ func TestNodeGroupResource_Read(t *testing.T) {
 		expectedError bool
 		shouldRemove  bool
 		errorContains string
+		verify        func(t *testing.T, result NodeGroupResourceModel)
 	}{
 		{
 			name: "successful read",
@@ -231,6 +232,10 @@ func TestNodeGroupResource_Read(t *testing.T) {
 					}, nil)
 			},
 			expectedError: false,
+			verify: func(t *testing.T, result NodeGroupResourceModel) {
+				require.NotNil(t, result.WorkloadConfiguration)
+				assert.Equal(t, "spiffe://{{ .trustdomain }}/{{ .nodegroup }}/{{ .unix.user }}", result.WorkloadConfiguration.SpiffeIDTemplate.ValueString())
+			},
 		},
 		{
 			name: "read with no workload_configuration on server keeps state nil",
@@ -252,6 +257,9 @@ func TestNodeGroupResource_Read(t *testing.T) {
 					}, nil)
 			},
 			expectedError: false,
+			verify: func(t *testing.T, result NodeGroupResourceModel) {
+				assert.Nil(t, result.WorkloadConfiguration, "workload_configuration should stay absent in state when the server reports none")
+			},
 		},
 		{
 			name: "API error during read",
@@ -301,6 +309,10 @@ func TestNodeGroupResource_Read(t *testing.T) {
 				assert.False(t, resp.Diagnostics.HasError())
 				if tt.shouldRemove {
 					assert.True(t, resp.State.Raw.IsNull(), "expected resource to be removed from state")
+				} else if tt.verify != nil {
+					var result NodeGroupResourceModel
+					require.False(t, resp.State.Get(ctx, &result).HasError())
+					tt.verify(t, result)
 				}
 			}
 		})
