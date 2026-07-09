@@ -9,6 +9,7 @@ import (
 
 	swaclient "github.com/cyberark/terraform-provider-conjur/internal/swa/client"
 	swamocks "github.com/cyberark/terraform-provider-conjur/internal/swa/client/mocks"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
@@ -16,6 +17,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func mustClustersMap(t *testing.T, ctx context.Context, clusters map[string]K8sPsatClusterModel) types.Map {
+	t.Helper()
+	objs := make(map[string]attr.Value, len(clusters))
+	for k, v := range clusters {
+		obj, diags := types.ObjectValueFrom(ctx, k8sPsatClusterAttrTypes(), v)
+		require.False(t, diags.HasError(), "failed to build cluster object: %v", diags)
+		objs[k] = obj
+	}
+	m, diags := types.MapValue(types.ObjectType{AttrTypes: k8sPsatClusterAttrTypes()}, objs)
+	require.False(t, diags.HasError(), "failed to build clusters map: %v", diags)
+	return m
+}
 
 func makeServerGroupResponse(name, trustDomain string) *swaclient.ServerGroupResponse {
 	now := time.Now()
@@ -74,17 +88,28 @@ func TestUpdateNodeAttestationFromResponse(t *testing.T) {
 		require.NotNil(t, model.NodeAttestation)
 		assert.Nil(t, model.NodeAttestation.X509Pop, "x509pop should be cleared once the server no longer reports it")
 		require.NotNil(t, model.NodeAttestation.K8sPsat)
-		assert.Contains(t, model.NodeAttestation.K8sPsat.Clusters, "cluster-a")
+		assert.True(t, model.NodeAttestation.K8sPsat.Clusters.Elements() != nil)
+		assert.Contains(t, model.NodeAttestation.K8sPsat.Clusters.Elements(), "cluster-a")
 	})
 
 	t.Run("cluster removed server-side is removed from state", func(t *testing.T) {
+		nullLists := K8sPsatClusterModel{
+			ServiceAccountAllowList: types.ListNull(types.StringType),
+			Audience:                types.ListNull(types.StringType),
+			AllowedPodLabelKeys:     types.ListNull(types.StringType),
+			AllowedNodeLabelKeys:    types.ListNull(types.StringType),
+		}
+		clusterA := nullLists
+		clusterA.ServiceAccountAllowList = mustStringList(t, "ns/sa")
+		clusterB := nullLists
+		clusterB.ServiceAccountAllowList = mustStringList(t, "ns2/sa2")
 		model := &ServerGroupResourceModel{
 			NodeAttestation: &NodeAttestationModel{
 				K8sPsat: &K8sPsatModel{
-					Clusters: map[string]K8sPsatClusterModel{
-						"cluster-a": {ServiceAccountAllowList: mustStringList(t, "ns/sa")},
-						"cluster-b": {ServiceAccountAllowList: mustStringList(t, "ns2/sa2")},
-					},
+					Clusters: mustClustersMap(t, ctx, map[string]K8sPsatClusterModel{
+						"cluster-a": clusterA,
+						"cluster-b": clusterB,
+					}),
 				},
 			},
 		}
@@ -102,18 +127,24 @@ func TestUpdateNodeAttestationFromResponse(t *testing.T) {
 		diags := updateNodeAttestationFromResponse(ctx, model, na)
 		assert.False(t, diags.HasError())
 		require.NotNil(t, model.NodeAttestation.K8sPsat)
-		assert.Contains(t, model.NodeAttestation.K8sPsat.Clusters, "cluster-a")
-		assert.NotContains(t, model.NodeAttestation.K8sPsat.Clusters, "cluster-b", "cluster-b was removed server-side and must not persist in state")
+		assert.Contains(t, model.NodeAttestation.K8sPsat.Clusters.Elements(), "cluster-a")
+		assert.NotContains(t, model.NodeAttestation.K8sPsat.Clusters.Elements(), "cluster-b", "cluster-b was removed server-side and must not persist in state")
 	})
 
 	t.Run("k8s_psat removed server-side is removed from state", func(t *testing.T) {
+		emptyCluster := K8sPsatClusterModel{
+			ServiceAccountAllowList: types.ListNull(types.StringType),
+			Audience:                types.ListNull(types.StringType),
+			AllowedPodLabelKeys:     types.ListNull(types.StringType),
+			AllowedNodeLabelKeys:    types.ListNull(types.StringType),
+		}
 		model := &ServerGroupResourceModel{
 			NodeAttestation: &NodeAttestationModel{
 				X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
 				K8sPsat: &K8sPsatModel{
-					Clusters: map[string]K8sPsatClusterModel{
-						"cluster-a": {},
-					},
+					Clusters: mustClustersMap(t, ctx, map[string]K8sPsatClusterModel{
+						"cluster-a": emptyCluster,
+					}),
 				},
 			},
 		}
@@ -147,22 +178,24 @@ func TestBuildK8sPsatClusters(t *testing.T) {
 		assert.False(t, diags.HasError())
 	})
 
-	t.Run("nil clusters returns nil map", func(t *testing.T) {
-		clusters, diags := buildK8sPsatClusters(ctx, &K8sPsatModel{})
+	t.Run("null clusters returns nil map", func(t *testing.T) {
+		clusters, diags := buildK8sPsatClusters(ctx, &K8sPsatModel{
+			Clusters: types.MapNull(types.ObjectType{AttrTypes: k8sPsatClusterAttrTypes()}),
+		})
 		require.Nil(t, clusters)
 		assert.False(t, diags.HasError())
 	})
 
 	t.Run("converts non-null list attributes", func(t *testing.T) {
 		clusters, diags := buildK8sPsatClusters(ctx, &K8sPsatModel{
-			Clusters: map[string]K8sPsatClusterModel{
+			Clusters: mustClustersMap(t, ctx, map[string]K8sPsatClusterModel{
 				"cluster-a": {
 					ServiceAccountAllowList: mustStringList(t, "ns1/sa1", "ns2/sa2"),
 					Audience:                mustStringList(t, "audience-a"),
 					AllowedPodLabelKeys:     mustStringList(t, "team", "app"),
 					AllowedNodeLabelKeys:    mustStringList(t, "kubernetes.io/hostname"),
 				},
-			},
+			}),
 		})
 
 		require.False(t, diags.HasError())
@@ -182,14 +215,14 @@ func TestBuildK8sPsatClusters(t *testing.T) {
 
 	t.Run("null list attributes are omitted", func(t *testing.T) {
 		clusters, diags := buildK8sPsatClusters(ctx, &K8sPsatModel{
-			Clusters: map[string]K8sPsatClusterModel{
+			Clusters: mustClustersMap(t, ctx, map[string]K8sPsatClusterModel{
 				"cluster-a": {
 					ServiceAccountAllowList: types.ListNull(types.StringType),
 					Audience:                types.ListNull(types.StringType),
 					AllowedPodLabelKeys:     types.ListNull(types.StringType),
 					AllowedNodeLabelKeys:    types.ListNull(types.StringType),
 				},
-			},
+			}),
 		})
 
 		require.False(t, diags.HasError())
@@ -203,14 +236,18 @@ func TestBuildK8sPsatClusters(t *testing.T) {
 	})
 
 	t.Run("unknown list reports diagnostics", func(t *testing.T) {
-		_, diags := buildK8sPsatClusters(ctx, &K8sPsatModel{
-			Clusters: map[string]K8sPsatClusterModel{
-				"cluster-a": {
-					Audience: types.ListUnknown(types.StringType),
-				},
-			},
+		attrTypes := k8sPsatClusterAttrTypes()
+		obj, diags := types.ObjectValue(attrTypes, map[string]attr.Value{
+			"service_account_allow_list": types.ListNull(types.StringType),
+			"audience":                   types.ListUnknown(types.StringType),
+			"allowed_pod_label_keys":     types.ListNull(types.StringType),
+			"allowed_node_label_keys":    types.ListNull(types.StringType),
 		})
+		require.False(t, diags.HasError())
+		clustersMap, diags := types.MapValue(types.ObjectType{AttrTypes: attrTypes}, map[string]attr.Value{"cluster-a": obj})
+		require.False(t, diags.HasError())
 
+		_, diags = buildK8sPsatClusters(ctx, &K8sPsatModel{Clusters: clustersMap})
 		assert.True(t, diags.HasError())
 	})
 }
