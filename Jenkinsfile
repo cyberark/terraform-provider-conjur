@@ -248,7 +248,25 @@ pipeline {
             }
           }
         }
-        
+
+        // SWA resources (trust domain, server group, server, node group) create
+        // Conjur hosts via the agent-handler endpoint, which requires
+        // Conjur_Cloud_Admins - a privilege the 'testapp' host used by the other
+        // tests cannot hold. This pass authenticates the provider with the tenant
+        // admin token (SWA_ONLY makes bin/test use INFRAPOOL_CONJUR_AUTHN_TOKEN).
+        stage('Run integration tests (Conjur Cloud Tenant) for SWA') {
+          environment {
+            INFRAPOOL_CONJUR_APPLIANCE_URL="${TENANT.conjur_cloud_url}"
+            INFRAPOOL_CONJUR_AUTHN_LOGIN="${TENANT.login_name}"
+            INFRAPOOL_CONJUR_AUTHN_TOKEN="${env.conj_token}"
+          }
+          steps {
+            script {
+              INFRAPOOL_EXECUTORV2_AGENT_0.agentSh 'SWA_ONLY=1 ./bin/test -t cloud -tc api-key'
+            }
+          }
+        }
+
         stage('Run integration tests (Conjur Cloud Tenant) for JWT') {
           environment {
             INFRAPOOL_CONJUR_APPLIANCE_URL="${TENANT.conjur_cloud_url}"

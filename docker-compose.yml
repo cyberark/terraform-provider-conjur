@@ -21,6 +21,7 @@ services:
       CONJURAPI_LOG: stderr
       CONJUR_AUTHN_LOGIN:
       CONJUR_AUTHN_API_KEY:
+      CONJUR_AUTHN_TOKEN:
       TF_LOG: "${TF_LOG:-INFO}"
       TF_VAR_conjur_api_key:
       TF_VAR_conjur_ssl_cert:
@@ -38,6 +39,10 @@ services:
       TF_VAR_conjur_group_name:
       TF_VAR_conjur_secret_name:
       TF_VAR_conjur_policy_branch_name:
+      TF_VAR_conjur_trust_domain_name:
+      TF_VAR_conjur_server_group_name:
+      TF_VAR_conjur_server_name:
+      TF_VAR_conjur_node_group_name:
       GCP_TOKEN: "${GCP_TOKEN:-}"
     working_dir: /src
     volumes:

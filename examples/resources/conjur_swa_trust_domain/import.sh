@@ -1,0 +1,1 @@
+terraform import conjur_swa_trust_domain.my_trust_domain prod.example.org
