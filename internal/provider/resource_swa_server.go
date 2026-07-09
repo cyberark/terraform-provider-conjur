@@ -356,7 +356,15 @@ func syncServerAuthFromResponse(ctx context.Context, state *ServerResourceModel,
 	}
 
 	state.Auth.Type = types.StringValue(strings.ToUpper(string(auth.Type)))
-	state.Auth.Subject = stringValueFromAuthData(auth.Data, "sub")
+	// TEMPORARY: the API does not currently echo the JWT `sub` (subject) claim in
+	// the authentication data. Only overwrite the subject when the response
+	// includes it; otherwise keep the value already in state (originally from the
+	// create request). Without this, `auth.subject` drifts to null on every read
+	// and, because `auth` forces replacement, triggers a spurious destroy/create.
+	// Remove this fallback once the API returns `sub`.
+	if sub := stringValueFromAuthData(auth.Data, "sub"); knownStringValue(sub) {
+		state.Auth.Subject = sub
+	}
 	state.Auth.Audience = stringValueFromAuthData(auth.Data, "audience")
 	state.Auth.JWKSURI = stringValueFromAuthData(auth.Data, "jwks_uri")
 	state.Auth.Issuer = stringValueFromAuthData(auth.Data, "issuer")
