@@ -82,11 +82,13 @@ function main() {
   echo "Running test from directory: $test_dir"
   set_TF_vars
   # test -f "$test_dir/env" && source "$test_dir/env"
-  run_terraform_tests "$test_dir" || overall_status=1
-  validate_results || overall_status=1
+  if [[ -z "$SWA_ONLY" ]]; then
+    run_terraform_tests "$test_dir" || overall_status=1
+    validate_results || overall_status=1
+  fi
 
   if [[ "$run_resource_tests" == "true" ]]; then
-    TARGET=$TARGET ./bin/run_resource_tests || overall_status=1
+    TARGET=$TARGET SWA_ONLY=$SWA_ONLY ./bin/run_resource_tests || overall_status=1
   fi
 
   echo "###################################################################"
@@ -167,7 +169,7 @@ function enable_authenticator() {
   service_id=$1
   if [[ $TARGET == "cloud" ]]; then
     curl -w "%{http_code}" -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
-        -X PATCH  -H 'Content-Type: text/plain' --data-raw 'enabled=true' "${CONJUR_APPLIANCE_URL}/$1/conjur"
+        -X PATCH  -H 'Content-Type: text/plain' --data-raw 'enabled=true' "${CONJUR_APPLIANCE_URL}/$service_id/conjur"
   fi
 }
 
@@ -236,6 +238,10 @@ function configure_cli() {
 function load_policy() {
   branch=$1
   policy_file=$2
+
+  echo ">> Loading policy '$policy_file' into branch '$branch'"
+  cat "$policy_file"
+  echo ""
 
   if [[ $TARGET == "cloud" ]]; then
     curl -w "%{http_code}" -H "Authorization: Token token=\"$INFRAPOOL_CONJUR_AUTHN_TOKEN\"" \
@@ -368,6 +374,10 @@ function set_TF_vars() {
       # NOTE: These are only used if configuring the provider with env vars instead of TF vars
       export CONJUR_AUTHN_LOGIN="host/data/testapp"
       export CONJUR_AUTHN_API_KEY="$api_key"
+
+      if [[ -n "$SWA_ONLY" ]]; then
+        export CONJUR_AUTHN_TOKEN="$(printf '%s' "$INFRAPOOL_CONJUR_AUTHN_TOKEN" | base64 -d)"
+      fi
       ;;
     "jwt")
       export TF_VAR_conjur_authn_type="jwt"

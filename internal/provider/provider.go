@@ -403,10 +403,10 @@ func (p *providerImpl) Resources(_ context.Context) []func() resource.Resource {
 		NewMembershipResource,
 		NewSecretResource,
 		NewPolicyBranchResource,
-		//NewTrustDomainResource,
-		//NewServerGroupResource,
-		//NewServerResource,
-		//NewNodeGroupResource,
+		NewTrustDomainResource,
+		NewServerGroupResource,
+		NewServerResource,
+		NewNodeGroupResource,
 	}
 }
 

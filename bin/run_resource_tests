@@ -13,36 +13,60 @@ function main() {
   declare -a test_results=()
 
   # Run CRUD tests for each resource and collect results
-  echo ">> Running Authenticator CRUD test"
-  test_resource_crud "tests/resources/authenticator" "authenticator" "name" "jwt:$TF_VAR_conjur_authenticator_name"
-  test_results+=("Authenticator|$?")
+  if [[ -z "$SWA_ONLY" ]]; then
+    echo ">> Running Authenticator CRUD test"
+    test_resource_crud "tests/resources/authenticator" "authenticator" "name" "jwt:$TF_VAR_conjur_authenticator_name"
+    test_results+=("Authenticator|$?")
 
-  echo ">> Running Group CRUD test"
-  test_resource_crud "tests/resources/group" "group" "name"
-  test_results+=("Group|$?")
+    echo ">> Running Group CRUD test"
+    test_resource_crud "tests/resources/group" "group" "name"
+    test_results+=("Group|$?")
 
-  echo ">> Running Group Membership CRUD test"
-  test_resource_crud "tests/resources/membership" "membership" "id" "data/terraform/consumers:host:data/terraform/test/test-workload"
-  test_results+=("GroupMember|$?")
+    echo ">> Running Group Membership CRUD test"
+    test_resource_crud "tests/resources/membership" "membership" "id" "data/terraform/consumers:host:data/terraform/test/test-workload"
+    test_results+=("GroupMember|$?")
 
-  echo ">> Running Permission CRUD test"
-  test_resource_crud "tests/resources/permission" "permission" "role_name" "host/data/terraform/test/test-workload:variable/data/terraform/test/workload-secret"
-  test_results+=("Permission|$?")
+    echo ">> Running Permission CRUD test"
+    test_resource_crud "tests/resources/permission" "permission" "role_name" "host/data/terraform/test/test-workload:variable/data/terraform/test/workload-secret"
+    test_results+=("Permission|$?")
 
-  echo ">> Running Policy Branch CRUD test"
-  test_resource_crud "tests/resources/policy_branch" "policy_branch" "full_id" "data/terraform/$TF_VAR_conjur_policy_branch_name"
-  test_results+=("PolicyBranch|$?")
+    echo ">> Running Policy Branch CRUD test"
+    test_resource_crud "tests/resources/policy_branch" "policy_branch" "full_id" "data/terraform/$TF_VAR_conjur_policy_branch_name"
+    test_results+=("PolicyBranch|$?")
+  fi
 
-
-  # Workloads API and Static Secrets API are only available in Secrets Manager SaaS (currently)
+  # Host/Secret and SWA resources are only exercised against Secrets Manager SaaS (cloud).
   if [[ "$TARGET" == "cloud" ]]; then
-    echo ">> Running Host CRUD test"
-    test_resource_crud "tests/resources/host" "host" "name"
-    test_results+=("Host|$?")
+    if [[ -z "$SWA_ONLY" ]]; then
+      echo ">> Running Host CRUD test"
+      test_resource_crud "tests/resources/host" "host" "name"
+      test_results+=("Host|$?")
 
-    echo ">> Running Secret CRUD test"
-    test_resource_crud "tests/resources/secret" "secret" "name" "data/terraform/test/$TF_VAR_conjur_secret_name"
-    test_results+=("Secret|$?")
+      echo ">> Running Secret CRUD test"
+      test_resource_crud "tests/resources/secret" "secret" "name" "data/terraform/test/$TF_VAR_conjur_secret_name"
+      test_results+=("Secret|$?")
+    fi
+
+    if [[ -n "$SWA_ONLY" ]]; then
+      echo ">> Running Trust Domain CRUD test"
+      test_resource_crud "tests/resources/trust_domain" "trust_domain" "name" "$TF_VAR_conjur_trust_domain_name" "" "conjur_swa_trust_domain"
+      test_results+=("TrustDomain|$?")
+
+      echo ">> Running Server Group CRUD test"
+      test_resource_crud "tests/resources/server_group" "server_group" "id" "$TF_VAR_conjur_trust_domain_name/$TF_VAR_conjur_server_group_name" "conjur_swa_trust_domain.td=$TF_VAR_conjur_trust_domain_name" "conjur_swa_server_group"
+      test_results+=("ServerGroup|$?")
+
+      echo ">> Running Server CRUD test"
+      test_resource_crud "tests/resources/server" "server" "id" "$TF_VAR_conjur_trust_domain_name/$TF_VAR_conjur_server_group_name/$TF_VAR_conjur_server_name" "conjur_swa_trust_domain.td=$TF_VAR_conjur_trust_domain_name,conjur_swa_server_group.sg=$TF_VAR_conjur_trust_domain_name/$TF_VAR_conjur_server_group_name" "conjur_swa_server"
+      test_results+=("Server|$?")
+
+      echo ">> Running Node Group CRUD test"
+      test_resource_crud "tests/resources/node_group" "node_group" "id" "$TF_VAR_conjur_trust_domain_name/$TF_VAR_conjur_server_group_name/$TF_VAR_conjur_node_group_name" "conjur_swa_trust_domain.td=$TF_VAR_conjur_trust_domain_name,conjur_swa_server_group.sg=$TF_VAR_conjur_trust_domain_name/$TF_VAR_conjur_server_group_name" "conjur_swa_node_group"
+      test_results+=("NodeGroup|$?")
+    fi
+
+  else
+    echo ">> Skipping SWA CRUD tests for target '$TARGET' (cloud only)"
   fi
 
   # Stop the container
@@ -58,6 +82,8 @@ function test_resource_crud() {
   local resource_name="$2" # Resource name (e.g., "authenticator")
   local id_output_name="$3" # Output variable name for the resource ID
   local import_id="$4"
+  local extra_imports="$5" # Optional comma-separated "resource_address=import_id" values
+  local resource_tf_type="${6:-conjur_${resource_name}}" # Full Terraform type name (e.g., conjur_swa_trust_domain)
 
   echo "Testing ${resource_name} CRUD operations"
 
@@ -91,9 +117,31 @@ function test_resource_crud() {
     rsync -av --exclude='main.tf' "$test_dir/create/" "$test_dir/update/"
   else
     echo "Step 2: Importing ${resource_name}"
-    if ! terraform_exec "cd $test_dir/update && \
-      terraform init && \
-      terraform import conjur_${resource_name}.imported $import_id"; then
+    if ! terraform_exec "cd $test_dir/update && terraform init"; then
+      echo "FAILED: ${resource_name} init in update directory failed"
+      return 1
+    fi
+
+    if [[ -n "$extra_imports" ]]; then
+      IFS=',' read -r -a dependency_imports <<< "$extra_imports"
+      for dependency_import in "${dependency_imports[@]}"; do
+        local dependency_address="${dependency_import%%=*}"
+        local dependency_id="${dependency_import#*=}"
+
+        if [[ -z "$dependency_address" || -z "$dependency_id" || "$dependency_address" == "$dependency_id" ]]; then
+          echo "FAILED: Invalid dependency import format '$dependency_import' (expected resource_address=import_id)"
+          return 1
+        fi
+
+        echo "Step 2: Importing ${resource_name} dependency ${dependency_address}"
+        if ! terraform_exec "cd $test_dir/update && terraform import $dependency_address $dependency_id"; then
+          echo "FAILED: ${resource_name} dependency import failed for ${dependency_address}"
+          return 1
+        fi
+      done
+    fi
+
+    if ! terraform_exec "cd $test_dir/update && terraform import ${resource_tf_type}.imported $import_id"; then
       echo "FAILED: ${resource_name} import command failed"
       return 1
     fi
@@ -110,7 +158,6 @@ function test_resource_crud() {
     if [[ "$resource_name" == "secret" ]]; then
       echo "Step 2: Importing ${resource_name} resource with write-only attribute"
       if ! terraform_exec "cd $test_dir/update && \
-        terraform init && \
         terraform import conjur_${resource_name}.imported_wo $import_id-wo"; then
         echo "FAILED: ${resource_name} write-only import command failed"
         return 1
@@ -176,6 +223,10 @@ function generate_random_values() {
   export TF_VAR_conjur_group_name="tf-group-$rand_suffix"
   export TF_VAR_conjur_secret_name="tf-secret-$rand_suffix"
   export TF_VAR_conjur_policy_branch_name="tf-branch-$rand_suffix"
+  export TF_VAR_conjur_trust_domain_name="tf-td-$rand_suffix.example.org"
+  export TF_VAR_conjur_server_group_name="tf-sg-$rand_suffix"
+  export TF_VAR_conjur_server_name="tf-srv-$rand_suffix"
+  export TF_VAR_conjur_node_group_name="tf-ng-$rand_suffix"
 }
 
 function cleanup_terraform() {

@@ -17,8 +17,15 @@ else
 fi
 
 echo "StartAuthentication request..."
+# Discover the identity host by following the redirect from the tenant URL
+identity_host=$(curl -s -o /dev/null -w "%{redirect_url}" --request POST \
+    --url "https://$tenant_name.integration-cyberark.cloud/Security/StartAuthentication" \
+    --header 'Accept: application/json' \
+    --header 'Content-Type: application/json' \
+    --data "{ \"TenantId\": \"$tenant_id\", \"Version\": \"1.0\", \"User\": \"$user\" }" \
+  | sed 's|https://\([^/]*\)/.*|\1|')
 resp=$(curl --request POST \
-    --url https://$tenant_id.id.integration-cyberark.cloud/Security/StartAuthentication \
+    --url "https://$identity_host/Security/StartAuthentication" \
     --header 'Accept: application/json' \
     --header 'Content-Type: application/json' \
     --data "{ \"TenantId\": \"$tenant_id\", \"Version\": \"1.0\", \"User\": \"$user\" }")
@@ -27,7 +34,7 @@ mech_id=$(echo "$resp" | jq -r '.Result.Challenges[0].Mechanisms[0].MechanismId'
 echo
 echo "AdvanceAuthentication request..."
 resp=$(curl --request POST \
-  --url https://$tenant_id.id.integration-cyberark.cloud/Security/AdvanceAuthentication \
+  --url "https://$identity_host/Security/AdvanceAuthentication" \
   --header 'Accept: application/json' \
   --header 'Content-Type: application/json' \
   --data "{
@@ -44,7 +51,7 @@ echo "Identity Token:\n$identity_token"
 echo
 echo "Authenticating to Conjur Cloud..."
 conjur_token=$(curl --request POST \
-  --url https://$tenant_name.secretsmgr.integration-cyberark.cloud/api/authn-oidc/cyberark/conjur/authenticate \
+  --url https://$tenant_id.secretsmgr.integration-cyberark.cloud/api/authn-oidc/cyberark/conjur/authenticate \
   --header 'Accept-Encoding: base64' \
   --header 'Content-Type: application/x-www-form-urlencoded' \
   --data "id_token=$identity_token")
@@ -52,7 +59,7 @@ echo "Conjur Token:\n$conjur_token"
 
 # Export the required variables for the test script and run
 export INFRAPOOL_CONJUR_AUTHN_TOKEN="$conjur_token"
-export INFRAPOOL_CONJUR_APPLIANCE_URL="https://$tenant_name.secretsmgr.integration-cyberark.cloud"
+export INFRAPOOL_CONJUR_APPLIANCE_URL="https://$tenant_id.secretsmgr.integration-cyberark.cloud"
 export INFRAPOOL_CONJUR_AUTHN_LOGIN="$user"
 
-./bin/test -t cloud -tc api-key
+SWA_ONLY=$SWA_ONLY ./bin/test -t cloud -tc api-key
