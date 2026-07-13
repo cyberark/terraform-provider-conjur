@@ -232,6 +232,13 @@ func (p *providerImpl) Configure(ctx context.Context, req provider.ConfigureRequ
 		return
 	}
 
+	if mayUseStoredCredentials(&data) {
+		resp.Diagnostics.AddWarning(
+			"Using cached Secrets Manager credentials",
+			"No login information provided, will try using cached Secrets Manager credentials (e.g. by `conjur login`).",
+		)
+	}
+
 	conjurClient, err := p.createClient(config, &data)
 	if err != nil {
 		resp.Diagnostics.AddError("Client initialization failed", err.Error())
@@ -253,6 +260,33 @@ func (p *providerImpl) Configure(ctx context.Context, req provider.ConfigureRequ
 	resp.DataSourceData = clients
 	resp.ResourceData = clients
 	resp.EphemeralResourceData = clients
+}
+
+// mayUseStoredCredentials reports whether createAPIKeyClient is likely to fall back
+// to conjur-api-go's cached credential storage (e.g. credentials saved by a prior
+// `conjur login`) because no login/API key was supplied via the provider config or
+// via the CONJUR_AUTHN_LOGIN/CONJUR_AUTHN_API_KEY environment variables. It mirrors
+// the precedence documented on conjurapi.NewClientFromEnvironment, which is what
+// createAPIKeyClient delegates to in this situation.
+func mayUseStoredCredentials(data *providerModel) bool {
+	authnType := data.AuthnType.ValueString()
+	if authnType != "" && authnType != "api" {
+		return false
+	}
+
+	if data.Login.ValueString() != "" && data.APIKey.ValueString() != "" {
+		return false
+	}
+
+	if os.Getenv("CONJUR_AUTHN_TOKEN_FILE") != "" || os.Getenv("CONJUR_AUTHN_TOKEN") != "" {
+		return false
+	}
+
+	if os.Getenv("CONJUR_AUTHN_LOGIN") != "" && os.Getenv("CONJUR_AUTHN_API_KEY") != "" {
+		return false
+	}
+
+	return true
 }
 
 // resolveAuthnJWT returns the JWT from config or TFC_WORKLOAD_IDENTITY_TOKEN env var.
@@ -368,6 +402,13 @@ func (p *providerImpl) createIAMClient(config *conjurapi.Config, data *providerM
 func (p *providerImpl) createAPIKeyClient(config *conjurapi.Config, data *providerModel) (*conjurapi.Client, error) {
 	login := data.Login.ValueString()
 	apiKey := data.APIKey.ValueString()
+
+	// Pin the standard authn type so conjur-api-go binds to the API-key
+	// authenticator instead of silently falling back to credentials cached on
+	// the machine (e.g. by `conjur login`). Without this, an unset
+	// CONJUR_AUTHN_TYPE leaves the type blank and conjur-api-go treats stored
+	// credentials as a valid source.
+	config.AuthnType = conjurapi.AuthnTypeStandard
 
 	if login != "" && apiKey != "" {
 		return conjurapi.NewClientFromKey(*config, authn.LoginPair{
