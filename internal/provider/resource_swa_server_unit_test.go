@@ -1088,6 +1088,29 @@ func TestSyncServerAuthFromResponse_MissingFieldsClearExistingValues(t *testing.
 	assert.Nil(t, state.Auth.Identity)
 }
 
+// TEMPORARY: guards the fallback that keeps the prior subject when the API
+// omits `sub` from the authentication data. Remove alongside the fallback in
+// syncServerAuthFromResponse once the API echoes `sub` back.
+func TestSyncServerAuthFromResponse_MissingSubjectPreservesPriorValue(t *testing.T) {
+	ctx := context.Background()
+	state := &ServerResourceModel{
+		Auth: &ServerAuthenticationModel{
+			Subject: types.StringValue("system:serviceaccount:swa-e2e:swa-server"),
+		},
+	}
+
+	auth := &swaclient.ServerAuthentication{
+		Type: "jwt",
+		Data: map[string]any{
+			"audience": "conjur",
+		},
+	}
+
+	err := syncServerAuthFromResponse(ctx, state, auth)
+	assert.NoError(t, err)
+	assert.Equal(t, "system:serviceaccount:swa-e2e:swa-server", state.Auth.Subject.ValueString())
+}
+
 func TestSyncServerAuthFromResponse_PublicKeysMarshalError(t *testing.T) {
 	state := &ServerResourceModel{}
 	auth := &swaclient.ServerAuthentication{
