@@ -363,7 +363,7 @@ pipeline {
       // Resolve ownership issue before running infra post hook
      sh 'git config --global --add safe.directory ${PWD}'
      script {
-        if (params.MODE != 'PROMOTE' && params.MODE != 'RELEASE') {
+        if (MODE == 'BUILD') {
           sendNotification(channel: '#conjur-integrations-ci-notifications', branchFilter: 'main', slackMentions: ['@here'], sendSuccessNotification: false)
         }
       }
