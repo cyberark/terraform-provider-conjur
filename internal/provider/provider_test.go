@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/cyberark/conjur-api-go/conjurapi"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	fwprovider "github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -231,6 +232,160 @@ func TestResolveAuthnJWT(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMayUseStoredCredentials(t *testing.T) {
+	// Env vars that influence the decision. Each test starts with all of them
+	// cleared and sets only the ones it cares about.
+	credentialEnvVars := []string{
+		"CONJUR_AUTHN_TOKEN_FILE",
+		"CONJUR_AUTHN_TOKEN",
+		"CONJUR_AUTHN_LOGIN",
+		"CONJUR_AUTHN_API_KEY",
+	}
+
+	tests := []struct {
+		name string
+		data providerModel
+		env  map[string]string
+		want bool
+	}{
+		{
+			name: "empty authn_type and no credentials falls back to cache",
+			data: providerModel{},
+			want: true,
+		},
+		{
+			name: "api authn_type and no credentials falls back to cache",
+			data: providerModel{AuthnType: types.StringValue("api")},
+			want: true,
+		},
+		{
+			name: "non-api authn_type never uses cache",
+			data: providerModel{AuthnType: types.StringValue("jwt")},
+			want: false,
+		},
+		{
+			name: "azure authn_type never uses cache",
+			data: providerModel{AuthnType: types.StringValue("azure")},
+			want: false,
+		},
+		{
+			name: "login and api_key set in config",
+			data: providerModel{
+				Login:  types.StringValue("host/some"),
+				APIKey: types.StringValue("secret"),
+			},
+			want: false,
+		},
+		{
+			name: "only login set in config still falls back to cache",
+			data: providerModel{Login: types.StringValue("host/some")},
+			want: true,
+		},
+		{
+			name: "only api_key set in config still falls back to cache",
+			data: providerModel{APIKey: types.StringValue("secret")},
+			want: true,
+		},
+		{
+			name: "CONJUR_AUTHN_TOKEN_FILE set",
+			data: providerModel{},
+			env:  map[string]string{"CONJUR_AUTHN_TOKEN_FILE": "/tmp/token"},
+			want: false,
+		},
+		{
+			name: "CONJUR_AUTHN_TOKEN set",
+			data: providerModel{},
+			env:  map[string]string{"CONJUR_AUTHN_TOKEN": "token-content"},
+			want: false,
+		},
+		{
+			name: "CONJUR_AUTHN_LOGIN and CONJUR_AUTHN_API_KEY set",
+			data: providerModel{},
+			env: map[string]string{
+				"CONJUR_AUTHN_LOGIN":   "host/some",
+				"CONJUR_AUTHN_API_KEY": "secret",
+			},
+			want: false,
+		},
+		{
+			name: "only CONJUR_AUTHN_LOGIN set still falls back to cache",
+			data: providerModel{},
+			env:  map[string]string{"CONJUR_AUTHN_LOGIN": "host/some"},
+			want: true,
+		},
+		{
+			name: "only CONJUR_AUTHN_API_KEY set still falls back to cache",
+			data: providerModel{},
+			env:  map[string]string{"CONJUR_AUTHN_API_KEY": "secret"},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, name := range credentialEnvVars {
+				t.Setenv(name, "")
+			}
+			for name, value := range tt.env {
+				t.Setenv(name, value)
+			}
+
+			if got := mayUseStoredCredentials(&tt.data); got != tt.want {
+				t.Errorf("mayUseStoredCredentials() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCreateAPIKeyClient_PinsStandardAuthnType(t *testing.T) {
+	// conjur-api-go falls back to credentials cached on the machine (e.g. by
+	// `conjur login`) when the config's AuthnType is left blank. createAPIKeyClient
+	// must pin the standard authn type so an explicit login/api_key is honored and
+	// the cached-credentials fallback is not triggered unexpectedly.
+	p := &providerImpl{}
+
+	baseConfig := func() *conjurapi.Config {
+		return &conjurapi.Config{
+			ApplianceURL: "https://example.com",
+			Account:      "dev",
+			Environment:  conjurapi.EnvironmentSaaS,
+		}
+	}
+
+	t.Run("with explicit login and api_key", func(t *testing.T) {
+		config := baseConfig()
+		data := &providerModel{
+			Login:  types.StringValue("host/test"),
+			APIKey: types.StringValue("secret-key"),
+		}
+
+		client, err := p.createAPIKeyClient(config, data)
+		if err != nil {
+			t.Fatalf("createAPIKeyClient returned error: %v", err)
+		}
+		if got := client.GetConfig().AuthnType; got != conjurapi.AuthnTypeStandard {
+			t.Errorf("AuthnType = %q, want %q", got, conjurapi.AuthnTypeStandard)
+		}
+	})
+
+	t.Run("without login and api_key", func(t *testing.T) {
+		// Ensure no env credentials leak in from the host running the tests.
+		t.Setenv("CONJUR_AUTHN_TOKEN_FILE", "")
+		t.Setenv("CONJUR_AUTHN_TOKEN", "")
+		t.Setenv("CONJUR_AUTHN_LOGIN", "host/test")
+		t.Setenv("CONJUR_AUTHN_API_KEY", "secret-key")
+
+		config := baseConfig()
+		client, err := p.createAPIKeyClient(config, &providerModel{})
+		if err != nil {
+			t.Fatalf("createAPIKeyClient returned error: %v", err)
+		}
+		if got := client.GetConfig().AuthnType; got != conjurapi.AuthnTypeStandard {
+			t.Errorf("AuthnType = %q, want %q", got, conjurapi.AuthnTypeStandard)
+		}
+	})
 }
 
 func TestValidateAttributes_JWT(t *testing.T) {
