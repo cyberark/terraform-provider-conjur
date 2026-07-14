@@ -101,11 +101,11 @@ Required:
 Optional:
 
 - `audience` (String) The expected audience for JWT authentication.
-- `ca_cert` (String) PEM-encoded CA certificate for validating the JWKS provider's TLS certificate.
+- `ca_cert` (String, Sensitive) PEM-encoded CA certificate for validating the JWKS provider's TLS certificate.
 - `identity` (Attributes) Identity mapping configuration for the JWT authenticator. (see [below for nested schema](#nestedatt--auth--identity))
 - `issuer` (String) The expected issuer for JWT authentication.
 - `jwks_uri` (String) The JWKS URI for JWT verification.
-- `public_keys` (String) Inline JWKS as a JSON string. Format: {"type":"jwks","value":{"keys":[...]}}.
+- `public_keys` (String) Inline JWKS as a JSON string. Sent to the server as compact, canonical JSON.
 
 <a id="nestedatt--auth--identity"></a>
 ### Nested Schema for `auth.identity`

@@ -232,6 +232,7 @@ func (r *ServerGroupResource) Schema(ctx context.Context, req resource.SchemaReq
 							"ca_certificates": schema.StringAttribute{
 								MarkdownDescription: "PEM-encoded CA certificates for X.509 POP node attestation.",
 								Required:            true,
+								Sensitive:           true,
 							},
 						},
 					},

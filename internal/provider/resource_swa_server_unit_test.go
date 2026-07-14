@@ -276,6 +276,25 @@ func TestServerResource_Create(t *testing.T) {
 			errorContains: "Invalid auth configuration",
 		},
 		{
+			name: "both jwks_uri and public_keys set",
+			data: ServerResourceModel{
+				Name:          types.StringValue("my-server"),
+				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
+				Auth: &ServerAuthenticationModel{
+					Type:       types.StringValue("JWT"),
+					Subject:    types.StringValue("sub"),
+					Issuer:     types.StringValue("https://issuer.example.org"),
+					Audience:   types.StringNull(),
+					JWKSURI:    types.StringValue("https://issuer.example.org/.well-known/jwks.json"),
+					CACert:     types.StringNull(),
+					PublicKeys: types.StringValue(`{"type":"jwks","value":{"keys":[]}}`),
+				},
+			},
+			setupMock:     func(m *swamocks.MockClientWithResponsesInterface) {},
+			expectedError: true,
+			errorContains: "Only one of auth.jwks_uri or auth.public_keys",
+		},
+		{
 			name: "public_keys requires issuer",
 			data: ServerResourceModel{
 				Name:          types.StringValue("my-server"),
