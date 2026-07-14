@@ -357,13 +357,16 @@ pipeline {
       }  
     }
   }
-  
-  
+
   post {
     always {
       // Resolve ownership issue before running infra post hook
-      sh 'git config --global --add safe.directory ${PWD}'
-      sendNotification(channel: '#conjur-integrations-ci-notifications')
+     sh 'git config --global --add safe.directory ${PWD}'
+     script {
+        if (params.MODE != 'PROMOTE' && params.MODE != 'RELEASE') {
+          sendNotification(channel: '#conjur-integrations-ci-notifications', branchFilter: 'main', slackMentions: ['@here'], sendSuccessNotification: false)
+        }
+      }
       releaseInfraPoolAgent(".infrapool/release_agents")
     }
   }
