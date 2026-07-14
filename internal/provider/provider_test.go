@@ -10,11 +10,14 @@ import (
 	"github.com/cyberark/conjur-api-go/conjurapi"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	fwprovider "github.com/hashicorp/terraform-plugin-framework/provider"
+	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
 var (
@@ -388,6 +391,56 @@ func TestCreateAPIKeyClient_PinsStandardAuthnType(t *testing.T) {
 	})
 }
 
+func TestCreateAPIKeyClient_PreservesStoredCredentialAuthnType(t *testing.T) {
+	// When no inline login/api_key is supplied, createAPIKeyClient falls back to
+	// credentials cached by `conjur login`. For stored-credential authn types such
+	// as "cloud" (SaaS/Secrets Manager) and "oidc", it must NOT overwrite the
+	// AuthnType loaded from ~/.conjurrc: doing so routes the credential lookup to
+	// the generic authn store and misses the cached SaaS/OIDC credentials,
+	// producing a spurious "No valid credentials found" error.
+	p := &providerImpl{}
+
+	baseConfig := func(authnType string) *conjurapi.Config {
+		return &conjurapi.Config{
+			ApplianceURL: "https://example.com",
+			Account:      "dev",
+			Environment:  conjurapi.EnvironmentSaaS,
+			AuthnType:    authnType,
+		}
+	}
+
+	// Avoid leaking env credentials that would change the fallback path.
+	for _, name := range []string{
+		"CONJUR_AUTHN_TOKEN_FILE",
+		"CONJUR_AUTHN_TOKEN",
+		"CONJUR_AUTHN_LOGIN",
+		"CONJUR_AUTHN_API_KEY",
+	} {
+		t.Setenv(name, "")
+	}
+
+	for _, authnType := range []string{conjurapi.AuthnTypeCloud, "oidc", "ldap"} {
+		t.Run(authnType+" is preserved without inline credentials", func(t *testing.T) {
+			config := baseConfig(authnType)
+			// The client build may fail because no real cached credentials exist
+			// in the test environment, but the mutation on config we care about
+			// happens before that. Assert on config, not the returned client.
+			_, _ = p.createAPIKeyClient(config, &providerModel{})
+			if config.AuthnType != authnType {
+				t.Errorf("AuthnType = %q, want %q (stored-credential type must be preserved)", config.AuthnType, authnType)
+			}
+		})
+	}
+
+	t.Run("blank authn_type is pinned to standard without inline credentials", func(t *testing.T) {
+		config := baseConfig("")
+		_, _ = p.createAPIKeyClient(config, &providerModel{})
+		if config.AuthnType != conjurapi.AuthnTypeStandard {
+			t.Errorf("AuthnType = %q, want %q", config.AuthnType, conjurapi.AuthnTypeStandard)
+		}
+	})
+}
+
 func TestValidateAttributes_JWT(t *testing.T) {
 	t.Run("passes when required attributes set", func(t *testing.T) {
 		attributes := map[string]types.String{
@@ -414,4 +467,153 @@ func TestValidateAttributes_JWT(t *testing.T) {
 			t.Fatal("validateAttributes should error when service_id is missing")
 		}
 	})
+}
+
+// getProviderTestSchema returns the provider schema for building test configs.
+func getProviderTestSchema() schema.Schema {
+	p := &providerImpl{}
+	var schemaResp provider.SchemaResponse
+	p.Schema(context.Background(), provider.SchemaRequest{}, &schemaResp)
+	return schemaResp.Schema
+}
+
+// newValidateConfigRequest builds a ValidateConfigRequest whose config reflects
+// the supplied providerModel, so ValidateConfig can be exercised end-to-end.
+func newValidateConfigRequest(data providerModel) provider.ValidateConfigRequest {
+	str := func(v types.String) tftypes.Value {
+		if v.IsNull() {
+			return tftypes.NewValue(tftypes.String, nil)
+		}
+		return tftypes.NewValue(tftypes.String, v.ValueString())
+	}
+
+	configVal := tftypes.NewValue(
+		tftypes.Object{
+			AttributeTypes: map[string]tftypes.Type{
+				"authn_type":      tftypes.String,
+				"appliance_url":   tftypes.String,
+				"account":         tftypes.String,
+				"login":           tftypes.String,
+				"api_key":         tftypes.String,
+				"service_id":      tftypes.String,
+				"client_id":       tftypes.String,
+				"host_id":         tftypes.String,
+				"ssl_cert":        tftypes.String,
+				"ssl_cert_path":   tftypes.String,
+				"authn_jwt_token": tftypes.String,
+			},
+		},
+		map[string]tftypes.Value{
+			"authn_type":      str(data.AuthnType),
+			"appliance_url":   str(data.ApplianceUrl),
+			"account":         str(data.Account),
+			"login":           str(data.Login),
+			"api_key":         str(data.APIKey),
+			"service_id":      str(data.ServiceID),
+			"client_id":       str(data.ClientID),
+			"host_id":         str(data.HostID),
+			"ssl_cert":        str(data.SSLCert),
+			"ssl_cert_path":   str(data.SSLCertPath),
+			"authn_jwt_token": str(data.AuthnJWT),
+		},
+	)
+
+	return provider.ValidateConfigRequest{
+		Config: tfsdk.Config{
+			Raw:    configVal,
+			Schema: getProviderTestSchema(),
+		},
+	}
+}
+
+func TestValidateConfig_APIAuthnTypeWithoutCredentials(t *testing.T) {
+	// authn_type = "api" without a resolvable login/api_key silently falls back
+	// to credentials cached by `conjur login`. ValidateConfig must surface that
+	// decoupling as a warning (not an error) so the fallback stays usable.
+	credentialEnvVars := []string{
+		"CONJUR_AUTHN_TOKEN_FILE",
+		"CONJUR_AUTHN_TOKEN",
+		"CONJUR_AUTHN_LOGIN",
+		"CONJUR_AUTHN_API_KEY",
+	}
+
+	const warnSummary = "authn_type = \"api\" but no API key provided"
+
+	hasWarning := func(resp *provider.ValidateConfigResponse) bool {
+		for _, d := range resp.Diagnostics.Warnings() {
+			if d.Summary() == warnSummary {
+				return true
+			}
+		}
+		return false
+	}
+
+	p := &providerImpl{}
+	ctx := context.Background()
+
+	tests := []struct {
+		name string
+		data providerModel
+		env  map[string]string
+		want bool
+	}{
+		{
+			name: "api with no credentials warns",
+			data: providerModel{
+				AuthnType:    types.StringValue("api"),
+				ApplianceUrl: types.StringValue("https://example.com"),
+			},
+			want: true,
+		},
+		{
+			name: "api with inline login and api_key does not warn",
+			data: providerModel{
+				AuthnType:    types.StringValue("api"),
+				ApplianceUrl: types.StringValue("https://example.com"),
+				Login:        types.StringValue("host/some"),
+				APIKey:       types.StringValue("secret"),
+			},
+			want: false,
+		},
+		{
+			name: "api with env credentials does not warn",
+			data: providerModel{
+				AuthnType:    types.StringValue("api"),
+				ApplianceUrl: types.StringValue("https://example.com"),
+			},
+			env: map[string]string{
+				"CONJUR_AUTHN_LOGIN":   "host/some",
+				"CONJUR_AUTHN_API_KEY": "secret",
+			},
+			want: false,
+		},
+		{
+			name: "empty authn_type does not warn",
+			data: providerModel{
+				ApplianceUrl: types.StringValue("https://example.com"),
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, name := range credentialEnvVars {
+				t.Setenv(name, "")
+			}
+			for name, value := range tt.env {
+				t.Setenv(name, value)
+			}
+
+			resp := &provider.ValidateConfigResponse{}
+			p.ValidateConfig(ctx, newValidateConfigRequest(tt.data), resp)
+
+			if resp.Diagnostics.HasError() {
+				t.Fatalf("ValidateConfig returned errors: %v", resp.Diagnostics.Errors())
+			}
+			if got := hasWarning(resp); got != tt.want {
+				t.Errorf("cached-credentials warning present = %v, want %v (diags: %v)", got, tt.want, resp.Diagnostics)
+			}
+		})
+	}
 }
