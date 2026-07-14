@@ -96,7 +96,7 @@ Optional:
 
 Required:
 
-- `ca_certificates` (String) PEM-encoded CA certificates for X.509 POP node attestation.
+- `ca_certificates` (String, Sensitive) PEM-encoded CA certificates for X.509 POP node attestation.
 
 ## Import
 

@@ -257,6 +257,14 @@ func validateCreateServerAuthConfig(auth *ServerAuthenticationModel, diags *diag
 		return false
 	}
 
+	if hasJWKSURI && hasPublicKeys {
+		diags.AddError(
+			"Invalid auth configuration",
+			"Only one of auth.jwks_uri or auth.public_keys may be set, not both.",
+		)
+		return false
+	}
+
 	if hasPublicKeys && !hasIssuer && !issuerUnknown {
 		diags.AddError(
 			"Invalid auth configuration",
@@ -500,6 +508,7 @@ func (r *ServerResource) Schema(ctx context.Context, req resource.SchemaRequest,
 					"ca_cert": schema.StringAttribute{
 						MarkdownDescription: "PEM-encoded CA certificate for validating the JWKS provider's TLS certificate.",
 						Optional:            true,
+						Sensitive:           true,
 					},
 					"public_keys": schema.StringAttribute{
 						MarkdownDescription: `Inline JWKS as a JSON string. Sent to the server as compact, canonical JSON.`,
