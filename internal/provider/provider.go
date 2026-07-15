@@ -183,6 +183,20 @@ func (p *providerImpl) ValidateConfig(ctx context.Context, req provider.Validate
 		validateAttributes(authGcpAttributes, "gcp", resp)
 	case "jwt":
 		validateAttributes(authnJWTAttributes, "jwt", resp)
+	case "api":
+		validateAttributes(authApiAttributes, "api", resp)
+		// authn_type is explicitly "api" but createAPIKeyClient only performs a
+		// true API-key exchange when a login/api_key is resolvable (from config
+		// or the CONJUR_AUTHN_* env vars). Otherwise it falls back to the
+		// credentials cached by `conjur login`, so the explicit "api" type does
+		// not actually force API-key auth. Warn so the mismatch is visible.
+		if mayUseStoredCredentials(&data) {
+			resp.Diagnostics.AddWarning(
+				"authn_type = \"api\" but no API key provided",
+				"authn_type is set to \"api\" but no login/api_key was found in the provider config or CONJUR_AUTHN_* env vars. "+
+					"The provider will fall back to credentials cached by `conjur login`. Set login+api_key to force API-key auth.",
+			)
+		}
 	case "":
 		// No authn_type specified – fallback to API validation
 		validateAttributes(authApiAttributes, "api", resp)
@@ -403,18 +417,23 @@ func (p *providerImpl) createAPIKeyClient(config *conjurapi.Config, data *provid
 	login := data.Login.ValueString()
 	apiKey := data.APIKey.ValueString()
 
-	// Pin the standard authn type so conjur-api-go binds to the API-key
-	// authenticator instead of silently falling back to credentials cached on
-	// the machine (e.g. by `conjur login`). Without this, an unset
-	// CONJUR_AUTHN_TYPE leaves the type blank and conjur-api-go treats stored
-	// credentials as a valid source.
-	config.AuthnType = conjurapi.AuthnTypeStandard
-
 	if login != "" && apiKey != "" {
+		// Pin the standard authn type so conjur-api-go binds to the API-key
+		// authenticator instead of silently falling back to credentials cached
+		// on the machine (e.g. by `conjur login`). Without this, an unset
+		// CONJUR_AUTHN_TYPE leaves the type blank and conjur-api-go treats
+		// stored credentials as a valid source.
+		config.AuthnType = conjurapi.AuthnTypeStandard
 		return conjurapi.NewClientFromKey(*config, authn.LoginPair{
 			Login:  login,
 			APIKey: apiKey,
 		}, telemetryData)
+	}
+
+	// No inline API key was supplied, so we fall back to whatever credentials
+	// conjur-api-go can find (env vars or those cached by `conjur login`).
+	if config.AuthnType == "" {
+		config.AuthnType = conjurapi.AuthnTypeStandard
 	}
 	return conjurapi.NewClientFromEnvironment(*config, telemetryData)
 }
