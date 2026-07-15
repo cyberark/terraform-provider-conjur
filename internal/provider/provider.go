@@ -259,6 +259,27 @@ func (p *providerImpl) Configure(ctx context.Context, req provider.ConfigureRequ
 		return
 	}
 
+	// Eagerly obtain an access token so authentication problems surface here,
+	// with a clear message, instead of as a confusing per-resource error during
+	// the first API call (e.g. "Error reading trust domain: 404 Not Found" when
+	// the real cause is an expired session). RefreshToken reuses a valid cached
+	// token when one is present (e.g. from `conjur login`) and only contacts the
+	// server when a refresh is actually needed, so this does not break the
+	// cached-credentials workflow.
+	if err := conjurClient.RefreshToken(); err != nil {
+		resp.Diagnostics.AddError(
+			"Conjur authentication failed",
+			fmt.Sprintf(
+				"Could not authenticate to CyberArk Secrets Manager at %s: %s\n\n"+
+					"Verify your credentials (login/api_key, CONJUR_AUTHN_* environment variables, "+
+					"or a session cached by `conjur login`) and that the host is authorized. "+
+					"If a `conjur login` session has expired, run `conjur login` again.",
+				conjurClient.GetConfig().ApplianceURL, err,
+			),
+		)
+		return
+	}
+
 	applianceURL := strings.TrimSuffix(strings.TrimSuffix(conjurClient.GetConfig().ApplianceURL, "/"), "/api")
 	swaC, err := swaclient.NewSWAClientWithTransport(applianceURL, &AuthTransport{ConjurClient: conjurClient})
 	if err != nil {
