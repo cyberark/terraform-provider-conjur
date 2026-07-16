@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	tfresource "github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -53,7 +54,7 @@ func TestServerResource_Create(t *testing.T) {
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				resp := makeCreateServerResponse("my-server", "dHJ1c3RfZG9tYWlu")
-				m.On("PostServerWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), &swaclient.PostServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, mock.Anything).
+				m.On("PostServerWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.PostServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, mock.Anything).
 					Return(&swaclient.PostServerResponse{
 						HTTPResponse:                    makeHTTPResponse(http.StatusCreated),
 						ApplicationxSecretsmgrV2JSON201: resp,
@@ -115,7 +116,7 @@ func TestServerResource_Create(t *testing.T) {
 				},
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("PostServerWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), &swaclient.PostServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, mock.Anything).
+				m.On("PostServerWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.PostServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, mock.Anything).
 					Return(nil, fmt.Errorf("connection refused"))
 			},
 			expectedError: true,
@@ -137,7 +138,7 @@ func TestServerResource_Create(t *testing.T) {
 				},
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("PostServerWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), &swaclient.PostServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, mock.Anything).
+				m.On("PostServerWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.PostServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, mock.Anything).
 					Return(&swaclient.PostServerResponse{
 						HTTPResponse: makeHTTPResponse(http.StatusConflict),
 						Body:         []byte(`{"message":"already exists"}`),
@@ -163,7 +164,7 @@ func TestServerResource_Create(t *testing.T) {
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				resp := makeCreateServerResponse("my-server", "dHJ1c3RfZG9tYWlu")
-				m.On("PostServerWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), &swaclient.PostServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, mock.Anything).
+				m.On("PostServerWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.PostServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, mock.Anything).
 					Return(&swaclient.PostServerResponse{
 						HTTPResponse:                    makeHTTPResponse(http.StatusCreated),
 						ApplicationxSecretsmgrV2JSON201: resp,
@@ -188,7 +189,7 @@ func TestServerResource_Create(t *testing.T) {
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				resp := makeCreateServerResponse("my-server", "dHJ1c3RfZG9tYWlu")
-				m.On("PostServerWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), &swaclient.PostServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, mock.Anything).
+				m.On("PostServerWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.PostServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, mock.Anything).
 					Return(&swaclient.PostServerResponse{
 						HTTPResponse:                    makeHTTPResponse(http.StatusCreated),
 						ApplicationxSecretsmgrV2JSON201: resp,
@@ -224,7 +225,7 @@ func TestServerResource_Create(t *testing.T) {
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				resp := makeCreateServerResponse("my-server", "dHJ1c3RfZG9tYWlu")
-				m.On("PostServerWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), &swaclient.PostServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, mock.Anything).
+				m.On("PostServerWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.PostServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, mock.Anything).
 					Return(&swaclient.PostServerResponse{
 						HTTPResponse:                    makeHTTPResponse(http.StatusCreated),
 						ApplicationxSecretsmgrV2JSON201: resp,
@@ -248,7 +249,7 @@ func TestServerResource_Create(t *testing.T) {
 				},
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("PostServerWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), &swaclient.PostServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, mock.Anything).
+				m.On("PostServerWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.PostServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, mock.Anything).
 					Return(&swaclient.PostServerResponse{
 						HTTPResponse: makeHTTPResponse(http.StatusCreated),
 						// ApplicationxSecretsmgrV2JSON201 intentionally nil
@@ -418,7 +419,7 @@ func TestServerResource_Delete(t *testing.T) {
 				},
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("DeleteServerWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), swaclient.ServerName("my-server"), &swaclient.DeleteServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("DeleteServerWithResponse", context.Background(), "prod.example.org", "prod-servers", "my-server", &swaclient.DeleteServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(&swaclient.DeleteServerResponse{
 						HTTPResponse: makeHTTPResponse(http.StatusNoContent),
 					}, nil)
@@ -443,7 +444,7 @@ func TestServerResource_Delete(t *testing.T) {
 				},
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("DeleteServerWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), swaclient.ServerName("my-server"), &swaclient.DeleteServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("DeleteServerWithResponse", context.Background(), "prod.example.org", "prod-servers", "my-server", &swaclient.DeleteServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(&swaclient.DeleteServerResponse{
 						HTTPResponse: makeHTTPResponse(http.StatusNotFound),
 					}, nil)
@@ -489,7 +490,7 @@ func TestServerResource_Delete(t *testing.T) {
 				},
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("DeleteServerWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), swaclient.ServerName("my-server"), &swaclient.DeleteServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("DeleteServerWithResponse", context.Background(), "prod.example.org", "prod-servers", "my-server", &swaclient.DeleteServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(&swaclient.DeleteServerResponse{
 						HTTPResponse: makeHTTPResponse(http.StatusInternalServerError),
 						Body:         []byte(`{"message":"internal error"}`),
@@ -516,7 +517,7 @@ func TestServerResource_Delete(t *testing.T) {
 				},
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("DeleteServerWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), swaclient.ServerName("my-server"), &swaclient.DeleteServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("DeleteServerWithResponse", context.Background(), "prod.example.org", "prod-servers", "my-server", &swaclient.DeleteServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(nil, fmt.Errorf("connection refused"))
 			},
 			expectedError: true,
@@ -761,7 +762,7 @@ func TestServerResource_Read(t *testing.T) {
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				authnID := "fresh-authn-id"
-				m.On("GetServerWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), swaclient.ServerName("my-server"), &swaclient.GetServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("GetServerWithResponse", context.Background(), "prod.example.org", "prod-servers", "my-server", &swaclient.GetServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(&swaclient.GetServerResponse{
 						HTTPResponse: makeHTTPResponse(http.StatusOK),
 						ApplicationxSecretsmgrV2JSON200: &swaclient.ServerResponse{
@@ -794,7 +795,7 @@ func TestServerResource_Read(t *testing.T) {
 				},
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("GetServerWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), swaclient.ServerName("missing-server"), &swaclient.GetServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("GetServerWithResponse", context.Background(), "prod.example.org", "prod-servers", "missing-server", &swaclient.GetServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(&swaclient.GetServerResponse{HTTPResponse: makeHTTPResponse(http.StatusNotFound)}, nil)
 			},
 			expectedError: false,
@@ -828,7 +829,7 @@ func TestServerResource_Read(t *testing.T) {
 				},
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("GetServerWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), swaclient.ServerName("my-server"), &swaclient.GetServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("GetServerWithResponse", context.Background(), "prod.example.org", "prod-servers", "my-server", &swaclient.GetServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(nil, fmt.Errorf("network error"))
 			},
 			expectedError: true,
@@ -1191,4 +1192,285 @@ func TestSyncServerAuthFromResponse_NilAuthClearsExistingState(t *testing.T) {
 	err := syncServerAuthFromResponse(context.Background(), state, nil)
 	assert.NoError(t, err)
 	assert.Nil(t, state.Auth)
+}
+
+// --- Schema plan modifier tests ---
+
+func TestServerResource_Schema_RequiresReplace(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	r := &ServerResource{}
+	var schemaResp resource.SchemaResponse
+	r.Schema(ctx, resource.SchemaRequest{}, &schemaResp)
+
+	tests := []struct {
+		attrPath      string
+		shouldReplace bool
+	}{
+		{"name", true},
+		{"server_group_id", true},
+		{"auth", true},
+		{"id", false},
+		{"authn_id", false},
+	}
+
+	const requiresReplaceDesc = "If the value of this attribute changes, Terraform will destroy and recreate the resource."
+
+	for _, tc := range tests {
+		t.Run(tc.attrPath, func(t *testing.T) {
+			t.Parallel()
+			attr := schemaResp.Schema.Attributes[tc.attrPath]
+			assert.NotNil(t, attr, "attribute %q not found in schema", tc.attrPath)
+
+			hasRequiresReplace := false
+			switch a := attr.(type) {
+			case schema.StringAttribute:
+				for _, pm := range a.PlanModifiers {
+					if pm.Description(ctx) == requiresReplaceDesc {
+						hasRequiresReplace = true
+					}
+				}
+			case schema.SingleNestedAttribute:
+				for _, pm := range a.PlanModifiers {
+					if pm.Description(ctx) == requiresReplaceDesc {
+						hasRequiresReplace = true
+					}
+				}
+			}
+
+			if tc.shouldReplace {
+				assert.True(t, hasRequiresReplace, "attribute %q should have RequiresReplace", tc.attrPath)
+			} else {
+				assert.False(t, hasRequiresReplace, "attribute %q should NOT have RequiresReplace", tc.attrPath)
+			}
+		})
+	}
+}
+
+// --- Lifecycle tests (mock-client acceptance style) ---
+
+func TestServerResource_CreateAndDelete(t *testing.T) {
+	t.Parallel()
+
+	mockClient := swamocks.NewMockClientWithResponsesInterface(t)
+
+	mockClient.EXPECT().
+		PostServerWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything, mock.Anything).
+		Return(&swaclient.PostServerResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusCreated),
+			ApplicationxSecretsmgrV2JSON201: &swaclient.CreateServerResponse{
+				Name:           "test-server",
+				AuthnId:        "dGVzdC10ZC10ZXN0LXNnLXRlc3Qtc2VydmVy",
+				Authentication: swaclient.CreateServerAuthentication{Type: "JWT"},
+			},
+		}, nil).Times(1)
+
+	mockClient.EXPECT().
+		GetServerWithResponse(mock.Anything, "test-td", "test-sg", "test-server", mock.Anything).
+		Return(&swaclient.GetServerResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: &swaclient.ServerResponse{
+				Name:           "test-server",
+				Authentication: &swaclient.ServerAuthentication{Type: "jwt", Data: map[string]any{"sub": "my-workload", "jwks_uri": "https://www.googleapis.com/oauth2/v3/certs"}},
+			},
+		}, nil).Maybe()
+
+	mockClient.EXPECT().
+		DeleteServerWithResponse(mock.Anything, "test-td", "test-sg", "test-server", mock.Anything).
+		Return(&swaclient.DeleteServerResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusNoContent),
+		}, nil).Times(1)
+
+	tfresource.Test(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
+		Steps: []tfresource.TestStep{
+			{
+				Config: `
+resource "conjur_swa_server" "test" {
+  name            = "test-server"
+  server_group_id = "test-td/test-sg"
+  auth = {
+    type     = "JWT"
+    subject  = "my-workload"
+    jwks_uri = "https://www.googleapis.com/oauth2/v3/certs"
+  }
+}
+`,
+				Check: tfresource.ComposeTestCheckFunc(
+					tfresource.TestCheckResourceAttr("conjur_swa_server.test", "name", "test-server"),
+					tfresource.TestCheckResourceAttr("conjur_swa_server.test", "id", "test-td/test-sg/test-server"),
+					tfresource.TestCheckResourceAttr("conjur_swa_server.test", "authn_id", "dGVzdC10ZC10ZXN0LXNnLXRlc3Qtc2VydmVy"),
+				),
+			},
+		},
+	})
+}
+
+func TestServerResource_AuthChange_RequiresReplace(t *testing.T) {
+	t.Parallel()
+
+	mockClient := swamocks.NewMockClientWithResponsesInterface(t)
+
+	// Create is called once; step 2 uses PlanOnly so no apply fires.
+	mockClient.EXPECT().
+		PostServerWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything, mock.Anything).
+		Return(&swaclient.PostServerResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusCreated),
+			ApplicationxSecretsmgrV2JSON201: &swaclient.CreateServerResponse{
+				Name:           "test-server",
+				AuthnId:        "dGVzdC10ZC10ZXN0LXNnLXRlc3Qtc2VydmVy",
+				Authentication: swaclient.CreateServerAuthentication{Type: "JWT"},
+			},
+		}, nil).Times(1)
+
+	// All Reads return the original URI. After the replace the framework's post-apply
+	// refresh would show a diff (state has certs-CHANGED from the plan, Read returns
+	// certs), so we use PlanOnly on step 2 to verify the replace is planned without
+	// executing the apply — which avoids the post-apply consistency check.
+	mockClient.EXPECT().
+		GetServerWithResponse(mock.Anything, "test-td", "test-sg", "test-server", mock.Anything).
+		Return(&swaclient.GetServerResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: &swaclient.ServerResponse{
+				Name:           "test-server",
+				Authentication: &swaclient.ServerAuthentication{Type: "jwt", Data: map[string]any{"sub": "my-workload", "jwks_uri": "https://www.googleapis.com/oauth2/v3/certs"}},
+			},
+		}, nil).Maybe()
+
+	// Delete called once for final teardown after step 1.
+	mockClient.EXPECT().
+		DeleteServerWithResponse(mock.Anything, "test-td", "test-sg", "test-server", mock.Anything).
+		Return(&swaclient.DeleteServerResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusNoContent),
+		}, nil).Times(1)
+
+	tfresource.Test(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
+		Steps: []tfresource.TestStep{
+			{
+				Config: `
+resource "conjur_swa_server" "test" {
+  name            = "test-server"
+  server_group_id = "test-td/test-sg"
+  auth = {
+    type     = "JWT"
+    subject  = "my-workload"
+    jwks_uri = "https://www.googleapis.com/oauth2/v3/certs"
+  }
+}
+`,
+				Check: tfresource.TestCheckResourceAttr("conjur_swa_server.test", "name", "test-server"),
+			},
+			{
+				// Changing jwks_uri must produce a replace plan, not an update.
+				// PlanOnly skips apply so we avoid mock complexity around the post-replace read.
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: true,
+				Config: `
+resource "conjur_swa_server" "test" {
+  name            = "test-server"
+  server_group_id = "test-td/test-sg"
+  auth = {
+    type     = "JWT"
+    subject  = "my-workload"
+    jwks_uri = "https://www.googleapis.com/oauth2/v3/certs-CHANGED"
+  }
+}
+`,
+			},
+		},
+	})
+}
+
+func TestServerResource_NameChange_RequiresReplace(t *testing.T) {
+	t.Parallel()
+
+	mockClient := swamocks.NewMockClientWithResponsesInterface(t)
+
+	mockClient.EXPECT().
+		PostServerWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything,
+			mock.MatchedBy(func(body swaclient.PostServerJSONRequestBody) bool { return body.Name == "server-1" })).
+		Return(&swaclient.PostServerResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusCreated),
+			ApplicationxSecretsmgrV2JSON201: &swaclient.CreateServerResponse{
+				Name:           "server-1",
+				AuthnId:        "dGVzdC1zZXJ2ZXItMQ==",
+				Authentication: swaclient.CreateServerAuthentication{Type: "JWT"},
+			},
+		}, nil).Times(1)
+
+	mockClient.EXPECT().
+		PostServerWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything,
+			mock.MatchedBy(func(body swaclient.PostServerJSONRequestBody) bool { return body.Name == "server-2" })).
+		Return(&swaclient.PostServerResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusCreated),
+			ApplicationxSecretsmgrV2JSON201: &swaclient.CreateServerResponse{
+				Name:           "server-2",
+				AuthnId:        "dGVzdC1zZXJ2ZXItMg==",
+				Authentication: swaclient.CreateServerAuthentication{Type: "JWT"},
+			},
+		}, nil).Times(1)
+
+	mockClient.EXPECT().
+		GetServerWithResponse(mock.Anything, "test-td", "test-sg", "server-1", mock.Anything).
+		Return(&swaclient.GetServerResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: &swaclient.ServerResponse{
+				Name:           "server-1",
+				Authentication: &swaclient.ServerAuthentication{Type: "jwt", Data: map[string]any{"sub": "my-workload", "jwks_uri": "https://www.googleapis.com/oauth2/v3/certs"}},
+			},
+		}, nil).Maybe()
+
+	mockClient.EXPECT().
+		GetServerWithResponse(mock.Anything, "test-td", "test-sg", "server-2", mock.Anything).
+		Return(&swaclient.GetServerResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: &swaclient.ServerResponse{
+				Name:           "server-2",
+				Authentication: &swaclient.ServerAuthentication{Type: "jwt", Data: map[string]any{"sub": "my-workload", "jwks_uri": "https://www.googleapis.com/oauth2/v3/certs"}},
+			},
+		}, nil).Maybe()
+
+	mockClient.EXPECT().
+		DeleteServerWithResponse(mock.Anything, "test-td", "test-sg", "server-1", mock.Anything).
+		Return(&swaclient.DeleteServerResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
+
+	mockClient.EXPECT().
+		DeleteServerWithResponse(mock.Anything, "test-td", "test-sg", "server-2", mock.Anything).
+		Return(&swaclient.DeleteServerResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
+
+	tfresource.Test(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
+		Steps: []tfresource.TestStep{
+			{
+				Config: `
+resource "conjur_swa_server" "test" {
+  name            = "server-1"
+  server_group_id = "test-td/test-sg"
+  auth = {
+    type     = "JWT"
+    subject  = "my-workload"
+    jwks_uri = "https://www.googleapis.com/oauth2/v3/certs"
+  }
+}
+`,
+				Check: tfresource.TestCheckResourceAttr("conjur_swa_server.test", "name", "server-1"),
+			},
+			{
+				Config: `
+resource "conjur_swa_server" "test" {
+  name            = "server-2"
+  server_group_id = "test-td/test-sg"
+  auth = {
+    type     = "JWT"
+    subject  = "my-workload"
+    jwks_uri = "https://www.googleapis.com/oauth2/v3/certs"
+  }
+}
+`,
+				Check: tfresource.TestCheckResourceAttr("conjur_swa_server.test", "name", "server-2"),
+			},
+		},
+	})
 }

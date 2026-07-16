@@ -14,7 +14,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	tfresource "github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -322,7 +324,7 @@ func TestServerGroupResource_Create(t *testing.T) {
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				sg := makeServerGroupResponse("prod-servers", "prod.example.org")
-				m.On("PostServerGroupWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), &swaclient.PostServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PostServerGroupJSONRequestBody{
+				m.On("PostServerGroupWithResponse", context.Background(), "prod.example.org", &swaclient.PostServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PostServerGroupJSONRequestBody{
 					Name: "prod-servers",
 					NodeAttestation: struct {
 						K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
@@ -356,7 +358,7 @@ func TestServerGroupResource_Create(t *testing.T) {
 				desc := "Production servers"
 				sg.Description = &desc
 				descPtr := "Production servers"
-				m.On("PostServerGroupWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), &swaclient.PostServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PostServerGroupJSONRequestBody{
+				m.On("PostServerGroupWithResponse", context.Background(), "prod.example.org", &swaclient.PostServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PostServerGroupJSONRequestBody{
 					Name:        "prod-servers",
 					Description: &descPtr,
 					NodeAttestation: struct {
@@ -407,7 +409,7 @@ func TestServerGroupResource_Create(t *testing.T) {
 				},
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("PostServerGroupWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), &swaclient.PostServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PostServerGroupJSONRequestBody{
+				m.On("PostServerGroupWithResponse", context.Background(), "prod.example.org", &swaclient.PostServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PostServerGroupJSONRequestBody{
 					Name: "prod-servers",
 					NodeAttestation: struct {
 						K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
@@ -432,7 +434,7 @@ func TestServerGroupResource_Create(t *testing.T) {
 				},
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("PostServerGroupWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), &swaclient.PostServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PostServerGroupJSONRequestBody{
+				m.On("PostServerGroupWithResponse", context.Background(), "prod.example.org", &swaclient.PostServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PostServerGroupJSONRequestBody{
 					Name: "prod-servers",
 					NodeAttestation: struct {
 						K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
@@ -512,7 +514,7 @@ func TestServerGroupResource_Read(t *testing.T) {
 				}{
 					X509pop: &swaclient.X509PopConfigurationInput{CaCertificates: "fresh-cert"},
 				}
-				m.On("GetServerGroupWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), &swaclient.GetServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("GetServerGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.GetServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(&swaclient.GetServerGroupResponse{
 						HTTPResponse:                    makeHTTPResponse(http.StatusOK),
 						ApplicationxSecretsmgrV2JSON200: sg,
@@ -536,7 +538,7 @@ func TestServerGroupResource_Read(t *testing.T) {
 				}{
 					X509pop: &swaclient.X509PopConfigurationInput{CaCertificates: "fresh-cert"},
 				}
-				m.On("GetServerGroupWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), &swaclient.GetServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("GetServerGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.GetServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(&swaclient.GetServerGroupResponse{
 						HTTPResponse:                    makeHTTPResponse(http.StatusOK),
 						ApplicationxSecretsmgrV2JSON200: sg,
@@ -558,7 +560,7 @@ func TestServerGroupResource_Read(t *testing.T) {
 				},
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("GetServerGroupWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("missing-servers"), &swaclient.GetServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("GetServerGroupWithResponse", context.Background(), "prod.example.org", "missing-servers", &swaclient.GetServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(&swaclient.GetServerGroupResponse{
 						HTTPResponse: makeHTTPResponse(http.StatusNotFound),
 					}, nil)
@@ -577,7 +579,7 @@ func TestServerGroupResource_Read(t *testing.T) {
 				},
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("GetServerGroupWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), &swaclient.GetServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("GetServerGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.GetServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(&swaclient.GetServerGroupResponse{
 						HTTPResponse: makeHTTPResponse(http.StatusInternalServerError),
 						Body:         []byte(`{"message":"internal error"}`),
@@ -599,7 +601,7 @@ func TestServerGroupResource_Read(t *testing.T) {
 				},
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("GetServerGroupWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), &swaclient.GetServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("GetServerGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.GetServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(nil, fmt.Errorf("network error"))
 			},
 			expectedError: true,
@@ -668,7 +670,7 @@ func TestServerGroupResource_Delete(t *testing.T) {
 				},
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("DeleteServerGroupWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), &swaclient.DeleteServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("DeleteServerGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.DeleteServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(&swaclient.DeleteServerGroupResponse{
 						HTTPResponse: makeHTTPResponse(http.StatusNoContent),
 					}, nil)
@@ -686,7 +688,7 @@ func TestServerGroupResource_Delete(t *testing.T) {
 				},
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("DeleteServerGroupWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), &swaclient.DeleteServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("DeleteServerGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.DeleteServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(&swaclient.DeleteServerGroupResponse{
 						HTTPResponse: makeHTTPResponse(http.StatusNotFound),
 					}, nil)
@@ -704,7 +706,7 @@ func TestServerGroupResource_Delete(t *testing.T) {
 				},
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("DeleteServerGroupWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), &swaclient.DeleteServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("DeleteServerGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.DeleteServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(nil, fmt.Errorf("connection refused"))
 			},
 			expectedError: true,
@@ -721,7 +723,7 @@ func TestServerGroupResource_Delete(t *testing.T) {
 				},
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("DeleteServerGroupWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), &swaclient.DeleteServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("DeleteServerGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.DeleteServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(&swaclient.DeleteServerGroupResponse{
 						HTTPResponse: makeHTTPResponse(http.StatusInternalServerError),
 						Body:         []byte(`{"message":"internal error"}`),
@@ -797,7 +799,7 @@ func TestServerGroupResource_Update(t *testing.T) {
 				sg := makeServerGroupResponse("prod-servers", "prod.example.org")
 				desc := "updated description"
 				sg.Description = &desc
-				m.On("PatchServerGroupWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), &swaclient.PatchServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchServerGroupJSONRequestBody{
+				m.On("PatchServerGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.PatchServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchServerGroupJSONRequestBody{
 					Description: &desc,
 					NodeAttestation: &struct {
 						K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
@@ -833,7 +835,7 @@ func TestServerGroupResource_Update(t *testing.T) {
 				},
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("PatchServerGroupWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), &swaclient.PatchServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchServerGroupJSONRequestBody{
+				m.On("PatchServerGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.PatchServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchServerGroupJSONRequestBody{
 					NodeAttestation: &struct {
 						K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
 						X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
@@ -887,7 +889,7 @@ func TestServerGroupResource_Update(t *testing.T) {
 				},
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("PatchServerGroupWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), &swaclient.PatchServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchServerGroupJSONRequestBody{
+				m.On("PatchServerGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.PatchServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchServerGroupJSONRequestBody{
 					NodeAttestation: &struct {
 						K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
 						X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
@@ -1023,4 +1025,353 @@ func getServerGroupTestSchema() schema.Schema {
 	var schemaResp resource.SchemaResponse
 	r.Schema(context.Background(), resource.SchemaRequest{}, &schemaResp)
 	return schemaResp.Schema
+}
+
+// --- Schema plan modifier tests ---
+
+func TestServerGroupResource_Schema_RequiresReplace(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	r := &ServerGroupResource{}
+	var schemaResp resource.SchemaResponse
+	r.Schema(ctx, resource.SchemaRequest{}, &schemaResp)
+
+	tests := []struct {
+		attrPath      string
+		shouldReplace bool
+	}{
+		{"name", true},
+		{"trust_domain_name", true},
+		{"id", false},
+		{"description", false},
+		{"node_attestation", false},
+	}
+
+	const requiresReplaceDesc = "If the value of this attribute changes, Terraform will destroy and recreate the resource."
+
+	for _, tc := range tests {
+		t.Run(tc.attrPath, func(t *testing.T) {
+			t.Parallel()
+			attr := schemaResp.Schema.Attributes[tc.attrPath]
+			assert.NotNil(t, attr, "attribute %q not found in schema", tc.attrPath)
+
+			hasRequiresReplace := false
+			switch a := attr.(type) {
+			case schema.StringAttribute:
+				for _, pm := range a.PlanModifiers {
+					if pm.Description(ctx) == requiresReplaceDesc {
+						hasRequiresReplace = true
+					}
+				}
+			case schema.SingleNestedAttribute:
+				for _, pm := range a.PlanModifiers {
+					if pm.Description(ctx) == requiresReplaceDesc {
+						hasRequiresReplace = true
+					}
+				}
+			}
+
+			if tc.shouldReplace {
+				assert.True(t, hasRequiresReplace, "attribute %q should have RequiresReplace", tc.attrPath)
+			} else {
+				assert.False(t, hasRequiresReplace, "attribute %q should NOT have RequiresReplace", tc.attrPath)
+			}
+		})
+	}
+}
+
+// --- Lifecycle tests (mock-client acceptance style) ---
+
+func TestServerGroupResource_CreateAndDelete(t *testing.T) {
+	t.Parallel()
+
+	mockClient := swamocks.NewMockClientWithResponsesInterface(t)
+
+	cert := "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"
+
+	mockClient.EXPECT().
+		PostServerGroupWithResponse(mock.Anything, "test-td", mock.Anything, mock.Anything).
+		Return(&swaclient.PostServerGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusCreated),
+			ApplicationxSecretsmgrV2JSON201: &swaclient.ServerGroupResponse{
+				Name:            "test-sg",
+				TrustDomainName: "test-td",
+				NodeAttestation: &struct {
+					K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
+					X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
+				}{
+					X509pop: &swaclient.X509PopConfigurationInput{CaCertificates: cert},
+				},
+			},
+		}, nil).Times(1)
+
+	mockClient.EXPECT().
+		GetServerGroupWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything).
+		Return(&swaclient.GetServerGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: &swaclient.ServerGroupResponse{
+				Name:            "test-sg",
+				TrustDomainName: "test-td",
+				NodeAttestation: &struct {
+					K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
+					X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
+				}{
+					X509pop: &swaclient.X509PopConfigurationInput{CaCertificates: cert},
+				},
+			},
+		}, nil).Maybe()
+
+	mockClient.EXPECT().
+		DeleteServerGroupWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything).
+		Return(&swaclient.DeleteServerGroupResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
+
+	tfresource.Test(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
+		Steps: []tfresource.TestStep{
+			{
+				Config: `
+resource "conjur_swa_server_group" "test" {
+  name              = "test-sg"
+  trust_domain_name = "test-td"
+  node_attestation = {
+    x509pop = {
+      ca_certificates = "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"
+    }
+  }
+}
+`,
+				Check: tfresource.ComposeTestCheckFunc(
+					tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "name", "test-sg"),
+					tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "id", "test-td/test-sg"),
+					tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "trust_domain_name", "test-td"),
+				),
+			},
+		},
+	})
+}
+
+func TestServerGroupResource_NameChange_RequiresReplace(t *testing.T) {
+	t.Parallel()
+
+	mockClient := swamocks.NewMockClientWithResponsesInterface(t)
+
+	cert := "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"
+	nodeAtt := &struct {
+		K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
+		X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
+	}{
+		X509pop: &swaclient.X509PopConfigurationInput{CaCertificates: cert},
+	}
+
+	mockClient.EXPECT().
+		PostServerGroupWithResponse(mock.Anything, "test-td", mock.Anything,
+			mock.MatchedBy(func(body swaclient.PostServerGroupJSONRequestBody) bool { return body.Name == "sg-one" })).
+		Return(&swaclient.PostServerGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusCreated),
+			ApplicationxSecretsmgrV2JSON201: &swaclient.ServerGroupResponse{
+				Name: "sg-one", TrustDomainName: "test-td", NodeAttestation: nodeAtt,
+			},
+		}, nil).Times(1)
+
+	mockClient.EXPECT().
+		PostServerGroupWithResponse(mock.Anything, "test-td", mock.Anything,
+			mock.MatchedBy(func(body swaclient.PostServerGroupJSONRequestBody) bool { return body.Name == "sg-two" })).
+		Return(&swaclient.PostServerGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusCreated),
+			ApplicationxSecretsmgrV2JSON201: &swaclient.ServerGroupResponse{
+				Name: "sg-two", TrustDomainName: "test-td", NodeAttestation: nodeAtt,
+			},
+		}, nil).Times(1)
+
+	mockClient.EXPECT().
+		GetServerGroupWithResponse(mock.Anything, "test-td", "sg-one", mock.Anything).
+		Return(&swaclient.GetServerGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: &swaclient.ServerGroupResponse{
+				Name: "sg-one", TrustDomainName: "test-td", NodeAttestation: nodeAtt,
+			},
+		}, nil).Maybe()
+
+	mockClient.EXPECT().
+		GetServerGroupWithResponse(mock.Anything, "test-td", "sg-two", mock.Anything).
+		Return(&swaclient.GetServerGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: &swaclient.ServerGroupResponse{
+				Name: "sg-two", TrustDomainName: "test-td", NodeAttestation: nodeAtt,
+			},
+		}, nil).Maybe()
+
+	mockClient.EXPECT().
+		DeleteServerGroupWithResponse(mock.Anything, "test-td", "sg-one", mock.Anything).
+		Return(&swaclient.DeleteServerGroupResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
+
+	mockClient.EXPECT().
+		DeleteServerGroupWithResponse(mock.Anything, "test-td", "sg-two", mock.Anything).
+		Return(&swaclient.DeleteServerGroupResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
+
+	tfresource.Test(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
+		Steps: []tfresource.TestStep{
+			{
+				Config: `
+resource "conjur_swa_server_group" "test" {
+  name              = "sg-one"
+  trust_domain_name = "test-td"
+  node_attestation = {
+    x509pop = {
+      ca_certificates = "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"
+    }
+  }
+}
+`,
+				Check: tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "name", "sg-one"),
+			},
+			{
+				Config: `
+resource "conjur_swa_server_group" "test" {
+  name              = "sg-two"
+  trust_domain_name = "test-td"
+  node_attestation = {
+    x509pop = {
+      ca_certificates = "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"
+    }
+  }
+}
+`,
+				Check: tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "name", "sg-two"),
+			},
+		},
+	})
+}
+
+func TestServerGroupResource_RemoveX509PopKeepK8sPsat(t *testing.T) {
+	t.Parallel()
+
+	mockClient := swamocks.NewMockClientWithResponsesInterface(t)
+
+	saList := []string{"ns:sa"}
+	audience := []string{"swa-server"}
+	cert := "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"
+
+	bothNodeAtt := &struct {
+		K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
+		X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
+	}{
+		X509pop: &swaclient.X509PopConfigurationInput{CaCertificates: cert},
+		K8sPsat: &swaclient.K8sPsatConfigurationInput{
+			Clusters: &map[string]swaclient.K8sPsatCluster{
+				"cluster-1": {ServiceAccountAllowList: &saList, Audience: &audience},
+			},
+		},
+	}
+	k8sOnlyNodeAtt := &struct {
+		K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
+		X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
+	}{
+		K8sPsat: &swaclient.K8sPsatConfigurationInput{
+			Clusters: &map[string]swaclient.K8sPsatCluster{
+				"cluster-1": {ServiceAccountAllowList: &saList, Audience: &audience},
+			},
+		},
+	}
+
+	mockClient.EXPECT().
+		PostServerGroupWithResponse(mock.Anything, "test-td", mock.Anything, mock.Anything).
+		Return(&swaclient.PostServerGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusCreated),
+			ApplicationxSecretsmgrV2JSON201: &swaclient.ServerGroupResponse{
+				Name: "test-sg", TrustDomainName: "test-td", NodeAttestation: bothNodeAtt,
+			},
+		}, nil).Times(1)
+
+	// Two reads: post-apply step-1 refresh + pre-plan step-2 refresh.
+	mockClient.EXPECT().
+		GetServerGroupWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything).
+		Return(&swaclient.GetServerGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: &swaclient.ServerGroupResponse{
+				Name: "test-sg", TrustDomainName: "test-td", NodeAttestation: bothNodeAtt,
+			},
+		}, nil).Times(2)
+
+	mockClient.EXPECT().
+		PatchServerGroupWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything,
+			mock.MatchedBy(func(body swaclient.PatchServerGroupJSONRequestBody) bool {
+				return body.NodeAttestation != nil &&
+					body.NodeAttestation.X509pop == nil &&
+					body.NodeAttestation.K8sPsat != nil
+			})).
+		Return(&swaclient.PatchServerGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: &swaclient.ServerGroupResponse{
+				Name: "test-sg", TrustDomainName: "test-td", NodeAttestation: k8sOnlyNodeAtt,
+			},
+		}, nil).Times(1)
+
+	mockClient.EXPECT().
+		GetServerGroupWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything).
+		Return(&swaclient.GetServerGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: &swaclient.ServerGroupResponse{
+				Name: "test-sg", TrustDomainName: "test-td", NodeAttestation: k8sOnlyNodeAtt,
+			},
+		}, nil).Maybe()
+
+	mockClient.EXPECT().
+		DeleteServerGroupWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything).
+		Return(&swaclient.DeleteServerGroupResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
+
+	tfresource.Test(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
+		Steps: []tfresource.TestStep{
+			{
+				Config: `
+resource "conjur_swa_server_group" "test" {
+  name              = "test-sg"
+  trust_domain_name = "test-td"
+  node_attestation = {
+    x509pop = {
+      ca_certificates = "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"
+    }
+    k8s_psat = {
+      clusters = {
+        "cluster-1" = {
+          service_account_allow_list = ["ns:sa"]
+          audience                   = ["swa-server"]
+        }
+      }
+    }
+  }
+}
+`,
+				Check: tfresource.ComposeTestCheckFunc(
+					tfresource.TestCheckResourceAttrSet("conjur_swa_server_group.test", "node_attestation.x509pop.ca_certificates"),
+					tfresource.TestCheckResourceAttrSet("conjur_swa_server_group.test", "node_attestation.k8s_psat.clusters.cluster-1.service_account_allow_list.0"),
+				),
+			},
+			{
+				Config: `
+resource "conjur_swa_server_group" "test" {
+  name              = "test-sg"
+  trust_domain_name = "test-td"
+  node_attestation = {
+    k8s_psat = {
+      clusters = {
+        "cluster-1" = {
+          service_account_allow_list = ["ns:sa"]
+          audience                   = ["swa-server"]
+        }
+      }
+    }
+  }
+}
+`,
+				Check: tfresource.ComposeTestCheckFunc(
+					tfresource.TestCheckNoResourceAttr("conjur_swa_server_group.test", "node_attestation.x509pop.ca_certificates"),
+					tfresource.TestCheckResourceAttrSet("conjur_swa_server_group.test", "node_attestation.k8s_psat.clusters.cluster-1.service_account_allow_list.0"),
+				),
+			},
+		},
+	})
 }

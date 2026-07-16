@@ -14,7 +14,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	tfresource "github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -283,7 +285,7 @@ func TestTrustDomainResource_Read(t *testing.T) {
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				td := makeTrustDomainResponse()
-				m.On("GetTrustDomainWithResponse", ctx, swaclient.TrustDomainName("prod.example.org"), &swaclient.GetTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("GetTrustDomainWithResponse", ctx, "prod.example.org", &swaclient.GetTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(&swaclient.GetTrustDomainResponse{
 						HTTPResponse:                    makeHTTPResponse(http.StatusOK),
 						ApplicationxSecretsmgrV2JSON200: td,
@@ -302,7 +304,7 @@ func TestTrustDomainResource_Read(t *testing.T) {
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				td := makeTrustDomainResponse() // RS512, RSA_4096, 86400, 300
-				m.On("GetTrustDomainWithResponse", ctx, swaclient.TrustDomainName("prod.example.org"), &swaclient.GetTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("GetTrustDomainWithResponse", ctx, "prod.example.org", &swaclient.GetTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(&swaclient.GetTrustDomainResponse{
 						HTTPResponse:                    makeHTTPResponse(http.StatusOK),
 						ApplicationxSecretsmgrV2JSON200: td,
@@ -320,7 +322,7 @@ func TestTrustDomainResource_Read(t *testing.T) {
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				td := makeTrustDomainResponse() // WorkloadTtl: 3600
-				m.On("GetTrustDomainWithResponse", ctx, swaclient.TrustDomainName("prod.example.org"), &swaclient.GetTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("GetTrustDomainWithResponse", ctx, "prod.example.org", &swaclient.GetTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(&swaclient.GetTrustDomainResponse{
 						HTTPResponse:                    makeHTTPResponse(http.StatusOK),
 						ApplicationxSecretsmgrV2JSON200: td,
@@ -336,7 +338,7 @@ func TestTrustDomainResource_Read(t *testing.T) {
 				X509: nullX509Object,
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("GetTrustDomainWithResponse", ctx, swaclient.TrustDomainName("missing.example.org"), &swaclient.GetTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("GetTrustDomainWithResponse", ctx, "missing.example.org", &swaclient.GetTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(&swaclient.GetTrustDomainResponse{
 						HTTPResponse: makeHTTPResponse(http.StatusNotFound),
 					}, nil)
@@ -353,7 +355,7 @@ func TestTrustDomainResource_Read(t *testing.T) {
 				X509: nullX509Object,
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("GetTrustDomainWithResponse", ctx, swaclient.TrustDomainName("prod.example.org"), &swaclient.GetTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("GetTrustDomainWithResponse", ctx, "prod.example.org", &swaclient.GetTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(nil, fmt.Errorf("network error"))
 			},
 			expectedError: true,
@@ -368,7 +370,7 @@ func TestTrustDomainResource_Read(t *testing.T) {
 				X509: nullX509Object,
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("GetTrustDomainWithResponse", ctx, swaclient.TrustDomainName("prod.example.org"), &swaclient.GetTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("GetTrustDomainWithResponse", ctx, "prod.example.org", &swaclient.GetTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(&swaclient.GetTrustDomainResponse{
 						HTTPResponse: makeHTTPResponse(http.StatusInternalServerError),
 						Body:         []byte(`{"message":"internal error"}`),
@@ -464,7 +466,7 @@ func TestTrustDomainResource_Update(t *testing.T) {
 				keyType := swaclient.UpdateJWTConfigurationInputSigningKeyType("RSA_4096")
 				signingKeyTTL := int32(86400)
 				tokenTTL := int32(600)
-				m.On("PatchTrustDomainWithResponse", ctx, swaclient.TrustDomainName("prod.example.org"), &swaclient.PatchTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchTrustDomainJSONRequestBody{
+				m.On("PatchTrustDomainWithResponse", ctx, "prod.example.org", &swaclient.PatchTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchTrustDomainJSONRequestBody{
 					Jwt: &swaclient.UpdateJWTConfigurationInput{
 						SignatureAlgorithm: &sigAlg,
 						SigningKeyType:     &keyType,
@@ -494,7 +496,7 @@ func TestTrustDomainResource_Update(t *testing.T) {
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				td := makeTrustDomainResponse()
-				m.On("PatchTrustDomainWithResponse", ctx, swaclient.TrustDomainName("prod.example.org"), &swaclient.PatchTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchTrustDomainJSONRequestBody{
+				m.On("PatchTrustDomainWithResponse", ctx, "prod.example.org", &swaclient.PatchTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchTrustDomainJSONRequestBody{
 					X509: &swaclient.UpdateX509ConfigurationInput{WorkloadTtl: 7200},
 				}).Return(&swaclient.PatchTrustDomainResponse{
 					HTTPResponse:                    makeHTTPResponse(http.StatusOK),
@@ -540,7 +542,7 @@ func TestTrustDomainResource_Update(t *testing.T) {
 				keyType := swaclient.UpdateJWTConfigurationInputSigningKeyType("RSA_4096")
 				signingKeyTTL := int32(86400)
 				tokenTTL := int32(300)
-				m.On("PatchTrustDomainWithResponse", ctx, swaclient.TrustDomainName("prod.example.org"), &swaclient.PatchTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchTrustDomainJSONRequestBody{
+				m.On("PatchTrustDomainWithResponse", ctx, "prod.example.org", &swaclient.PatchTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchTrustDomainJSONRequestBody{
 					Jwt: &swaclient.UpdateJWTConfigurationInput{
 						SignatureAlgorithm: &sigAlg,
 						SigningKeyType:     &keyType,
@@ -571,7 +573,7 @@ func TestTrustDomainResource_Update(t *testing.T) {
 				keyType := swaclient.UpdateJWTConfigurationInputSigningKeyType("RSA_4096")
 				signingKeyTTL := int32(86400)
 				tokenTTL := int32(300)
-				m.On("PatchTrustDomainWithResponse", ctx, swaclient.TrustDomainName("prod.example.org"), &swaclient.PatchTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchTrustDomainJSONRequestBody{
+				m.On("PatchTrustDomainWithResponse", ctx, "prod.example.org", &swaclient.PatchTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchTrustDomainJSONRequestBody{
 					Jwt: &swaclient.UpdateJWTConfigurationInput{
 						SignatureAlgorithm: &sigAlg,
 						SigningKeyType:     &keyType,
@@ -642,7 +644,7 @@ func TestTrustDomainResource_Delete(t *testing.T) {
 				X509: nullX509Object,
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("DeleteTrustDomainWithResponse", ctx, swaclient.TrustDomainName("prod.example.org"), &swaclient.DeleteTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("DeleteTrustDomainWithResponse", ctx, "prod.example.org", &swaclient.DeleteTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(&swaclient.DeleteTrustDomainResponse{
 						HTTPResponse: makeHTTPResponse(http.StatusNoContent),
 					}, nil)
@@ -658,7 +660,7 @@ func TestTrustDomainResource_Delete(t *testing.T) {
 				X509: nullX509Object,
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("DeleteTrustDomainWithResponse", ctx, swaclient.TrustDomainName("prod.example.org"), &swaclient.DeleteTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("DeleteTrustDomainWithResponse", ctx, "prod.example.org", &swaclient.DeleteTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(&swaclient.DeleteTrustDomainResponse{
 						HTTPResponse: makeHTTPResponse(http.StatusNotFound),
 					}, nil)
@@ -674,7 +676,7 @@ func TestTrustDomainResource_Delete(t *testing.T) {
 				X509: nullX509Object,
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("DeleteTrustDomainWithResponse", ctx, swaclient.TrustDomainName("prod.example.org"), &swaclient.DeleteTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("DeleteTrustDomainWithResponse", ctx, "prod.example.org", &swaclient.DeleteTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(nil, fmt.Errorf("connection refused"))
 			},
 			expectedError: true,
@@ -689,7 +691,7 @@ func TestTrustDomainResource_Delete(t *testing.T) {
 				X509: nullX509Object,
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("DeleteTrustDomainWithResponse", ctx, swaclient.TrustDomainName("prod.example.org"), &swaclient.DeleteTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("DeleteTrustDomainWithResponse", ctx, "prod.example.org", &swaclient.DeleteTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(&swaclient.DeleteTrustDomainResponse{
 						HTTPResponse: makeHTTPResponse(http.StatusInternalServerError),
 						Body:         []byte(`{"message":"internal error"}`),
@@ -845,4 +847,280 @@ func TestTrustDomainResource_NilClientWarning(t *testing.T) {
 	r.Delete(ctx, deleteReq, deleteResp)
 	assert.False(t, deleteResp.Diagnostics.HasError())
 	assertWarningContains(t, deleteResp.Diagnostics, "Provider client not configured")
+}
+
+// --- Schema plan modifier tests ---
+
+func TestTrustDomainResource_Schema_RequiresReplace(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	r := &TrustDomainResource{}
+	var schemaResp resource.SchemaResponse
+	r.Schema(ctx, resource.SchemaRequest{}, &schemaResp)
+
+	tests := []struct {
+		attrPath      string
+		shouldReplace bool
+	}{
+		{"name", true},
+		{"id", false},
+		{"jwt", false},
+		{"x509", false},
+	}
+
+	const requiresReplaceDesc = "If the value of this attribute changes, Terraform will destroy and recreate the resource."
+
+	for _, tc := range tests {
+		t.Run(tc.attrPath, func(t *testing.T) {
+			t.Parallel()
+			attr := schemaResp.Schema.Attributes[tc.attrPath]
+			assert.NotNil(t, attr, "attribute %q not found in schema", tc.attrPath)
+
+			hasRequiresReplace := false
+			switch a := attr.(type) {
+			case schema.StringAttribute:
+				for _, pm := range a.PlanModifiers {
+					if pm.Description(ctx) == requiresReplaceDesc {
+						hasRequiresReplace = true
+					}
+				}
+			case schema.SingleNestedAttribute:
+				for _, pm := range a.PlanModifiers {
+					if pm.Description(ctx) == requiresReplaceDesc {
+						hasRequiresReplace = true
+					}
+				}
+			}
+
+			if tc.shouldReplace {
+				assert.True(t, hasRequiresReplace, "attribute %q should have RequiresReplace", tc.attrPath)
+			} else {
+				assert.False(t, hasRequiresReplace, "attribute %q should NOT have RequiresReplace", tc.attrPath)
+			}
+		})
+	}
+}
+
+// --- Lifecycle tests (mock-client acceptance style) ---
+
+func TestTrustDomainResource_CreateAndDelete(t *testing.T) {
+	t.Parallel()
+
+	mockClient := swamocks.NewMockClientWithResponsesInterface(t)
+	now := time.Now()
+
+	tdResp := &swaclient.TrustDomainResponse{
+		Name: "test-td", CreatedAt: now, UpdatedAt: now,
+		Jwt:  swaclient.JWTConfiguration{SignatureAlgorithm: "RS512", SigningKeyType: "RSA_4096", SigningKeyTtl: 86400, TokenTtl: 300},
+		X509: swaclient.X509Configuration{WorkloadTtl: 3600},
+	}
+
+	mockClient.EXPECT().
+		PostTrustDomainWithResponse(mock.Anything, mock.Anything, mock.Anything).
+		Return(&swaclient.PostTrustDomainResponse{
+			HTTPResponse:                    makeHTTPResponse(http.StatusCreated),
+			ApplicationxSecretsmgrV2JSON201: tdResp,
+		}, nil).Times(1)
+
+	mockClient.EXPECT().
+		GetTrustDomainWithResponse(mock.Anything, "test-td", mock.Anything).
+		Return(&swaclient.GetTrustDomainResponse{
+			HTTPResponse:                    makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: tdResp,
+		}, nil).Maybe()
+
+	mockClient.EXPECT().
+		DeleteTrustDomainWithResponse(mock.Anything, "test-td", mock.Anything).
+		Return(&swaclient.DeleteTrustDomainResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
+
+	tfresource.Test(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
+		Steps: []tfresource.TestStep{
+			{
+				Config: `
+resource "conjur_swa_trust_domain" "test" {
+  name = "test-td"
+  jwt  = {}
+}
+`,
+				Check: tfresource.ComposeTestCheckFunc(
+					tfresource.TestCheckResourceAttr("conjur_swa_trust_domain.test", "name", "test-td"),
+					tfresource.TestCheckResourceAttr("conjur_swa_trust_domain.test", "id", "test-td"),
+				),
+			},
+		},
+	})
+}
+
+func TestTrustDomainResource_NameChange_RequiresReplace(t *testing.T) {
+	t.Parallel()
+
+	mockClient := swamocks.NewMockClientWithResponsesInterface(t)
+	now := time.Now()
+
+	mockClient.EXPECT().
+		PostTrustDomainWithResponse(mock.Anything, mock.Anything,
+			mock.MatchedBy(func(body swaclient.PostTrustDomainJSONRequestBody) bool { return body.Name == "td-one" })).
+		Return(&swaclient.PostTrustDomainResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusCreated),
+			ApplicationxSecretsmgrV2JSON201: &swaclient.TrustDomainResponse{
+				Name: "td-one", CreatedAt: now, UpdatedAt: now,
+				Jwt:  swaclient.JWTConfiguration{SignatureAlgorithm: "RS512", SigningKeyType: "RSA_4096", SigningKeyTtl: 86400, TokenTtl: 300},
+				X509: swaclient.X509Configuration{WorkloadTtl: 3600},
+			},
+		}, nil).Times(1)
+
+	mockClient.EXPECT().
+		PostTrustDomainWithResponse(mock.Anything, mock.Anything,
+			mock.MatchedBy(func(body swaclient.PostTrustDomainJSONRequestBody) bool { return body.Name == "td-two" })).
+		Return(&swaclient.PostTrustDomainResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusCreated),
+			ApplicationxSecretsmgrV2JSON201: &swaclient.TrustDomainResponse{
+				Name: "td-two", CreatedAt: now, UpdatedAt: now,
+				Jwt:  swaclient.JWTConfiguration{SignatureAlgorithm: "RS512", SigningKeyType: "RSA_4096", SigningKeyTtl: 86400, TokenTtl: 300},
+				X509: swaclient.X509Configuration{WorkloadTtl: 3600},
+			},
+		}, nil).Times(1)
+
+	mockClient.EXPECT().
+		GetTrustDomainWithResponse(mock.Anything, "td-one", mock.Anything).
+		Return(&swaclient.GetTrustDomainResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: &swaclient.TrustDomainResponse{
+				Name: "td-one", CreatedAt: now, UpdatedAt: now,
+				Jwt:  swaclient.JWTConfiguration{SignatureAlgorithm: "RS512", SigningKeyType: "RSA_4096", SigningKeyTtl: 86400, TokenTtl: 300},
+				X509: swaclient.X509Configuration{WorkloadTtl: 3600},
+			},
+		}, nil).Maybe()
+
+	mockClient.EXPECT().
+		GetTrustDomainWithResponse(mock.Anything, "td-two", mock.Anything).
+		Return(&swaclient.GetTrustDomainResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: &swaclient.TrustDomainResponse{
+				Name: "td-two", CreatedAt: now, UpdatedAt: now,
+				Jwt:  swaclient.JWTConfiguration{SignatureAlgorithm: "RS512", SigningKeyType: "RSA_4096", SigningKeyTtl: 86400, TokenTtl: 300},
+				X509: swaclient.X509Configuration{WorkloadTtl: 3600},
+			},
+		}, nil).Maybe()
+
+	mockClient.EXPECT().
+		DeleteTrustDomainWithResponse(mock.Anything, "td-one", mock.Anything).
+		Return(&swaclient.DeleteTrustDomainResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
+
+	mockClient.EXPECT().
+		DeleteTrustDomainWithResponse(mock.Anything, "td-two", mock.Anything).
+		Return(&swaclient.DeleteTrustDomainResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
+
+	tfresource.Test(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
+		Steps: []tfresource.TestStep{
+			{
+				Config: `
+resource "conjur_swa_trust_domain" "test" {
+  name = "td-one"
+  jwt  = {}
+}
+`,
+				Check: tfresource.TestCheckResourceAttr("conjur_swa_trust_domain.test", "name", "td-one"),
+			},
+			{
+				Config: `
+resource "conjur_swa_trust_domain" "test" {
+  name = "td-two"
+  jwt  = {}
+}
+`,
+				Check: tfresource.TestCheckResourceAttr("conjur_swa_trust_domain.test", "name", "td-two"),
+			},
+		},
+	})
+}
+
+func TestTrustDomainResource_JWTUpdate_InPlace(t *testing.T) {
+	t.Parallel()
+
+	mockClient := swamocks.NewMockClientWithResponsesInterface(t)
+	now := time.Now()
+
+	mockClient.EXPECT().
+		PostTrustDomainWithResponse(mock.Anything, mock.Anything, mock.Anything).
+		Return(&swaclient.PostTrustDomainResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusCreated),
+			ApplicationxSecretsmgrV2JSON201: &swaclient.TrustDomainResponse{
+				Name: "test-td", CreatedAt: now, UpdatedAt: now,
+				Jwt:  swaclient.JWTConfiguration{SignatureAlgorithm: "RS512", SigningKeyType: "RSA_4096", SigningKeyTtl: 86400, TokenTtl: 300},
+				X509: swaclient.X509Configuration{WorkloadTtl: 3600},
+			},
+		}, nil).Times(1)
+
+	// Two reads: post-apply step-1 refresh + pre-plan step-2 refresh.
+	mockClient.EXPECT().
+		GetTrustDomainWithResponse(mock.Anything, "test-td", mock.Anything).
+		Return(&swaclient.GetTrustDomainResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: &swaclient.TrustDomainResponse{
+				Name: "test-td", CreatedAt: now, UpdatedAt: now,
+				Jwt:  swaclient.JWTConfiguration{SignatureAlgorithm: "RS512", SigningKeyType: "RSA_4096", SigningKeyTtl: 86400, TokenTtl: 300},
+				X509: swaclient.X509Configuration{WorkloadTtl: 3600},
+			},
+		}, nil).Times(2)
+
+	mockClient.EXPECT().
+		PatchTrustDomainWithResponse(mock.Anything, "test-td", mock.Anything, mock.Anything).
+		Return(&swaclient.PatchTrustDomainResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: &swaclient.TrustDomainResponse{
+				Name: "test-td", CreatedAt: now, UpdatedAt: now,
+				Jwt:  swaclient.JWTConfiguration{SignatureAlgorithm: "ES256", SigningKeyType: "EC_P256", SigningKeyTtl: 86400, TokenTtl: 600},
+				X509: swaclient.X509Configuration{WorkloadTtl: 3600},
+			},
+		}, nil).Times(1)
+
+	mockClient.EXPECT().
+		GetTrustDomainWithResponse(mock.Anything, "test-td", mock.Anything).
+		Return(&swaclient.GetTrustDomainResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: &swaclient.TrustDomainResponse{
+				Name: "test-td", CreatedAt: now, UpdatedAt: now,
+				Jwt:  swaclient.JWTConfiguration{SignatureAlgorithm: "ES256", SigningKeyType: "EC_P256", SigningKeyTtl: 86400, TokenTtl: 600},
+				X509: swaclient.X509Configuration{WorkloadTtl: 3600},
+			},
+		}, nil).Maybe()
+
+	mockClient.EXPECT().
+		DeleteTrustDomainWithResponse(mock.Anything, "test-td", mock.Anything).
+		Return(&swaclient.DeleteTrustDomainResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
+
+	tfresource.Test(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
+		Steps: []tfresource.TestStep{
+			{
+				Config: `
+resource "conjur_swa_trust_domain" "test" {
+  name = "test-td"
+  jwt  = {}
+}
+`,
+				Check: tfresource.TestCheckResourceAttr("conjur_swa_trust_domain.test", "name", "test-td"),
+			},
+			{
+				Config: `
+resource "conjur_swa_trust_domain" "test" {
+  name = "test-td"
+  jwt = {
+    signature_algorithm = "ES256"
+    signing_key_type    = "EC_P256"
+    token_ttl           = 600
+  }
+}
+`,
+				Check: tfresource.ComposeTestCheckFunc(
+					tfresource.TestCheckResourceAttr("conjur_swa_trust_domain.test", "jwt.signature_algorithm", "ES256"),
+					tfresource.TestCheckResourceAttr("conjur_swa_trust_domain.test", "jwt.token_ttl", "600"),
+				),
+			},
+		},
+	})
 }
