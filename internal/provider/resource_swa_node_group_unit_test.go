@@ -12,7 +12,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	tfresource "github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -45,9 +47,9 @@ func TestNodeGroupResource_Create(t *testing.T) {
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				ng := makeNodeGroupResponse("prod-nodes")
-				m.On("PostNodeGroupsWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), &swaclient.PostNodeGroupsParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PostNodeGroupsJSONRequestBody{
+				m.On("PostNodeGroupsWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.PostNodeGroupsParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PostNodeGroupsJSONRequestBody{
 					Name:         "prod-nodes",
-					WorkloadType: swaclient.NodeGroupCreateRequestWorkloadType("unix"),
+					WorkloadType: "unix",
 				}).Return(&swaclient.PostNodeGroupsResponse{
 					HTTPResponse:                    makeHTTPResponse(http.StatusCreated),
 					ApplicationxSecretsmgrV2JSON201: ng,
@@ -72,9 +74,9 @@ func TestNodeGroupResource_Create(t *testing.T) {
 				ng := makeNodeGroupResponse("k8s-nodes")
 				ng.WorkloadType = "kubernetes"
 				tmpl := "spiffe://{{ .trustdomain }}/{{ .nodegroup }}/{{ .k8s.ns }}/{{ .k8s.sa }}"
-				m.On("PostNodeGroupsWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("k8s-servers"), &swaclient.PostNodeGroupsParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PostNodeGroupsJSONRequestBody{
+				m.On("PostNodeGroupsWithResponse", context.Background(), "prod.example.org", "k8s-servers", &swaclient.PostNodeGroupsParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PostNodeGroupsJSONRequestBody{
 					Name:         "k8s-nodes",
-					WorkloadType: swaclient.NodeGroupCreateRequestWorkloadType("kubernetes"),
+					WorkloadType: "kubernetes",
 					WorkloadConfiguration: &swaclient.WorkloadConfiguration{
 						SpiffeIdTemplate: &tmpl,
 					},
@@ -95,9 +97,9 @@ func TestNodeGroupResource_Create(t *testing.T) {
 				Description:     types.StringNull(),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("PostNodeGroupsWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), &swaclient.PostNodeGroupsParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PostNodeGroupsJSONRequestBody{
+				m.On("PostNodeGroupsWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.PostNodeGroupsParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PostNodeGroupsJSONRequestBody{
 					Name:         "prod-nodes",
-					WorkloadType: swaclient.NodeGroupCreateRequestWorkloadType("unix"),
+					WorkloadType: "unix",
 				}).Return(nil, fmt.Errorf("connection refused"))
 			},
 			expectedError: true,
@@ -113,9 +115,9 @@ func TestNodeGroupResource_Create(t *testing.T) {
 				Description:     types.StringNull(),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("PostNodeGroupsWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), &swaclient.PostNodeGroupsParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PostNodeGroupsJSONRequestBody{
+				m.On("PostNodeGroupsWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.PostNodeGroupsParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PostNodeGroupsJSONRequestBody{
 					Name:         "prod-nodes",
-					WorkloadType: swaclient.NodeGroupCreateRequestWorkloadType("unix"),
+					WorkloadType: "unix",
 				}).Return(&swaclient.PostNodeGroupsResponse{
 					HTTPResponse: makeHTTPResponse(http.StatusConflict),
 					Body:         []byte(`{"message":"already exists"}`),
@@ -180,7 +182,7 @@ func TestNodeGroupResource_Read(t *testing.T) {
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				ng := makeNodeGroupResponse("prod-nodes")
-				m.On("GetNodeGroupWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), swaclient.NodeGroupName("prod-nodes"), &swaclient.GetNodeGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("GetNodeGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", "prod-nodes", &swaclient.GetNodeGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(&swaclient.GetNodeGroupResponse{
 						HTTPResponse:                    makeHTTPResponse(http.StatusOK),
 						ApplicationxSecretsmgrV2JSON200: ng,
@@ -199,7 +201,7 @@ func TestNodeGroupResource_Read(t *testing.T) {
 				Description:     types.StringNull(),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("GetNodeGroupWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), swaclient.NodeGroupName("missing-nodes"), &swaclient.GetNodeGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("GetNodeGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", "missing-nodes", &swaclient.GetNodeGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(&swaclient.GetNodeGroupResponse{
 						HTTPResponse: makeHTTPResponse(http.StatusNotFound),
 					}, nil)
@@ -225,7 +227,7 @@ func TestNodeGroupResource_Read(t *testing.T) {
 				tmpl := "spiffe://{{ .trustdomain }}/{{ .nodegroup }}/{{ .unix.user }}"
 				ng := makeNodeGroupResponse("prod-nodes")
 				ng.WorkloadConfiguration = swaclient.WorkloadConfiguration{SpiffeIdTemplate: &tmpl}
-				m.On("GetNodeGroupWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), swaclient.NodeGroupName("prod-nodes"), &swaclient.GetNodeGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("GetNodeGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", "prod-nodes", &swaclient.GetNodeGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(&swaclient.GetNodeGroupResponse{
 						HTTPResponse:                    makeHTTPResponse(http.StatusOK),
 						ApplicationxSecretsmgrV2JSON200: ng,
@@ -250,7 +252,7 @@ func TestNodeGroupResource_Read(t *testing.T) {
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				ng := makeNodeGroupResponse("prod-nodes")
 				// WorkloadConfiguration is empty (no fields set)
-				m.On("GetNodeGroupWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), swaclient.NodeGroupName("prod-nodes"), &swaclient.GetNodeGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("GetNodeGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", "prod-nodes", &swaclient.GetNodeGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(&swaclient.GetNodeGroupResponse{
 						HTTPResponse:                    makeHTTPResponse(http.StatusOK),
 						ApplicationxSecretsmgrV2JSON200: ng,
@@ -272,7 +274,7 @@ func TestNodeGroupResource_Read(t *testing.T) {
 				Description:     types.StringNull(),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("GetNodeGroupWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), swaclient.NodeGroupName("prod-nodes"), &swaclient.GetNodeGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("GetNodeGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", "prod-nodes", &swaclient.GetNodeGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(nil, fmt.Errorf("network error"))
 			},
 			expectedError: true,
@@ -338,7 +340,7 @@ func TestNodeGroupResource_Delete(t *testing.T) {
 				Description:     types.StringNull(),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("DeleteNodeGroupWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), swaclient.NodeGroupName("prod-nodes"), &swaclient.DeleteNodeGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("DeleteNodeGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", "prod-nodes", &swaclient.DeleteNodeGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(&swaclient.DeleteNodeGroupResponse{
 						HTTPResponse: makeHTTPResponse(http.StatusNoContent),
 					}, nil)
@@ -356,7 +358,7 @@ func TestNodeGroupResource_Delete(t *testing.T) {
 				Description:     types.StringNull(),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("DeleteNodeGroupWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), swaclient.NodeGroupName("prod-nodes"), &swaclient.DeleteNodeGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("DeleteNodeGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", "prod-nodes", &swaclient.DeleteNodeGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(&swaclient.DeleteNodeGroupResponse{
 						HTTPResponse: makeHTTPResponse(http.StatusNotFound),
 					}, nil)
@@ -374,7 +376,7 @@ func TestNodeGroupResource_Delete(t *testing.T) {
 				Description:     types.StringNull(),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("DeleteNodeGroupWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), swaclient.NodeGroupName("prod-nodes"), &swaclient.DeleteNodeGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("DeleteNodeGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", "prod-nodes", &swaclient.DeleteNodeGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(nil, fmt.Errorf("connection refused"))
 			},
 			expectedError: true,
@@ -391,7 +393,7 @@ func TestNodeGroupResource_Delete(t *testing.T) {
 				Description:     types.StringNull(),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("DeleteNodeGroupWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), swaclient.NodeGroupName("prod-nodes"), &swaclient.DeleteNodeGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+				m.On("DeleteNodeGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", "prod-nodes", &swaclient.DeleteNodeGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
 					Return(&swaclient.DeleteNodeGroupResponse{
 						HTTPResponse: makeHTTPResponse(http.StatusInternalServerError),
 						Body:         []byte(`{"message":"internal error"}`),
@@ -465,7 +467,7 @@ func TestNodeGroupResource_Update(t *testing.T) {
 				ng := makeNodeGroupResponse("prod-nodes")
 				desc := "updated"
 				ng.Description = &desc
-				m.On("PatchNodeGroupWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), swaclient.NodeGroupName("prod-nodes"), &swaclient.PatchNodeGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchNodeGroupJSONRequestBody{
+				m.On("PatchNodeGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", "prod-nodes", &swaclient.PatchNodeGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchNodeGroupJSONRequestBody{
 					Description: &desc,
 				}).Return(&swaclient.PatchNodeGroupResponse{
 					HTTPResponse:                    makeHTTPResponse(http.StatusOK),
@@ -500,7 +502,7 @@ func TestNodeGroupResource_Update(t *testing.T) {
 				ng := makeNodeGroupResponse("prod-nodes")
 				tmpl := "spiffe://{{ .trustdomain }}/{{ .nodegroup }}/{{ .unix.user }}"
 				ng.WorkloadConfiguration = swaclient.WorkloadConfiguration{SpiffeIdTemplate: &tmpl}
-				m.On("PatchNodeGroupWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), swaclient.NodeGroupName("prod-nodes"), &swaclient.PatchNodeGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchNodeGroupJSONRequestBody{
+				m.On("PatchNodeGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", "prod-nodes", &swaclient.PatchNodeGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchNodeGroupJSONRequestBody{
 					WorkloadConfiguration: &swaclient.WorkloadConfiguration{SpiffeIdTemplate: &tmpl},
 				}).Return(&swaclient.PatchNodeGroupResponse{
 					HTTPResponse:                    makeHTTPResponse(http.StatusOK),
@@ -536,7 +538,7 @@ func TestNodeGroupResource_Update(t *testing.T) {
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				ng := makeNodeGroupResponse("prod-nodes")
 				// Server returns empty WorkloadConfiguration after reset
-				m.On("PatchNodeGroupWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), swaclient.NodeGroupName("prod-nodes"), &swaclient.PatchNodeGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchNodeGroupJSONRequestBody{
+				m.On("PatchNodeGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", "prod-nodes", &swaclient.PatchNodeGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchNodeGroupJSONRequestBody{
 					// Empty WorkloadConfiguration signals reset to defaults
 					WorkloadConfiguration: &swaclient.WorkloadConfiguration{},
 				}).Return(&swaclient.PatchNodeGroupResponse{
@@ -565,7 +567,7 @@ func TestNodeGroupResource_Update(t *testing.T) {
 				Description:     types.StringNull(),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("PatchNodeGroupWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), swaclient.NodeGroupName("prod-nodes"), &swaclient.PatchNodeGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchNodeGroupJSONRequestBody{}).
+				m.On("PatchNodeGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", "prod-nodes", &swaclient.PatchNodeGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchNodeGroupJSONRequestBody{}).
 					Return(nil, fmt.Errorf("connection refused"))
 			},
 			expectedError: true,
@@ -590,7 +592,7 @@ func TestNodeGroupResource_Update(t *testing.T) {
 				Description:     types.StringNull(),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				m.On("PatchNodeGroupWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), swaclient.NodeGroupName("prod-nodes"), &swaclient.PatchNodeGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchNodeGroupJSONRequestBody{}).
+				m.On("PatchNodeGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", "prod-nodes", &swaclient.PatchNodeGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchNodeGroupJSONRequestBody{}).
 					Return(&swaclient.PatchNodeGroupResponse{
 						HTTPResponse: makeHTTPResponse(http.StatusBadRequest),
 						Body:         []byte(`{"message":"invalid input"}`),
@@ -733,9 +735,9 @@ func TestNodeGroupResource_WorkloadRegistrationPoliciesRoundTrip(t *testing.T) {
 	ng.WorkloadConfiguration = swaclient.WorkloadConfiguration{WorkloadRegistrationPolicies: &policies}
 
 	mockClient := swamocks.NewMockClientWithResponsesInterface(t)
-	mockClient.On("PostNodeGroupsWithResponse", context.Background(), swaclient.TrustDomainName("prod.example.org"), swaclient.ServerGroupName("prod-servers"), &swaclient.PostNodeGroupsParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PostNodeGroupsJSONRequestBody{
+	mockClient.On("PostNodeGroupsWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.PostNodeGroupsParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PostNodeGroupsJSONRequestBody{
 		Name:         "prod-nodes",
-		WorkloadType: swaclient.NodeGroupCreateRequestWorkloadType("unix"),
+		WorkloadType: "unix",
 		WorkloadConfiguration: &swaclient.WorkloadConfiguration{
 			WorkloadRegistrationPolicies: &policies,
 		},
@@ -778,4 +780,421 @@ func getNodeGroupTestSchema() schema.Schema {
 	var schemaResp resource.SchemaResponse
 	r.Schema(context.Background(), resource.SchemaRequest{}, &schemaResp)
 	return schemaResp.Schema
+}
+
+// --- Schema plan modifier tests ---
+
+func TestNodeGroupResource_Schema_RequiresReplace(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	r := &NodeGroupResource{}
+	var schemaResp resource.SchemaResponse
+	r.Schema(ctx, resource.SchemaRequest{}, &schemaResp)
+
+	tests := []struct {
+		attrPath      string
+		shouldReplace bool
+	}{
+		{"name", true},
+		{"trust_domain_name", true},
+		{"server_group_name", true},
+		{"workload_type", true},
+		{"id", false},
+		{"description", false},
+		{"workload_configuration", false},
+	}
+
+	const requiresReplaceDesc = "If the value of this attribute changes, Terraform will destroy and recreate the resource."
+
+	for _, tc := range tests {
+		t.Run(tc.attrPath, func(t *testing.T) {
+			t.Parallel()
+			attr := schemaResp.Schema.Attributes[tc.attrPath]
+			assert.NotNil(t, attr, "attribute %q not found in schema", tc.attrPath)
+
+			hasRequiresReplace := false
+			switch a := attr.(type) {
+			case schema.StringAttribute:
+				for _, pm := range a.PlanModifiers {
+					if pm.Description(ctx) == requiresReplaceDesc {
+						hasRequiresReplace = true
+					}
+				}
+			case schema.SingleNestedAttribute:
+				for _, pm := range a.PlanModifiers {
+					if pm.Description(ctx) == requiresReplaceDesc {
+						hasRequiresReplace = true
+					}
+				}
+			}
+
+			if tc.shouldReplace {
+				assert.True(t, hasRequiresReplace, "attribute %q should have RequiresReplace", tc.attrPath)
+			} else {
+				assert.False(t, hasRequiresReplace, "attribute %q should NOT have RequiresReplace", tc.attrPath)
+			}
+		})
+	}
+}
+
+// --- Lifecycle tests (mock-client acceptance style) ---
+
+func TestNodeGroupResource_CreateAndDelete(t *testing.T) {
+	t.Parallel()
+
+	mockClient := swamocks.NewMockClientWithResponsesInterface(t)
+	now := time.Now()
+
+	mockClient.EXPECT().
+		PostNodeGroupsWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything, mock.Anything).
+		Return(&swaclient.PostNodeGroupsResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusCreated),
+			ApplicationxSecretsmgrV2JSON201: &swaclient.NodeGroupResponse{
+				Name: "test-ng", WorkloadType: "unix", CreatedAt: now, UpdatedAt: now,
+				WorkloadConfiguration: swaclient.WorkloadConfiguration{},
+			},
+		}, nil).Times(1)
+
+	mockClient.EXPECT().
+		GetNodeGroupWithResponse(mock.Anything, "test-td", "test-sg", "test-ng", mock.Anything).
+		Return(&swaclient.GetNodeGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: &swaclient.NodeGroupResponse{
+				Name: "test-ng", WorkloadType: "unix", CreatedAt: now, UpdatedAt: now,
+				WorkloadConfiguration: swaclient.WorkloadConfiguration{},
+			},
+		}, nil).Maybe()
+
+	mockClient.EXPECT().
+		DeleteNodeGroupWithResponse(mock.Anything, "test-td", "test-sg", "test-ng", mock.Anything).
+		Return(&swaclient.DeleteNodeGroupResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
+
+	tfresource.Test(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: swaTestProviderFactories(mockClient),
+		Steps: []tfresource.TestStep{
+			{
+				Config: `
+resource "conjur_swa_node_group" "test" {
+  name              = "test-ng"
+  trust_domain_name = "test-td"
+  server_group_name = "test-sg"
+  workload_type     = "unix"
+}
+`,
+				Check: tfresource.ComposeTestCheckFunc(
+					tfresource.TestCheckResourceAttr("conjur_swa_node_group.test", "name", "test-ng"),
+					tfresource.TestCheckResourceAttr("conjur_swa_node_group.test", "id", "test-td/test-sg/test-ng"),
+					tfresource.TestCheckResourceAttr("conjur_swa_node_group.test", "workload_type", "unix"),
+				),
+			},
+		},
+	})
+}
+
+func TestNodeGroupResource_WorkloadTypeChange_RequiresReplace(t *testing.T) {
+	t.Parallel()
+
+	mockClient := swamocks.NewMockClientWithResponsesInterface(t)
+	now := time.Now()
+
+	mockClient.EXPECT().
+		PostNodeGroupsWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything,
+			mock.MatchedBy(func(body swaclient.PostNodeGroupsJSONRequestBody) bool { return body.WorkloadType == "unix" })).
+		Return(&swaclient.PostNodeGroupsResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusCreated),
+			ApplicationxSecretsmgrV2JSON201: &swaclient.NodeGroupResponse{
+				Name: "test-ng", WorkloadType: "unix", CreatedAt: now, UpdatedAt: now,
+				WorkloadConfiguration: swaclient.WorkloadConfiguration{},
+			},
+		}, nil).Times(1)
+
+	mockClient.EXPECT().
+		PostNodeGroupsWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything,
+			mock.MatchedBy(func(body swaclient.PostNodeGroupsJSONRequestBody) bool { return body.WorkloadType == "kubernetes" })).
+		Return(&swaclient.PostNodeGroupsResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusCreated),
+			ApplicationxSecretsmgrV2JSON201: &swaclient.NodeGroupResponse{
+				Name: "test-ng", WorkloadType: "kubernetes", CreatedAt: now, UpdatedAt: now,
+				WorkloadConfiguration: swaclient.WorkloadConfiguration{},
+			},
+		}, nil).Times(1)
+
+	// Read returns unix for the post-create read and the step-2 refresh so
+	// Terraform detects the workload_type diff and triggers RequiresReplace.
+	mockClient.EXPECT().
+		GetNodeGroupWithResponse(mock.Anything, "test-td", "test-sg", "test-ng", mock.Anything).
+		Return(&swaclient.GetNodeGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: &swaclient.NodeGroupResponse{
+				Name: "test-ng", WorkloadType: "unix", CreatedAt: now, UpdatedAt: now,
+				WorkloadConfiguration: swaclient.WorkloadConfiguration{},
+			},
+		}, nil).Times(2)
+
+	// Read after replacement returns kubernetes.
+	mockClient.EXPECT().
+		GetNodeGroupWithResponse(mock.Anything, "test-td", "test-sg", "test-ng", mock.Anything).
+		Return(&swaclient.GetNodeGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: &swaclient.NodeGroupResponse{
+				Name: "test-ng", WorkloadType: "kubernetes", CreatedAt: now, UpdatedAt: now,
+				WorkloadConfiguration: swaclient.WorkloadConfiguration{},
+			},
+		}, nil).Maybe()
+
+	// Delete unix during replace + final delete of kubernetes.
+	mockClient.EXPECT().
+		DeleteNodeGroupWithResponse(mock.Anything, "test-td", "test-sg", "test-ng", mock.Anything).
+		Return(&swaclient.DeleteNodeGroupResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(2)
+
+	tfresource.Test(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: swaTestProviderFactories(mockClient),
+		Steps: []tfresource.TestStep{
+			{
+				Config: `
+resource "conjur_swa_node_group" "test" {
+  name              = "test-ng"
+  trust_domain_name = "test-td"
+  server_group_name = "test-sg"
+  workload_type     = "unix"
+}
+`,
+				Check: tfresource.TestCheckResourceAttr("conjur_swa_node_group.test", "workload_type", "unix"),
+			},
+			{
+				// Changing workload_type must trigger destroy+create, not update.
+				Config: `
+resource "conjur_swa_node_group" "test" {
+  name              = "test-ng"
+  trust_domain_name = "test-td"
+  server_group_name = "test-sg"
+  workload_type     = "kubernetes"
+}
+`,
+				Check: tfresource.TestCheckResourceAttr("conjur_swa_node_group.test", "workload_type", "kubernetes"),
+			},
+		},
+	})
+}
+
+func TestNodeGroupResource_ClearWorkloadConfiguration(t *testing.T) {
+	t.Parallel()
+
+	mockClient := swamocks.NewMockClientWithResponsesInterface(t)
+	now := time.Now()
+
+	customTemplate := "spiffe://{{ .trustdomain }}/{{ .nodegroup }}/custom/{{ .unix.user }}"
+	policies := []string{"unix.uid == 1000"}
+
+	mockClient.EXPECT().
+		PostNodeGroupsWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything, mock.Anything).
+		Return(&swaclient.PostNodeGroupsResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusCreated),
+			ApplicationxSecretsmgrV2JSON201: &swaclient.NodeGroupResponse{
+				Name: "test-ng", WorkloadType: "unix", CreatedAt: now, UpdatedAt: now,
+				WorkloadConfiguration: swaclient.WorkloadConfiguration{
+					SpiffeIdTemplate:             &customTemplate,
+					WorkloadRegistrationPolicies: &policies,
+				},
+			},
+		}, nil).Times(1)
+
+	// Read after create AND the pre-plan refresh before step-2 — both must return
+	// the custom config so the step-2 plan sees a diff and calls Update/Patch.
+	mockClient.EXPECT().
+		GetNodeGroupWithResponse(mock.Anything, "test-td", "test-sg", "test-ng", mock.Anything).
+		Return(&swaclient.GetNodeGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: &swaclient.NodeGroupResponse{
+				Name: "test-ng", WorkloadType: "unix", CreatedAt: now, UpdatedAt: now,
+				WorkloadConfiguration: swaclient.WorkloadConfiguration{
+					SpiffeIdTemplate:             &customTemplate,
+					WorkloadRegistrationPolicies: &policies,
+				},
+			},
+		}, nil).Times(2)
+
+	// Patch clears workload_configuration (non-nil body with nil fields).
+	mockClient.EXPECT().
+		PatchNodeGroupWithResponse(mock.Anything, "test-td", "test-sg", "test-ng", mock.Anything, mock.Anything).
+		Return(&swaclient.PatchNodeGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			// Both fields nil so syncWorkloadConfigFromResponse sets WorkloadConfiguration = nil,
+			// matching the step-2 config that omits the workload_configuration block.
+			ApplicationxSecretsmgrV2JSON200: &swaclient.NodeGroupResponse{
+				Name: "test-ng", WorkloadType: "unix", CreatedAt: now, UpdatedAt: now,
+				WorkloadConfiguration: swaclient.WorkloadConfiguration{},
+			},
+		}, nil).Times(1)
+
+	// Read after clear: all-nil WorkloadConfiguration keeps the block absent in state.
+	mockClient.EXPECT().
+		GetNodeGroupWithResponse(mock.Anything, "test-td", "test-sg", "test-ng", mock.Anything).
+		Return(&swaclient.GetNodeGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: &swaclient.NodeGroupResponse{
+				Name: "test-ng", WorkloadType: "unix", CreatedAt: now, UpdatedAt: now,
+				WorkloadConfiguration: swaclient.WorkloadConfiguration{},
+			},
+		}, nil).Maybe()
+
+	mockClient.EXPECT().
+		DeleteNodeGroupWithResponse(mock.Anything, "test-td", "test-sg", "test-ng", mock.Anything).
+		Return(&swaclient.DeleteNodeGroupResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
+
+	tfresource.Test(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: swaTestProviderFactories(mockClient),
+		Steps: []tfresource.TestStep{
+			{
+				Config: `
+resource "conjur_swa_node_group" "test" {
+  name              = "test-ng"
+  trust_domain_name = "test-td"
+  server_group_name = "test-sg"
+  workload_type     = "unix"
+  workload_configuration = {
+    spiffe_id_template             = "spiffe://{{ .trustdomain }}/{{ .nodegroup }}/custom/{{ .unix.user }}"
+    workload_registration_policies = ["unix.uid == 1000"]
+  }
+}
+`,
+				Check: tfresource.ComposeTestCheckFunc(
+					tfresource.TestCheckResourceAttr("conjur_swa_node_group.test", "workload_configuration.spiffe_id_template", customTemplate),
+					tfresource.TestCheckResourceAttr("conjur_swa_node_group.test", "workload_configuration.workload_registration_policies.#", "1"),
+				),
+			},
+			{
+				// Remove workload_configuration entirely — triggers the clear path.
+				Config: `
+resource "conjur_swa_node_group" "test" {
+  name              = "test-ng"
+  trust_domain_name = "test-td"
+  server_group_name = "test-sg"
+  workload_type     = "unix"
+}
+`,
+				Check: tfresource.ComposeTestCheckFunc(
+					tfresource.TestCheckResourceAttr("conjur_swa_node_group.test", "name", "test-ng"),
+					tfresource.TestCheckNoResourceAttr("conjur_swa_node_group.test", "workload_configuration.spiffe_id_template"),
+					tfresource.TestCheckNoResourceAttr("conjur_swa_node_group.test", "workload_configuration.workload_registration_policies.#"),
+				),
+			},
+		},
+	})
+}
+
+func TestNodeGroupResource_InPlaceUpdate_DescriptionAndWorkloadConfig(t *testing.T) {
+	t.Parallel()
+
+	mockClient := swamocks.NewMockClientWithResponsesInterface(t)
+	now := time.Now()
+
+	updatedTemplate := "spiffe://{{ .trustdomain }}/{{ .nodegroup }}/custom/{{ .unix.uid }}"
+	originalDesc := "original description"
+	updatedDesc := "updated description"
+	policies := []string{"unix.uid > 500"}
+
+	mockClient.EXPECT().
+		PostNodeGroupsWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything, mock.Anything).
+		Return(&swaclient.PostNodeGroupsResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusCreated),
+			// Step-1 config has no workload_configuration block, so the Create response
+			// must also return an empty WorkloadConfiguration to avoid a consistency error.
+			ApplicationxSecretsmgrV2JSON201: &swaclient.NodeGroupResponse{
+				Name: "test-ng", Description: &originalDesc, WorkloadType: "unix", CreatedAt: now, UpdatedAt: now,
+				WorkloadConfiguration: swaclient.WorkloadConfiguration{},
+			},
+		}, nil).Times(1)
+
+	// Read after create AND the pre-plan refresh before step-2 — both must return
+	// empty WorkloadConfiguration so the step-2 plan sees nil→non-nil diff and calls Update/Patch.
+	mockClient.EXPECT().
+		GetNodeGroupWithResponse(mock.Anything, "test-td", "test-sg", "test-ng", mock.Anything).
+		Return(&swaclient.GetNodeGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: &swaclient.NodeGroupResponse{
+				Name: "test-ng", Description: &originalDesc, WorkloadType: "unix", CreatedAt: now, UpdatedAt: now,
+				WorkloadConfiguration: swaclient.WorkloadConfiguration{},
+			},
+		}, nil).Times(2)
+
+	// Patch with updated description + workload_configuration.
+	mockClient.EXPECT().
+		PatchNodeGroupWithResponse(mock.Anything, "test-td", "test-sg", "test-ng", mock.Anything,
+			mock.MatchedBy(func(body swaclient.PatchNodeGroupJSONRequestBody) bool {
+				return body.Description != nil && *body.Description == updatedDesc &&
+					body.WorkloadConfiguration != nil &&
+					body.WorkloadConfiguration.SpiffeIdTemplate != nil && *body.WorkloadConfiguration.SpiffeIdTemplate == updatedTemplate &&
+					body.WorkloadConfiguration.WorkloadRegistrationPolicies != nil
+			})).
+		Return(&swaclient.PatchNodeGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: &swaclient.NodeGroupResponse{
+				Name: "test-ng", Description: &updatedDesc, WorkloadType: "unix", CreatedAt: now, UpdatedAt: now,
+				WorkloadConfiguration: swaclient.WorkloadConfiguration{
+					SpiffeIdTemplate:             &updatedTemplate,
+					WorkloadRegistrationPolicies: &policies,
+				},
+			},
+		}, nil).Times(1)
+
+	// Read after update.
+	mockClient.EXPECT().
+		GetNodeGroupWithResponse(mock.Anything, "test-td", "test-sg", "test-ng", mock.Anything).
+		Return(&swaclient.GetNodeGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: &swaclient.NodeGroupResponse{
+				Name: "test-ng", Description: &updatedDesc, WorkloadType: "unix", CreatedAt: now, UpdatedAt: now,
+				WorkloadConfiguration: swaclient.WorkloadConfiguration{
+					SpiffeIdTemplate:             &updatedTemplate,
+					WorkloadRegistrationPolicies: &policies,
+				},
+			},
+		}, nil).Maybe()
+
+	mockClient.EXPECT().
+		DeleteNodeGroupWithResponse(mock.Anything, "test-td", "test-sg", "test-ng", mock.Anything).
+		Return(&swaclient.DeleteNodeGroupResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
+
+	tfresource.Test(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: swaTestProviderFactories(mockClient),
+		Steps: []tfresource.TestStep{
+			{
+				Config: `
+resource "conjur_swa_node_group" "test" {
+  name              = "test-ng"
+  trust_domain_name = "test-td"
+  server_group_name = "test-sg"
+  workload_type     = "unix"
+  description       = "original description"
+}
+`,
+				Check: tfresource.ComposeTestCheckFunc(
+					tfresource.TestCheckResourceAttr("conjur_swa_node_group.test", "description", originalDesc),
+					tfresource.TestCheckNoResourceAttr("conjur_swa_node_group.test", "workload_configuration.spiffe_id_template"),
+				),
+			},
+			{
+				Config: `
+resource "conjur_swa_node_group" "test" {
+  name              = "test-ng"
+  trust_domain_name = "test-td"
+  server_group_name = "test-sg"
+  workload_type     = "unix"
+  description       = "updated description"
+  workload_configuration = {
+    spiffe_id_template             = "spiffe://{{ .trustdomain }}/{{ .nodegroup }}/custom/{{ .unix.uid }}"
+    workload_registration_policies = ["unix.uid > 500"]
+  }
+}
+`,
+				Check: tfresource.ComposeTestCheckFunc(
+					tfresource.TestCheckResourceAttr("conjur_swa_node_group.test", "description", updatedDesc),
+					tfresource.TestCheckResourceAttr("conjur_swa_node_group.test", "workload_configuration.spiffe_id_template", updatedTemplate),
+					tfresource.TestCheckResourceAttr("conjur_swa_node_group.test", "workload_configuration.workload_registration_policies.#", "1"),
+				),
+			},
+		},
+	})
 }
