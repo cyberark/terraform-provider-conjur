@@ -132,6 +132,38 @@ func jsonSemanticallyEqual(a, b string) bool {
 	return reflect.DeepEqual(av, bv)
 }
 
+// preferPriorJSONString returns prior when both values are known strings and
+// are semantically-equivalent JSON; otherwise it returns incoming. This keeps
+// the user's original formatting rather than replacing it with a reformatted
+// but equivalent value, which would produce a diff.
+func preferPriorJSONString(prior, incoming types.String) types.String {
+	if !knownStringValue(prior) || !knownStringValue(incoming) {
+		return incoming
+	}
+	if jsonSemanticallyEqual(prior.ValueString(), incoming.ValueString()) {
+		return prior
+	}
+	return incoming
+}
+
+// jsonEquivalentPlanModifier suppresses a plan diff when the prior state and
+// incoming config contain semantically-equivalent JSON. Without this, whitespace
+// or key-order reformats in public_keys would register as a change and, because
+// auth carries RequiresReplace, trigger a destroy+create.
+type jsonEquivalentPlanModifier struct{}
+
+func (m jsonEquivalentPlanModifier) Description(_ context.Context) string {
+	return "Suppresses diff when JSON content is semantically equivalent."
+}
+
+func (m jsonEquivalentPlanModifier) MarkdownDescription(ctx context.Context) string {
+	return m.Description(ctx)
+}
+
+func (m jsonEquivalentPlanModifier) PlanModifyString(_ context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
+	resp.PlanValue = preferPriorJSONString(req.StateValue, req.ConfigValue)
+}
+
 func nonEmptyKnownStringValue(v types.String) bool {
 	return knownStringValue(v) && v.ValueString() != ""
 }
@@ -383,14 +415,7 @@ func syncServerAuthFromResponse(ctx context.Context, state *ServerResourceModel,
 		if err != nil {
 			return fmt.Errorf("failed to marshal auth.public_keys from response: %w", err)
 		}
-		// Terraform requires the stored value to match the user's config exactly,
-		// so when the server echoes back semantically-equivalent but reformatted
-		// JSON, keep the prior config string.
-		if prior := state.Auth.PublicKeys; knownStringValue(prior) && jsonSemanticallyEqual(prior.ValueString(), string(publicKeysJSON)) {
-			state.Auth.PublicKeys = prior
-		} else {
-			state.Auth.PublicKeys = types.StringValue(string(publicKeysJSON))
-		}
+		state.Auth.PublicKeys = preferPriorJSONString(state.Auth.PublicKeys, types.StringValue(string(publicKeysJSON)))
 	} else {
 		state.Auth.PublicKeys = types.StringNull()
 	}
@@ -513,6 +538,9 @@ func (r *ServerResource) Schema(ctx context.Context, req resource.SchemaRequest,
 					"public_keys": schema.StringAttribute{
 						MarkdownDescription: `Inline JWKS as a JSON string. Sent to the server as compact, canonical JSON.`,
 						Optional:            true,
+						PlanModifiers: []planmodifier.String{
+							jsonEquivalentPlanModifier{},
+						},
 					},
 					"identity": schema.SingleNestedAttribute{
 						MarkdownDescription: "Identity mapping configuration for the JWT authenticator.",

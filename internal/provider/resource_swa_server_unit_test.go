@@ -11,6 +11,7 @@ import (
 	swamocks "github.com/cyberark/terraform-provider-conjur/internal/swa/client/mocks"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/stretchr/testify/assert"
@@ -1016,70 +1017,6 @@ func TestSyncServerAuthFromResponse_FullMapping(t *testing.T) {
 	assert.Equal(t, "sub", state.Auth.Identity.TokenAppProperty.ValueString())
 }
 
-// TestSyncServerAuthFromResponse_PreservesPriorPublicKeysFormatting verifies that when the
-// server echoes back semantically-equivalent but reformatted JSON (whitespace / key order),
-// the prior config string is preserved byte-for-byte so Terraform does not report an
-// inconsistent result after apply.
-func TestSyncServerAuthFromResponse_PreservesPriorPublicKeysFormatting(t *testing.T) {
-	ctx := context.Background()
-
-	priorJSON := "{\n  \"type\": \"jwks\",\n  \"value\": {\"keys\": [{\"kid\": \"abc\"}]}\n}"
-	state := &ServerResourceModel{
-		Auth: &ServerAuthenticationModel{
-			PublicKeys: types.StringValue(priorJSON),
-		},
-	}
-
-	// Server returns the same content, differently formatted / key-ordered.
-	auth := &swaclient.ServerAuthentication{
-		Type: "jwt",
-		Data: map[string]any{
-			"sub": "workload-sub",
-			"public_keys": map[string]any{
-				"value": map[string]any{"keys": []any{map[string]any{"kid": "abc"}}},
-				"type":  "jwks",
-			},
-		},
-	}
-
-	err := syncServerAuthFromResponse(ctx, state, auth)
-	assert.NoError(t, err)
-	assert.Equal(t, priorJSON, state.Auth.PublicKeys.ValueString(), "prior formatting must be preserved when semantically equal")
-}
-
-// TestSyncServerAuthFromResponse_UpdatesPublicKeysWhenChanged verifies that a genuinely
-// different response value replaces the prior state value.
-func TestSyncServerAuthFromResponse_UpdatesPublicKeysWhenChanged(t *testing.T) {
-	ctx := context.Background()
-
-	state := &ServerResourceModel{
-		Auth: &ServerAuthenticationModel{
-			PublicKeys: types.StringValue(`{"type":"jwks","value":{"keys":[{"kid":"old"}]}}`),
-		},
-	}
-
-	auth := &swaclient.ServerAuthentication{
-		Type: "jwt",
-		Data: map[string]any{
-			"sub": "workload-sub",
-			"public_keys": map[string]any{
-				"type":  "jwks",
-				"value": map[string]any{"keys": []any{map[string]any{"kid": "new"}}},
-			},
-		},
-	}
-
-	err := syncServerAuthFromResponse(ctx, state, auth)
-	assert.NoError(t, err)
-
-	var publicKeys map[string]any
-	err = json.Unmarshal([]byte(state.Auth.PublicKeys.ValueString()), &publicKeys)
-	assert.NoError(t, err)
-	value := publicKeys["value"].(map[string]any)
-	keys := value["keys"].([]any)
-	assert.Equal(t, "new", keys[0].(map[string]any)["kid"])
-}
-
 func TestSyncServerAuthFromResponse_MissingFieldsClearExistingValues(t *testing.T) {
 	ctx := context.Background()
 	state := &ServerResourceModel{
@@ -1143,6 +1080,104 @@ func TestSyncServerAuthFromResponse_PublicKeysMarshalError(t *testing.T) {
 	err := syncServerAuthFromResponse(context.Background(), state, auth)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to marshal auth.public_keys")
+}
+
+func TestPreferPriorJSONString(t *testing.T) {
+	compact := `{"type":"jwks","value":{"keys":[{"kid":"abc"}]}}`
+	pretty := "{\n  \"type\": \"jwks\",\n  \"value\": {\"keys\": [{\"kid\": \"abc\"}]}\n}"
+	reordered := `{"value":{"keys":[{"kid":"abc"}]},"type":"jwks"}`
+	different := `{"type":"jwks","value":{"keys":[{"kid":"xyz"}]}}`
+
+	tests := []struct {
+		name     string
+		prior    types.String
+		incoming types.String
+		want     types.String
+	}{
+		{
+			name:     "semantically equal compact vs pretty — returns prior",
+			prior:    types.StringValue(compact),
+			incoming: types.StringValue(pretty),
+			want:     types.StringValue(compact),
+		},
+		{
+			name:     "semantically equal different key order — returns prior",
+			prior:    types.StringValue(compact),
+			incoming: types.StringValue(reordered),
+			want:     types.StringValue(compact),
+		},
+		{
+			name:     "semantically equal identical strings — returns prior",
+			prior:    types.StringValue(compact),
+			incoming: types.StringValue(compact),
+			want:     types.StringValue(compact),
+		},
+		{
+			name:     "genuinely different JSON — returns incoming",
+			prior:    types.StringValue(compact),
+			incoming: types.StringValue(different),
+			want:     types.StringValue(different),
+		},
+		{
+			name:     "prior null — returns incoming",
+			prior:    types.StringNull(),
+			incoming: types.StringValue(compact),
+			want:     types.StringValue(compact),
+		},
+		{
+			name:     "prior unknown — returns incoming",
+			prior:    types.StringUnknown(),
+			incoming: types.StringValue(compact),
+			want:     types.StringValue(compact),
+		},
+		{
+			name:     "incoming null — returns incoming",
+			prior:    types.StringValue(compact),
+			incoming: types.StringNull(),
+			want:     types.StringNull(),
+		},
+		{
+			name:     "incoming unknown — returns incoming",
+			prior:    types.StringValue(compact),
+			incoming: types.StringUnknown(),
+			want:     types.StringUnknown(),
+		},
+		{
+			name:     "invalid JSON in incoming — returns incoming",
+			prior:    types.StringValue(compact),
+			incoming: types.StringValue("not-json"),
+			want:     types.StringValue("not-json"),
+		},
+		{
+			name:     "invalid JSON in prior — returns incoming",
+			prior:    types.StringValue("not-json"),
+			incoming: types.StringValue(compact),
+			want:     types.StringValue(compact),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, preferPriorJSONString(tt.prior, tt.incoming))
+		})
+	}
+}
+
+func TestJSONEquivalentPlanModifier_WiresPreferPriorJSONString(t *testing.T) {
+	compact := `{"type":"jwks","value":{"keys":[{"kid":"abc"}]}}`
+	pretty := "{\n  \"type\": \"jwks\",\n  \"value\": {\"keys\": [{\"kid\": \"abc\"}]}\n}"
+
+	m := jsonEquivalentPlanModifier{}
+	req := planmodifier.StringRequest{
+		StateValue:  types.StringValue(compact),
+		ConfigValue: types.StringValue(pretty),
+		PlanValue:   types.StringValue(pretty),
+	}
+	resp := &planmodifier.StringResponse{PlanValue: types.StringValue(pretty)}
+	m.PlanModifyString(context.Background(), req, resp)
+
+	assert.Equal(t, types.StringValue(compact), resp.PlanValue)
+	assert.False(t, resp.Diagnostics.HasError())
 }
 
 func TestSyncServerAuthFromResponse_NilAuthClearsExistingState(t *testing.T) {
