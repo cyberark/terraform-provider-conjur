@@ -1127,7 +1127,7 @@ func TestServerGroupResource_CreateAndDelete(t *testing.T) {
 		Return(&swaclient.DeleteServerGroupResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
 
 	tfresource.Test(t, tfresource.TestCase{
-		ProtoV6ProviderFactories: swaTestProviderFactories(mockClient),
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
 		Steps: []tfresource.TestStep{
 			{
 				Config: `
@@ -1211,7 +1211,7 @@ func TestServerGroupResource_NameChange_RequiresReplace(t *testing.T) {
 		Return(&swaclient.DeleteServerGroupResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
 
 	tfresource.Test(t, tfresource.TestCase{
-		ProtoV6ProviderFactories: swaTestProviderFactories(mockClient),
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
 		Steps: []tfresource.TestStep{
 			{
 				Config: `
@@ -1323,7 +1323,7 @@ func TestServerGroupResource_RemoveX509PopKeepK8sPsat(t *testing.T) {
 		Return(&swaclient.DeleteServerGroupResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
 
 	tfresource.Test(t, tfresource.TestCase{
-		ProtoV6ProviderFactories: swaTestProviderFactories(mockClient),
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
 		Steps: []tfresource.TestStep{
 			{
 				Config: `

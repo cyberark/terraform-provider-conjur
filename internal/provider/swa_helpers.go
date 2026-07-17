@@ -25,6 +25,17 @@ func configureSWAClient(req resource.ConfigureRequest, resp *resource.ConfigureR
 		return nil, false
 	}
 
+	cfg := clients.conjurClient.GetConfig()
+	if !cfg.IsSaaS() {
+		resp.Diagnostics.AddError(
+			"SWA resources require Idira Secrets Manager SaaS",
+			"SWA resources (conjur_swa_*) are only supported against Idira Secrets Manager SaaS "+
+				"endpoints. The configured appliance URL does not appear to be a SaaS instance. "+
+				"Remove any conjur_swa_* resources from your configuration when targeting a Self-Hosted deployment.",
+		)
+		return nil, false
+	}
+
 	return clients.swaClient, true
 }
 

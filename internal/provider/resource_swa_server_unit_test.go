@@ -1283,7 +1283,7 @@ func TestServerResource_CreateAndDelete(t *testing.T) {
 		}, nil).Times(1)
 
 	tfresource.Test(t, tfresource.TestCase{
-		ProtoV6ProviderFactories: swaTestProviderFactories(mockClient),
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
 		Steps: []tfresource.TestStep{
 			{
 				Config: `
@@ -1346,7 +1346,7 @@ func TestServerResource_AuthChange_RequiresReplace(t *testing.T) {
 		}, nil).Times(1)
 
 	tfresource.Test(t, tfresource.TestCase{
-		ProtoV6ProviderFactories: swaTestProviderFactories(mockClient),
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
 		Steps: []tfresource.TestStep{
 			{
 				Config: `
@@ -1441,7 +1441,7 @@ func TestServerResource_NameChange_RequiresReplace(t *testing.T) {
 		Return(&swaclient.DeleteServerResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
 
 	tfresource.Test(t, tfresource.TestCase{
-		ProtoV6ProviderFactories: swaTestProviderFactories(mockClient),
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
 		Steps: []tfresource.TestStep{
 			{
 				Config: `

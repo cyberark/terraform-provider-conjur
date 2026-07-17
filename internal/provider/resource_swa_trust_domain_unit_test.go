@@ -935,7 +935,7 @@ func TestTrustDomainResource_CreateAndDelete(t *testing.T) {
 		Return(&swaclient.DeleteTrustDomainResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
 
 	tfresource.Test(t, tfresource.TestCase{
-		ProtoV6ProviderFactories: swaTestProviderFactories(mockClient),
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
 		Steps: []tfresource.TestStep{
 			{
 				Config: `
@@ -1014,7 +1014,7 @@ func TestTrustDomainResource_NameChange_RequiresReplace(t *testing.T) {
 		Return(&swaclient.DeleteTrustDomainResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
 
 	tfresource.Test(t, tfresource.TestCase{
-		ProtoV6ProviderFactories: swaTestProviderFactories(mockClient),
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
 		Steps: []tfresource.TestStep{
 			{
 				Config: `
@@ -1094,7 +1094,7 @@ func TestTrustDomainResource_JWTUpdate_InPlace(t *testing.T) {
 		Return(&swaclient.DeleteTrustDomainResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
 
 	tfresource.Test(t, tfresource.TestCase{
-		ProtoV6ProviderFactories: swaTestProviderFactories(mockClient),
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
 		Steps: []tfresource.TestStep{
 			{
 				Config: `

@@ -871,7 +871,7 @@ func TestNodeGroupResource_CreateAndDelete(t *testing.T) {
 		Return(&swaclient.DeleteNodeGroupResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
 
 	tfresource.Test(t, tfresource.TestCase{
-		ProtoV6ProviderFactories: swaTestProviderFactories(mockClient),
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
 		Steps: []tfresource.TestStep{
 			{
 				Config: `
@@ -949,7 +949,7 @@ func TestNodeGroupResource_WorkloadTypeChange_RequiresReplace(t *testing.T) {
 		Return(&swaclient.DeleteNodeGroupResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(2)
 
 	tfresource.Test(t, tfresource.TestCase{
-		ProtoV6ProviderFactories: swaTestProviderFactories(mockClient),
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
 		Steps: []tfresource.TestStep{
 			{
 				Config: `
@@ -1044,7 +1044,7 @@ func TestNodeGroupResource_ClearWorkloadConfiguration(t *testing.T) {
 		Return(&swaclient.DeleteNodeGroupResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
 
 	tfresource.Test(t, tfresource.TestCase{
-		ProtoV6ProviderFactories: swaTestProviderFactories(mockClient),
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
 		Steps: []tfresource.TestStep{
 			{
 				Config: `
@@ -1158,7 +1158,7 @@ func TestNodeGroupResource_InPlaceUpdate_DescriptionAndWorkloadConfig(t *testing
 		Return(&swaclient.DeleteNodeGroupResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
 
 	tfresource.Test(t, tfresource.TestCase{
-		ProtoV6ProviderFactories: swaTestProviderFactories(mockClient),
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
 		Steps: []tfresource.TestStep{
 			{
 				Config: `
