@@ -18,7 +18,7 @@ resource "conjur_swa_node_group" "k8s_nodes" {
   workload_configuration = {
     spiffe_id_template = "spiffe://{{ .trustdomain }}/{{ .nodegroup }}/{{ .k8s.ns }}/{{ .k8s.sa }}"
     workload_registration_policies = [
-      "workload.k8s.ns == 'app'",
+      "k8s.ns == 'app'",
     ]
   }
 }
