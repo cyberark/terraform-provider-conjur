@@ -4,7 +4,7 @@ resource "conjur_swa_server_group" "x509pop" {
   name              = "prod-servers"
   description       = "Production servers attested via X.509 POP"
 
-  node_attestation = {
+  attestation = {
     x509pop = {
       ca_certificates = file("ca.pem")
     }
@@ -17,7 +17,7 @@ resource "conjur_swa_server_group" "k8s" {
   name              = "k8s-servers"
   description       = "Kubernetes workload server group"
 
-  node_attestation = {
+  attestation = {
     k8s_psat = {
       clusters = {
         "prod-cluster" = {
@@ -31,3 +31,9 @@ resource "conjur_swa_server_group" "k8s" {
   }
 }
 
+# Server group with no node attestation (attestation is optional)
+resource "conjur_swa_server_group" "no_attestation" {
+  trust_domain_name = "prod.example.org"
+  name              = "unattested-servers"
+  description       = "Server group without node attestation"
+}

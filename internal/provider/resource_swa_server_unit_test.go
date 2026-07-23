@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	swaclient "github.com/cyberark/terraform-provider-conjur/internal/swa/client"
@@ -17,6 +18,7 @@ import (
 	tfresource "github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func makeCreateServerResponse(name, authnID string) *swaclient.CreateServerResponse {
@@ -146,31 +148,6 @@ func TestServerResource_Create(t *testing.T) {
 			},
 			expectedError: true,
 			errorContains: "Error creating server",
-		},
-		{
-			name: "successful creation with all optional JWT fields",
-			data: ServerResourceModel{
-				Name:          types.StringValue("my-server"),
-				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
-				Auth: &ServerAuthenticationModel{
-					Type:       types.StringValue("JWT"),
-					Subject:    types.StringValue("my-workload"),
-					Issuer:     types.StringValue("https://issuer.example.org"),
-					Audience:   types.StringValue("https://api.example.org"),
-					JWKSURI:    types.StringValue("https://issuer.example.org/.well-known/jwks.json"),
-					CACert:     types.StringValue("-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"),
-					PublicKeys: types.StringNull(),
-				},
-			},
-			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				resp := makeCreateServerResponse("my-server", "dHJ1c3RfZG9tYWlu")
-				m.On("PostServerWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.PostServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, mock.Anything).
-					Return(&swaclient.PostServerResponse{
-						HTTPResponse:                    makeHTTPResponse(http.StatusCreated),
-						ApplicationxSecretsmgrV2JSON201: resp,
-					}, nil)
-			},
-			expectedError: false,
 		},
 		{
 			name: "successful creation with inline public keys",
@@ -572,20 +549,150 @@ func getServerTestSchema() schema.Schema {
 }
 
 func TestServerResource_Update(t *testing.T) {
-	ctx := context.Background()
-	r := &ServerResource{client: swamocks.NewMockClientWithResponsesInterface(t)}
-
-	req := resource.UpdateRequest{
-		Plan:  newPlanWithSchema(getServerTestSchema()),
-		State: newStateWithSchema(getServerTestSchema()),
+	// The PATCH /servers/{name} operation updates the mutable auth data fields
+	// (jwks_uri/public_keys/issuer/audience) in place. Immutable fields
+	// (type/subject/ca_cert) are handled by RequiresReplace at plan time, so the
+	// resource's Update never has to reject them — it simply PATCHes the plan.
+	tests := []struct {
+		name          string
+		plan          ServerResourceModel
+		setupMock     func(*swamocks.MockClientWithResponsesInterface)
+		expectedError bool
+		errorContains string
+	}{
+		{
+			name: "successful in-place update of jwks_uri",
+			plan: ServerResourceModel{
+				ID:            types.StringValue("prod.example.org/prod-servers/my-server"),
+				Name:          types.StringValue("my-server"),
+				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
+				Auth: &ServerAuthenticationModel{
+					Type:       types.StringValue("JWT"),
+					Subject:    types.StringValue("my-workload"),
+					Issuer:     types.StringValue("https://issuer.example.org"),
+					Audience:   types.StringNull(),
+					JWKSURI:    types.StringValue("https://issuer.example.org/.well-known/jwks-v2.json"),
+					CACert:     types.StringNull(),
+					PublicKeys: types.StringNull(),
+				},
+			},
+			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
+				m.On("PatchServerWithResponse", context.Background(), "prod.example.org", "prod-servers", "my-server", &swaclient.PatchServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, mock.Anything).
+					Return(&swaclient.PatchServerResponse{
+						HTTPResponse: makeHTTPResponse(http.StatusOK),
+						ApplicationxSecretsmgrV2JSON200: &swaclient.ServerResponse{
+							Name:           "my-server",
+							Authentication: &swaclient.ServerAuthentication{Type: "jwt", Data: map[string]any{"sub": "my-workload", "jwks_uri": "https://issuer.example.org/.well-known/jwks-v2.json"}},
+						},
+					}, nil)
+			},
+			expectedError: false,
+		},
+		{
+			name: "invalid server ID format",
+			plan: ServerResourceModel{
+				ID:            types.StringValue("invalid-no-slash"),
+				Name:          types.StringValue("my-server"),
+				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
+				Auth: &ServerAuthenticationModel{
+					Type:       types.StringValue("JWT"),
+					Subject:    types.StringValue("my-workload"),
+					Issuer:     types.StringValue("https://issuer.example.org"),
+					Audience:   types.StringNull(),
+					JWKSURI:    types.StringValue("https://issuer.example.org/.well-known/jwks.json"),
+					CACert:     types.StringNull(),
+					PublicKeys: types.StringNull(),
+				},
+			},
+			setupMock:     func(m *swamocks.MockClientWithResponsesInterface) {},
+			expectedError: true,
+			errorContains: "Invalid server ID",
+		},
+		{
+			name: "API error during update",
+			plan: ServerResourceModel{
+				ID:            types.StringValue("prod.example.org/prod-servers/my-server"),
+				Name:          types.StringValue("my-server"),
+				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
+				Auth: &ServerAuthenticationModel{
+					Type:       types.StringValue("JWT"),
+					Subject:    types.StringValue("my-workload"),
+					Issuer:     types.StringValue("https://issuer.example.org"),
+					Audience:   types.StringNull(),
+					JWKSURI:    types.StringValue("https://issuer.example.org/.well-known/jwks.json"),
+					CACert:     types.StringNull(),
+					PublicKeys: types.StringNull(),
+				},
+			},
+			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
+				m.On("PatchServerWithResponse", context.Background(), "prod.example.org", "prod-servers", "my-server", &swaclient.PatchServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, mock.Anything).
+					Return(nil, fmt.Errorf("connection refused"))
+			},
+			expectedError: true,
+			errorContains: "Error updating server",
+		},
+		{
+			name: "non-200 status code",
+			plan: ServerResourceModel{
+				ID:            types.StringValue("prod.example.org/prod-servers/my-server"),
+				Name:          types.StringValue("my-server"),
+				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
+				Auth: &ServerAuthenticationModel{
+					Type:       types.StringValue("JWT"),
+					Subject:    types.StringValue("my-workload"),
+					Issuer:     types.StringValue("https://issuer.example.org"),
+					Audience:   types.StringNull(),
+					JWKSURI:    types.StringValue("https://issuer.example.org/.well-known/jwks.json"),
+					CACert:     types.StringNull(),
+					PublicKeys: types.StringNull(),
+				},
+			},
+			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
+				m.On("PatchServerWithResponse", context.Background(), "prod.example.org", "prod-servers", "my-server", &swaclient.PatchServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, mock.Anything).
+					Return(&swaclient.PatchServerResponse{
+						HTTPResponse: makeHTTPResponse(http.StatusBadRequest),
+						Body:         []byte(`{"message":"invalid input"}`),
+					}, nil)
+			},
+			expectedError: true,
+			errorContains: "Error updating server",
+		},
 	}
-	resp := &resource.UpdateResponse{
-		State: newStateWithSchema(getServerTestSchema()),
-	}
 
-	r.Update(ctx, req, resp)
-	assert.True(t, resp.Diagnostics.HasError())
-	assertDiagContains(t, resp.Diagnostics, "Update Not Supported")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockClient := swamocks.NewMockClientWithResponsesInterface(t)
+			tt.setupMock(mockClient)
+
+			r := &ServerResource{client: mockClient}
+
+			req := resource.UpdateRequest{
+				Plan:  newPlanWithSchema(getServerTestSchema()),
+				State: newStateWithSchema(getServerTestSchema()),
+			}
+			resp := &resource.UpdateResponse{
+				State: newStateWithSchema(getServerTestSchema()),
+			}
+
+			ctx := context.Background()
+			if diags := req.Plan.Set(ctx, &tt.plan); diags.HasError() {
+				t.Fatalf("failed to set plan: %v", diags)
+			}
+			if diags := req.State.Set(ctx, &tt.plan); diags.HasError() {
+				t.Fatalf("failed to set state: %v", diags)
+			}
+			r.Update(ctx, req, resp)
+
+			if tt.expectedError {
+				assert.True(t, resp.Diagnostics.HasError())
+				if tt.errorContains != "" {
+					assertDiagContains(t, resp.Diagnostics, tt.errorContains)
+				}
+			} else {
+				assert.False(t, resp.Diagnostics.HasError())
+			}
+		})
+	}
 }
 
 func TestServerResource_NilClientWarning(t *testing.T) {
@@ -1204,45 +1311,67 @@ func TestServerResource_Schema_RequiresReplace(t *testing.T) {
 	var schemaResp resource.SchemaResponse
 	r.Schema(ctx, resource.SchemaRequest{}, &schemaResp)
 
+	// auth itself no longer forces replacement — the PATCH operation updates mutable
+	// auth data in place. Only the immutable leaves (type/subject/ca_cert/identity)
+	// carry RequiresReplace; the mutable ones (jwks_uri/issuer/audience/public_keys)
+	// route through Update.
 	tests := []struct {
-		attrPath      string
+		attrPath      []string
 		shouldReplace bool
 	}{
-		{"name", true},
-		{"server_group_id", true},
-		{"auth", true},
-		{"id", false},
-		{"authn_id", false},
+		{[]string{"name"}, true},
+		{[]string{"server_group_id"}, true},
+		{[]string{"auth"}, false},
+		{[]string{"id"}, false},
+		{[]string{"authn_id"}, false},
+		{[]string{"auth", "type"}, true},
+		{[]string{"auth", "subject"}, true},
+		{[]string{"auth", "ca_cert"}, true},
+		{[]string{"auth", "identity"}, true},
+		{[]string{"auth", "jwks_uri"}, false},
+		{[]string{"auth", "issuer"}, false},
+		{[]string{"auth", "audience"}, false},
+		{[]string{"auth", "public_keys"}, false},
 	}
 
 	const requiresReplaceDesc = "If the value of this attribute changes, Terraform will destroy and recreate the resource."
 
-	for _, tc := range tests {
-		t.Run(tc.attrPath, func(t *testing.T) {
-			t.Parallel()
-			attr := schemaResp.Schema.Attributes[tc.attrPath]
-			assert.NotNil(t, attr, "attribute %q not found in schema", tc.attrPath)
-
-			hasRequiresReplace := false
-			switch a := attr.(type) {
-			case schema.StringAttribute:
-				for _, pm := range a.PlanModifiers {
-					if pm.Description(ctx) == requiresReplaceDesc {
-						hasRequiresReplace = true
-					}
-				}
-			case schema.SingleNestedAttribute:
-				for _, pm := range a.PlanModifiers {
-					if pm.Description(ctx) == requiresReplaceDesc {
-						hasRequiresReplace = true
-					}
+	planModifiersHaveReplace := func(attr schema.Attribute) bool {
+		switch a := attr.(type) {
+		case schema.StringAttribute:
+			for _, pm := range a.PlanModifiers {
+				if pm.Description(ctx) == requiresReplaceDesc {
+					return true
 				}
 			}
+		case schema.SingleNestedAttribute:
+			for _, pm := range a.PlanModifiers {
+				if pm.Description(ctx) == requiresReplaceDesc {
+					return true
+				}
+			}
+		}
+		return false
+	}
 
+	for _, tc := range tests {
+		t.Run(strings.Join(tc.attrPath, "."), func(t *testing.T) {
+			t.Parallel()
+			attr := schemaResp.Schema.Attributes[tc.attrPath[0]]
+			assert.NotNil(t, attr, "attribute %q not found in schema", tc.attrPath[0])
+
+			if len(tc.attrPath) == 2 {
+				nested, ok := attr.(schema.SingleNestedAttribute)
+				require.True(t, ok, "attribute %q is not a nested attribute", tc.attrPath[0])
+				attr = nested.Attributes[tc.attrPath[1]]
+				assert.NotNil(t, attr, "nested attribute %q not found", tc.attrPath[1])
+			}
+
+			hasRequiresReplace := planModifiersHaveReplace(attr)
 			if tc.shouldReplace {
-				assert.True(t, hasRequiresReplace, "attribute %q should have RequiresReplace", tc.attrPath)
+				assert.True(t, hasRequiresReplace, "attribute %v should have RequiresReplace", tc.attrPath)
 			} else {
-				assert.False(t, hasRequiresReplace, "attribute %q should NOT have RequiresReplace", tc.attrPath)
+				assert.False(t, hasRequiresReplace, "attribute %v should NOT have RequiresReplace", tc.attrPath)
 			}
 		})
 	}
@@ -1363,8 +1492,10 @@ resource "conjur_swa_server" "test" {
 				Check: tfresource.TestCheckResourceAttr("conjur_swa_server.test", "name", "test-server"),
 			},
 			{
-				// Changing jwks_uri must produce a replace plan, not an update.
-				// PlanOnly skips apply so we avoid mock complexity around the post-replace read.
+				// Changing the immutable subject must produce a replace plan, not an update.
+				// (Mutable auth data such as jwks_uri routes through Update instead — see
+				// TestServerResource_Update.) PlanOnly skips apply so we avoid mock complexity
+				// around the post-replace read.
 				PlanOnly:           true,
 				ExpectNonEmptyPlan: true,
 				Config: `
@@ -1373,8 +1504,8 @@ resource "conjur_swa_server" "test" {
   server_group_id = "test-td/test-sg"
   auth = {
     type     = "JWT"
-    subject  = "my-workload"
-    jwks_uri = "https://www.googleapis.com/oauth2/v3/certs-CHANGED"
+    subject  = "my-workload-CHANGED"
+    jwks_uri = "https://www.googleapis.com/oauth2/v3/certs"
   }
 }
 `,

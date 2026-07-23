@@ -352,6 +352,30 @@ func buildCreateServerJWTAuthData(ctx context.Context, auth *ServerAuthenticatio
 	return jwtAuthData, diags
 }
 
+// buildUpdateServerJWTAuthData builds the PATCH authenticator data from the plan. The API only
+// permits updating jwks_uri/public_keys/issuer/audience; sub and type are not updatable (guarded
+// by RequiresReplace on those attributes), and ca_cert/identity are not part of the update payload.
+func buildUpdateServerJWTAuthData(auth *ServerAuthenticationModel) (swaclient.UpdateServerJWTAuthenticationData, diag.Diagnostics) {
+	var diags diag.Diagnostics
+
+	jwtAuthData := swaclient.UpdateServerJWTAuthenticationData{
+		JwksUri:  stringPointerFromValue(auth.JWKSURI),
+		Issuer:   stringPointerFromValue(auth.Issuer),
+		Audience: stringPointerFromValue(auth.Audience),
+	}
+
+	if knownStringValue(auth.PublicKeys) {
+		var pk map[string]any
+		if err := json.Unmarshal([]byte(auth.PublicKeys.ValueString()), &pk); err != nil {
+			diags.AddError("Invalid public_keys JSON", err.Error())
+			return jwtAuthData, diags
+		}
+		jwtAuthData.PublicKeys = &pk
+	}
+
+	return jwtAuthData, diags
+}
+
 func serverAuthFromCreateResponse(auth swaclient.CreateServerAuthentication) (*swaclient.ServerAuthentication, error) {
 	jwtData, err := auth.Data.AsCreateServerJWTAuthenticationData()
 	if err != nil {
@@ -506,17 +530,20 @@ func (r *ServerResource) Schema(ctx context.Context, req resource.SchemaRequest,
 			"auth": schema.SingleNestedAttribute{
 				MarkdownDescription: "Authentication configuration for the server.",
 				Required:            true,
-				PlanModifiers: []planmodifier.Object{
-					objectplanmodifier.RequiresReplace(),
-				},
 				Attributes: map[string]schema.Attribute{
 					"type": schema.StringAttribute{
-						MarkdownDescription: "The authentication type (e.g., 'JWT').",
+						MarkdownDescription: "The authentication type (e.g., 'JWT'). Changing this forces a new server to be created.",
 						Required:            true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplace(),
+						},
 					},
 					"subject": schema.StringAttribute{
-						MarkdownDescription: "The expected subject claim value from the workload JWT.",
+						MarkdownDescription: "The expected subject claim value from the workload JWT. Changing this forces a new server to be created.",
 						Required:            true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplace(),
+						},
 					},
 					"audience": schema.StringAttribute{
 						MarkdownDescription: "The expected audience for JWT authentication.",
@@ -531,9 +558,12 @@ func (r *ServerResource) Schema(ctx context.Context, req resource.SchemaRequest,
 						Optional:            true,
 					},
 					"ca_cert": schema.StringAttribute{
-						MarkdownDescription: "PEM-encoded CA certificate for validating the JWKS provider's TLS certificate.",
+						MarkdownDescription: "PEM-encoded CA certificate for validating the JWKS provider's TLS certificate. Changing this forces a new server to be created.",
 						Optional:            true,
 						Sensitive:           true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplace(),
+						},
 					},
 					"public_keys": schema.StringAttribute{
 						MarkdownDescription: `Inline JWKS as a JSON string. Sent to the server as compact, canonical JSON.`,
@@ -543,8 +573,11 @@ func (r *ServerResource) Schema(ctx context.Context, req resource.SchemaRequest,
 						},
 					},
 					"identity": schema.SingleNestedAttribute{
-						MarkdownDescription: "Identity mapping configuration for the JWT authenticator.",
+						MarkdownDescription: "Identity mapping configuration for the JWT authenticator. Changing this forces a new server to be created.",
 						Optional:            true,
+						PlanModifiers: []planmodifier.Object{
+							objectplanmodifier.RequiresReplace(),
+						},
 						Attributes: map[string]schema.Attribute{
 							"claim_aliases": schema.MapAttribute{
 								MarkdownDescription: "A map of claim aliases to JWT claim names.",
@@ -740,10 +773,73 @@ func (r *ServerResource) Update(ctx context.Context, req resource.UpdateRequest,
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
 	}
-	resp.Diagnostics.AddError(
-		"Update Not Supported",
-		"Servers cannot be updated. Delete and recreate the resource instead.",
-	)
+
+	var plan ServerResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	parts, err := splitSWAID(plan.ID.ValueString(), 3, "trust_domain_name/server_group_name/server_name")
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid server ID", err.Error())
+		return
+	}
+	trustDomainName, serverGroupName, serverName := parts[0], parts[1], parts[2]
+
+	if !validateCreateServerAuthConfig(plan.Auth, &resp.Diagnostics) {
+		return
+	}
+
+	jwtAuthData, jwtDiags := buildUpdateServerJWTAuthData(plan.Auth)
+	resp.Diagnostics.Append(jwtDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	authInput := swaclient.UpdateServerAuthenticationInput{
+		Data: &swaclient.UpdateServerAuthenticationInput_Data{},
+	}
+	if err := authInput.Data.FromUpdateServerJWTAuthenticationData(jwtAuthData); err != nil {
+		resp.Diagnostics.AddError("Error setting auth data", err.Error())
+		return
+	}
+
+	updateReq := swaclient.PatchServerJSONRequestBody{Authentication: authInput}
+
+	params := &swaclient.PatchServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}
+
+	result, err := r.client.PatchServerWithResponse(ctx, trustDomainName, serverGroupName, serverName, params, updateReq)
+	if err != nil {
+		resp.Diagnostics.AddError("Error updating server", err.Error())
+		return
+	}
+
+	if result.StatusCode() != http.StatusOK {
+		summary, detail := apiStatusError("updating server", result.StatusCode(), result.Body)
+		resp.Diagnostics.AddError(summary, detail)
+		return
+	}
+
+	if result.ApplicationxSecretsmgrV2JSON200 == nil {
+		resp.Diagnostics.AddError("Error updating server", "No response body")
+		return
+	}
+
+	serverResp := result.ApplicationxSecretsmgrV2JSON200
+	plan.ID = types.StringValue(fmt.Sprintf("%s/%s/%s", trustDomainName, serverGroupName, serverResp.Name))
+	plan.Name = types.StringValue(serverResp.Name)
+	if serverResp.AuthnId != nil {
+		plan.AuthnID = types.StringValue(*serverResp.AuthnId)
+	}
+
+	if err := syncServerAuthFromResponse(ctx, &plan, serverResp.Authentication); err != nil {
+		resp.Diagnostics.AddError("Error updating server", err.Error())
+		return
+	}
+
+	tflog.Trace(ctx, "updated server resource")
+	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
 func (r *ServerResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

@@ -12,7 +12,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	tfresource "github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/stretchr/testify/assert"
@@ -33,6 +32,13 @@ func mustClustersMap(t *testing.T, ctx context.Context, clusters map[string]K8sP
 	return m
 }
 
+func mustStringList(t *testing.T, values ...string) types.List {
+	t.Helper()
+	list, diags := types.ListValueFrom(context.Background(), types.StringType, values)
+	require.False(t, diags.HasError(), "failed to build test list: %v", diags)
+	return list
+}
+
 func makeServerGroupResponse(name, trustDomain string) *swaclient.ServerGroupResponse {
 	now := time.Now()
 	return &swaclient.ServerGroupResponse{
@@ -43,41 +49,31 @@ func makeServerGroupResponse(name, trustDomain string) *swaclient.ServerGroupRes
 	}
 }
 
-// TestUpdateNodeAttestationFromResponse verifies that updateNodeAttestationFromResponse fully
+// TestUpdateAttestationFromResponse verifies that updateAttestationFromResponse fully
 // reconciles state from the API response (rather than merging into whatever was already in the
 // model), so attestation methods or clusters removed server-side actually disappear from state
 // on the next Read instead of persisting indefinitely.
-func TestUpdateNodeAttestationFromResponse(t *testing.T) {
+func TestUpdateAttestationFromResponse(t *testing.T) {
 	ctx := context.Background()
-
-	mustStringList := func(t *testing.T, values ...string) types.List {
-		t.Helper()
-		list, diags := types.ListValueFrom(ctx, types.StringType, values)
-		require.False(t, diags.HasError(), "failed to build test list: %v", diags)
-		return list
-	}
 
 	t.Run("nil response clears node attestation", func(t *testing.T) {
 		model := &ServerGroupResourceModel{
-			NodeAttestation: &NodeAttestationModel{
+			Attestation: &AttestationModel{
 				X509Pop: &X509PopModel{CaCertificates: types.StringValue("stale-cert")},
 			},
 		}
-		diags := updateNodeAttestationFromResponse(ctx, model, nil)
+		diags := updateAttestationFromResponse(ctx, model, nil)
 		assert.False(t, diags.HasError())
-		assert.Nil(t, model.NodeAttestation)
+		assert.Nil(t, model.Attestation)
 	})
 
 	t.Run("x509pop removed server-side is removed from state", func(t *testing.T) {
 		model := &ServerGroupResourceModel{
-			NodeAttestation: &NodeAttestationModel{
+			Attestation: &AttestationModel{
 				X509Pop: &X509PopModel{CaCertificates: types.StringValue("stale-cert")},
 			},
 		}
-		na := &struct {
-			K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
-			X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
-		}{
+		at := &swaclient.AttestationConfiguration{
 			K8sPsat: &swaclient.K8sPsatConfigurationInput{
 				Clusters: &map[string]swaclient.K8sPsatCluster{
 					"cluster-a": {},
@@ -85,13 +81,12 @@ func TestUpdateNodeAttestationFromResponse(t *testing.T) {
 			},
 		}
 
-		diags := updateNodeAttestationFromResponse(ctx, model, na)
+		diags := updateAttestationFromResponse(ctx, model, at)
 		assert.False(t, diags.HasError())
-		require.NotNil(t, model.NodeAttestation)
-		assert.Nil(t, model.NodeAttestation.X509Pop, "x509pop should be cleared once the server no longer reports it")
-		require.NotNil(t, model.NodeAttestation.K8sPsat)
-		assert.True(t, model.NodeAttestation.K8sPsat.Clusters.Elements() != nil)
-		assert.Contains(t, model.NodeAttestation.K8sPsat.Clusters.Elements(), "cluster-a")
+		require.NotNil(t, model.Attestation)
+		assert.Nil(t, model.Attestation.X509Pop, "x509pop should be cleared once the server no longer reports it")
+		require.NotNil(t, model.Attestation.K8sPsat)
+		assert.Contains(t, model.Attestation.K8sPsat.Clusters.Elements(), "cluster-a")
 	})
 
 	t.Run("cluster removed server-side is removed from state", func(t *testing.T) {
@@ -106,7 +101,7 @@ func TestUpdateNodeAttestationFromResponse(t *testing.T) {
 		clusterB := nullLists
 		clusterB.ServiceAccountAllowList = mustStringList(t, "ns2/sa2")
 		model := &ServerGroupResourceModel{
-			NodeAttestation: &NodeAttestationModel{
+			Attestation: &AttestationModel{
 				K8sPsat: &K8sPsatModel{
 					Clusters: mustClustersMap(t, ctx, map[string]K8sPsatClusterModel{
 						"cluster-a": clusterA,
@@ -115,10 +110,7 @@ func TestUpdateNodeAttestationFromResponse(t *testing.T) {
 				},
 			},
 		}
-		na := &struct {
-			K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
-			X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
-		}{
+		at := &swaclient.AttestationConfiguration{
 			K8sPsat: &swaclient.K8sPsatConfigurationInput{
 				Clusters: &map[string]swaclient.K8sPsatCluster{
 					"cluster-a": {},
@@ -126,11 +118,11 @@ func TestUpdateNodeAttestationFromResponse(t *testing.T) {
 			},
 		}
 
-		diags := updateNodeAttestationFromResponse(ctx, model, na)
+		diags := updateAttestationFromResponse(ctx, model, at)
 		assert.False(t, diags.HasError())
-		require.NotNil(t, model.NodeAttestation.K8sPsat)
-		assert.Contains(t, model.NodeAttestation.K8sPsat.Clusters.Elements(), "cluster-a")
-		assert.NotContains(t, model.NodeAttestation.K8sPsat.Clusters.Elements(), "cluster-b", "cluster-b was removed server-side and must not persist in state")
+		require.NotNil(t, model.Attestation.K8sPsat)
+		assert.Contains(t, model.Attestation.K8sPsat.Clusters.Elements(), "cluster-a")
+		assert.NotContains(t, model.Attestation.K8sPsat.Clusters.Elements(), "cluster-b", "cluster-b was removed server-side and must not persist in state")
 	})
 
 	t.Run("k8s_psat removed server-side is removed from state", func(t *testing.T) {
@@ -141,7 +133,7 @@ func TestUpdateNodeAttestationFromResponse(t *testing.T) {
 			AllowedNodeLabelKeys:    types.ListNull(types.StringType),
 		}
 		model := &ServerGroupResourceModel{
-			NodeAttestation: &NodeAttestationModel{
+			Attestation: &AttestationModel{
 				X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
 				K8sPsat: &K8sPsatModel{
 					Clusters: mustClustersMap(t, ctx, map[string]K8sPsatClusterModel{
@@ -150,29 +142,45 @@ func TestUpdateNodeAttestationFromResponse(t *testing.T) {
 				},
 			},
 		}
-		na := &struct {
-			K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
-			X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
-		}{
+		at := &swaclient.AttestationConfiguration{
 			X509pop: &swaclient.X509PopConfigurationInput{CaCertificates: "cert"},
 		}
 
-		diags := updateNodeAttestationFromResponse(ctx, model, na)
+		diags := updateAttestationFromResponse(ctx, model, at)
 		assert.False(t, diags.HasError())
-		require.NotNil(t, model.NodeAttestation)
-		assert.Nil(t, model.NodeAttestation.K8sPsat, "k8s_psat should be cleared once the server no longer reports it")
+		require.NotNil(t, model.Attestation)
+		assert.Nil(t, model.Attestation.K8sPsat, "k8s_psat should be cleared once the server no longer reports it")
+	})
+
+	t.Run("gcp_service_account from attestation field is reconciled into state", func(t *testing.T) {
+		model := &ServerGroupResourceModel{}
+		audiences := []string{"urn:panw:swa"}
+		at := &swaclient.AttestationConfiguration{
+			GcpServiceAccount: &swaclient.GcpServiceAccountAttestationConfiguration{
+				AllowedProjectIds: []string{"project-a", "project-b"},
+				Audiences:         &audiences,
+			},
+		}
+
+		diags := updateAttestationFromResponse(ctx, model, at)
+		assert.False(t, diags.HasError())
+		require.NotNil(t, model.Attestation)
+		require.NotNil(t, model.Attestation.GcpServiceAccount)
+		assert.Nil(t, model.Attestation.X509Pop)
+		assert.Nil(t, model.Attestation.K8sPsat)
+
+		var projects []string
+		require.False(t, model.Attestation.GcpServiceAccount.AllowedProjectIDs.ElementsAs(ctx, &projects, false).HasError())
+		assert.Equal(t, []string{"project-a", "project-b"}, projects)
+
+		var auds []string
+		require.False(t, model.Attestation.GcpServiceAccount.Audiences.ElementsAs(ctx, &auds, false).HasError())
+		assert.Equal(t, []string{"urn:panw:swa"}, auds)
 	})
 }
 
 func TestBuildK8sPsatClusters(t *testing.T) {
 	ctx := context.Background()
-
-	mustStringList := func(t *testing.T, values ...string) types.List {
-		t.Helper()
-		list, diags := types.ListValueFrom(ctx, types.StringType, values)
-		require.False(t, diags.HasError(), "failed to build test list: %v", diags)
-		return list
-	}
 
 	t.Run("nil model returns nil map", func(t *testing.T) {
 		clusters, diags := buildK8sPsatClusters(ctx, nil)
@@ -254,54 +262,6 @@ func TestBuildK8sPsatClusters(t *testing.T) {
 	})
 }
 
-func TestServerGroupResource_ValidateConfig(t *testing.T) {
-	tests := []struct {
-		name          string
-		data          ServerGroupResourceModel
-		expectedError bool
-		errorContains string
-	}{
-		{
-			name: "valid with x509pop",
-			data: ServerGroupResourceModel{
-				Name:            types.StringValue("prod-servers"),
-				TrustDomainName: types.StringValue("prod.example.org"),
-				NodeAttestation: &NodeAttestationModel{
-					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
-				},
-			},
-			expectedError: false,
-		},
-		{
-			name: "invalid without x509pop and k8s_psat",
-			data: ServerGroupResourceModel{
-				Name:            types.StringValue("prod-servers"),
-				TrustDomainName: types.StringValue("prod.example.org"),
-				NodeAttestation: &NodeAttestationModel{},
-			},
-			expectedError: true,
-			errorContains: "Invalid node_attestation",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			r := &ServerGroupResource{}
-			req := resource.ValidateConfigRequest{Config: buildServerGroupConfigFromModel(tt.data)}
-			resp := &resource.ValidateConfigResponse{}
-
-			r.ValidateConfig(context.Background(), req, resp)
-
-			if tt.expectedError {
-				assert.True(t, resp.Diagnostics.HasError())
-				assertDiagContains(t, resp.Diagnostics, tt.errorContains)
-			} else {
-				assert.False(t, resp.Diagnostics.HasError())
-			}
-		})
-	}
-}
-
 func TestServerGroupResource_Create(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -316,7 +276,7 @@ func TestServerGroupResource_Create(t *testing.T) {
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
 				Description:     types.StringNull(),
-				NodeAttestation: &NodeAttestationModel{
+				Attestation: &AttestationModel{
 					X509Pop: &X509PopModel{
 						CaCertificates: types.StringValue("-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"),
 					},
@@ -326,10 +286,7 @@ func TestServerGroupResource_Create(t *testing.T) {
 				sg := makeServerGroupResponse("prod-servers", "prod.example.org")
 				m.On("PostServerGroupWithResponse", context.Background(), "prod.example.org", &swaclient.PostServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PostServerGroupJSONRequestBody{
 					Name: "prod-servers",
-					NodeAttestation: struct {
-						K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
-						X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
-					}{
+					Attestation: &swaclient.AttestationConfiguration{
 						X509pop: &swaclient.X509PopConfigurationInput{
 							CaCertificates: "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----",
 						},
@@ -347,7 +304,7 @@ func TestServerGroupResource_Create(t *testing.T) {
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
 				Description:     types.StringValue("Production servers"),
-				NodeAttestation: &NodeAttestationModel{
+				Attestation: &AttestationModel{
 					X509Pop: &X509PopModel{
 						CaCertificates: types.StringValue("-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"),
 					},
@@ -361,10 +318,7 @@ func TestServerGroupResource_Create(t *testing.T) {
 				m.On("PostServerGroupWithResponse", context.Background(), "prod.example.org", &swaclient.PostServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PostServerGroupJSONRequestBody{
 					Name:        "prod-servers",
 					Description: &descPtr,
-					NodeAttestation: struct {
-						K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
-						X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
-					}{
+					Attestation: &swaclient.AttestationConfiguration{
 						X509pop: &swaclient.X509PopConfigurationInput{
 							CaCertificates: "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----",
 						},
@@ -377,32 +331,84 @@ func TestServerGroupResource_Create(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			name: "missing node_attestation block",
+			// When gcp_service_account is configured, the request must go out on the newer
+			// attestation API field.
+			name: "successful creation with GCP service account attestation",
 			data: ServerGroupResourceModel{
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
+				Description:     types.StringNull(),
+				Attestation: &AttestationModel{
+					GcpServiceAccount: &GcpServiceAccountModel{
+						AllowedProjectIDs: mustStringList(t, "project-a", "project-b"),
+						Audiences:         mustStringList(t, "urn:panw:swa"),
+					},
+				},
 			},
-			setupMock:     func(m *swamocks.MockClientWithResponsesInterface) {},
-			expectedError: true,
-			errorContains: "Missing node attestation",
+			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
+				sg := makeServerGroupResponse("prod-servers", "prod.example.org")
+				audiences := []string{"urn:panw:swa"}
+				m.On("PostServerGroupWithResponse", context.Background(), "prod.example.org", &swaclient.PostServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PostServerGroupJSONRequestBody{
+					Name: "prod-servers",
+					Attestation: &swaclient.AttestationConfiguration{
+						GcpServiceAccount: &swaclient.GcpServiceAccountAttestationConfiguration{
+							AllowedProjectIds: []string{"project-a", "project-b"},
+							Audiences:         &audiences,
+						},
+					},
+				}).Return(&swaclient.PostServerGroupResponse{
+					HTTPResponse:                    makeHTTPResponse(http.StatusCreated),
+					ApplicationxSecretsmgrV2JSON201: sg,
+				}, nil)
+			},
+			expectedError: false,
 		},
 		{
-			name: "node_attestation with neither x509pop nor k8s_psat",
+			// The spec allows a server group with no attestation at all; the request omits
+			// the attestation field entirely.
+			name: "successful creation without attestation block",
 			data: ServerGroupResourceModel{
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
-				NodeAttestation: &NodeAttestationModel{},
 			},
-			setupMock:     func(m *swamocks.MockClientWithResponsesInterface) {},
-			expectedError: true,
-			errorContains: "Missing node attestation",
+			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
+				sg := makeServerGroupResponse("prod-servers", "prod.example.org")
+				m.On("PostServerGroupWithResponse", context.Background(), "prod.example.org", &swaclient.PostServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PostServerGroupJSONRequestBody{
+					Name: "prod-servers",
+				}).Return(&swaclient.PostServerGroupResponse{
+					HTTPResponse:                    makeHTTPResponse(http.StatusCreated),
+					ApplicationxSecretsmgrV2JSON201: sg,
+				}, nil)
+			},
+			expectedError: false,
+		},
+		{
+			// An attestation block with no methods is also valid; it serializes to an empty
+			// attestation object.
+			name: "successful creation with empty attestation block",
+			data: ServerGroupResourceModel{
+				Name:            types.StringValue("prod-servers"),
+				TrustDomainName: types.StringValue("prod.example.org"),
+				Attestation:     &AttestationModel{},
+			},
+			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
+				sg := makeServerGroupResponse("prod-servers", "prod.example.org")
+				m.On("PostServerGroupWithResponse", context.Background(), "prod.example.org", &swaclient.PostServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PostServerGroupJSONRequestBody{
+					Name:        "prod-servers",
+					Attestation: &swaclient.AttestationConfiguration{},
+				}).Return(&swaclient.PostServerGroupResponse{
+					HTTPResponse:                    makeHTTPResponse(http.StatusCreated),
+					ApplicationxSecretsmgrV2JSON201: sg,
+				}, nil)
+			},
+			expectedError: false,
 		},
 		{
 			name: "API error during creation",
 			data: ServerGroupResourceModel{
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
-				NodeAttestation: &NodeAttestationModel{
+				Attestation: &AttestationModel{
 					X509Pop: &X509PopModel{
 						CaCertificates: types.StringValue("cert"),
 					},
@@ -411,10 +417,7 @@ func TestServerGroupResource_Create(t *testing.T) {
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				m.On("PostServerGroupWithResponse", context.Background(), "prod.example.org", &swaclient.PostServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PostServerGroupJSONRequestBody{
 					Name: "prod-servers",
-					NodeAttestation: struct {
-						K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
-						X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
-					}{
+					Attestation: &swaclient.AttestationConfiguration{
 						X509pop: &swaclient.X509PopConfigurationInput{CaCertificates: "cert"},
 					},
 				}).Return(nil, fmt.Errorf("connection refused"))
@@ -427,7 +430,7 @@ func TestServerGroupResource_Create(t *testing.T) {
 			data: ServerGroupResourceModel{
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
-				NodeAttestation: &NodeAttestationModel{
+				Attestation: &AttestationModel{
 					X509Pop: &X509PopModel{
 						CaCertificates: types.StringValue("cert"),
 					},
@@ -436,10 +439,7 @@ func TestServerGroupResource_Create(t *testing.T) {
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				m.On("PostServerGroupWithResponse", context.Background(), "prod.example.org", &swaclient.PostServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PostServerGroupJSONRequestBody{
 					Name: "prod-servers",
-					NodeAttestation: struct {
-						K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
-						X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
-					}{
+					Attestation: &swaclient.AttestationConfiguration{
 						X509pop: &swaclient.X509PopConfigurationInput{CaCertificates: "cert"},
 					},
 				}).Return(&swaclient.PostServerGroupResponse{
@@ -500,7 +500,7 @@ func TestServerGroupResource_Read(t *testing.T) {
 				ID:              types.StringValue("prod.example.org/prod-servers"),
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
-				NodeAttestation: &NodeAttestationModel{
+				Attestation: &AttestationModel{
 					X509Pop: &X509PopModel{
 						CaCertificates: types.StringValue("stale-cert"),
 					},
@@ -508,34 +508,7 @@ func TestServerGroupResource_Read(t *testing.T) {
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				sg := makeServerGroupResponse("prod-servers", "prod.example.org")
-				sg.NodeAttestation = &struct {
-					K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
-					X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
-				}{
-					X509pop: &swaclient.X509PopConfigurationInput{CaCertificates: "fresh-cert"},
-				}
-				m.On("GetServerGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.GetServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
-					Return(&swaclient.GetServerGroupResponse{
-						HTTPResponse:                    makeHTTPResponse(http.StatusOK),
-						ApplicationxSecretsmgrV2JSON200: sg,
-					}, nil)
-			},
-			expectedError: false,
-			expectedCert:  "fresh-cert",
-		},
-		{
-			name: "read hydrates node attestation when missing from state",
-			data: ServerGroupResourceModel{
-				ID:              types.StringValue("prod.example.org/prod-servers"),
-				Name:            types.StringValue("prod-servers"),
-				TrustDomainName: types.StringValue("prod.example.org"),
-			},
-			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
-				sg := makeServerGroupResponse("prod-servers", "prod.example.org")
-				sg.NodeAttestation = &struct {
-					K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
-					X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
-				}{
+				sg.Attestation = &swaclient.AttestationConfiguration{
 					X509pop: &swaclient.X509PopConfigurationInput{CaCertificates: "fresh-cert"},
 				}
 				m.On("GetServerGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.GetServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
@@ -553,7 +526,7 @@ func TestServerGroupResource_Read(t *testing.T) {
 				ID:              types.StringValue("prod.example.org/missing-servers"),
 				Name:            types.StringValue("missing-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
-				NodeAttestation: &NodeAttestationModel{
+				Attestation: &AttestationModel{
 					X509Pop: &X509PopModel{
 						CaCertificates: types.StringValue("cert"),
 					},
@@ -574,7 +547,7 @@ func TestServerGroupResource_Read(t *testing.T) {
 				ID:              types.StringValue("prod.example.org/prod-servers"),
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
-				NodeAttestation: &NodeAttestationModel{
+				Attestation: &AttestationModel{
 					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
 				},
 			},
@@ -594,7 +567,7 @@ func TestServerGroupResource_Read(t *testing.T) {
 				ID:              types.StringValue("prod.example.org/prod-servers"),
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
-				NodeAttestation: &NodeAttestationModel{
+				Attestation: &AttestationModel{
 					X509Pop: &X509PopModel{
 						CaCertificates: types.StringValue("cert"),
 					},
@@ -642,9 +615,9 @@ func TestServerGroupResource_Read(t *testing.T) {
 					var result ServerGroupResourceModel
 					diag := resp.State.Get(ctx, &result)
 					require.False(t, diag.HasError())
-					require.NotNil(t, result.NodeAttestation)
-					require.NotNil(t, result.NodeAttestation.X509Pop)
-					assert.Equal(t, tt.expectedCert, result.NodeAttestation.X509Pop.CaCertificates.ValueString())
+					require.NotNil(t, result.Attestation)
+					require.NotNil(t, result.Attestation.X509Pop)
+					assert.Equal(t, tt.expectedCert, result.Attestation.X509Pop.CaCertificates.ValueString())
 				}
 			}
 		})
@@ -665,7 +638,7 @@ func TestServerGroupResource_Delete(t *testing.T) {
 				ID:              types.StringValue("prod.example.org/prod-servers"),
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
-				NodeAttestation: &NodeAttestationModel{
+				Attestation: &AttestationModel{
 					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
 				},
 			},
@@ -683,7 +656,7 @@ func TestServerGroupResource_Delete(t *testing.T) {
 				ID:              types.StringValue("prod.example.org/prod-servers"),
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
-				NodeAttestation: &NodeAttestationModel{
+				Attestation: &AttestationModel{
 					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
 				},
 			},
@@ -701,7 +674,7 @@ func TestServerGroupResource_Delete(t *testing.T) {
 				ID:              types.StringValue("prod.example.org/prod-servers"),
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
-				NodeAttestation: &NodeAttestationModel{
+				Attestation: &AttestationModel{
 					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
 				},
 			},
@@ -718,7 +691,7 @@ func TestServerGroupResource_Delete(t *testing.T) {
 				ID:              types.StringValue("prod.example.org/prod-servers"),
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
-				NodeAttestation: &NodeAttestationModel{
+				Attestation: &AttestationModel{
 					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
 				},
 			},
@@ -782,7 +755,7 @@ func TestServerGroupResource_Update(t *testing.T) {
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
 				Description:     types.StringValue("updated description"),
-				NodeAttestation: &NodeAttestationModel{
+				Attestation: &AttestationModel{
 					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
 				},
 			},
@@ -791,7 +764,7 @@ func TestServerGroupResource_Update(t *testing.T) {
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
 				Description:     types.StringNull(),
-				NodeAttestation: &NodeAttestationModel{
+				Attestation: &AttestationModel{
 					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
 				},
 			},
@@ -801,10 +774,7 @@ func TestServerGroupResource_Update(t *testing.T) {
 				sg.Description = &desc
 				m.On("PatchServerGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.PatchServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchServerGroupJSONRequestBody{
 					Description: &desc,
-					NodeAttestation: &struct {
-						K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
-						X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
-					}{
+					Attestation: &swaclient.AttestationConfiguration{
 						X509pop: &swaclient.X509PopConfigurationInput{CaCertificates: "cert"},
 					},
 				}).Return(&swaclient.PatchServerGroupResponse{
@@ -821,7 +791,7 @@ func TestServerGroupResource_Update(t *testing.T) {
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
 				Description:     types.StringNull(),
-				NodeAttestation: &NodeAttestationModel{
+				Attestation: &AttestationModel{
 					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
 				},
 			},
@@ -830,16 +800,13 @@ func TestServerGroupResource_Update(t *testing.T) {
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
 				Description:     types.StringNull(),
-				NodeAttestation: &NodeAttestationModel{
+				Attestation: &AttestationModel{
 					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
 				},
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				m.On("PatchServerGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.PatchServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchServerGroupJSONRequestBody{
-					NodeAttestation: &struct {
-						K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
-						X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
-					}{
+					Attestation: &swaclient.AttestationConfiguration{
 						X509pop: &swaclient.X509PopConfigurationInput{CaCertificates: "cert"},
 					},
 				}).Return(nil, fmt.Errorf("connection refused"))
@@ -848,7 +815,9 @@ func TestServerGroupResource_Update(t *testing.T) {
 			errorContains: "Error updating server group",
 		},
 		{
-			name: "missing node_attestation block",
+			// Removing the attestation block is a valid update; the request omits the
+			// attestation field entirely.
+			name: "successful update removing attestation",
 			plan: ServerGroupResourceModel{
 				ID:              types.StringValue("prod.example.org/prod-servers"),
 				Name:            types.StringValue("prod-servers"),
@@ -860,13 +829,19 @@ func TestServerGroupResource_Update(t *testing.T) {
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
 				Description:     types.StringNull(),
-				NodeAttestation: &NodeAttestationModel{
+				Attestation: &AttestationModel{
 					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
 				},
 			},
-			setupMock:     func(m *swamocks.MockClientWithResponsesInterface) {},
-			expectedError: true,
-			errorContains: "Missing node attestation",
+			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
+				sg := makeServerGroupResponse("prod-servers", "prod.example.org")
+				sg.Attestation = nil
+				m.On("PatchServerGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.PatchServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchServerGroupJSONRequestBody{}).Return(&swaclient.PatchServerGroupResponse{
+					HTTPResponse:                    makeHTTPResponse(http.StatusOK),
+					ApplicationxSecretsmgrV2JSON200: sg,
+				}, nil)
+			},
+			expectedError: false,
 		},
 		{
 			name: "non-200 status code",
@@ -875,7 +850,7 @@ func TestServerGroupResource_Update(t *testing.T) {
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
 				Description:     types.StringNull(),
-				NodeAttestation: &NodeAttestationModel{
+				Attestation: &AttestationModel{
 					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
 				},
 			},
@@ -884,16 +859,13 @@ func TestServerGroupResource_Update(t *testing.T) {
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
 				Description:     types.StringNull(),
-				NodeAttestation: &NodeAttestationModel{
+				Attestation: &AttestationModel{
 					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
 				},
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				m.On("PatchServerGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.PatchServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchServerGroupJSONRequestBody{
-					NodeAttestation: &struct {
-						K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
-						X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
-					}{
+					Attestation: &swaclient.AttestationConfiguration{
 						X509pop: &swaclient.X509PopConfigurationInput{CaCertificates: "cert"},
 					},
 				}).Return(&swaclient.PatchServerGroupResponse{
@@ -1009,17 +981,6 @@ func TestServerGroupResource_ImportState(t *testing.T) {
 	})
 }
 
-func buildServerGroupConfigFromModel(data ServerGroupResourceModel) tfsdk.Config {
-	plan := newPlanWithSchema(getServerGroupTestSchema())
-	ctx := context.Background()
-	plan.Set(ctx, &data)
-
-	return tfsdk.Config{
-		Raw:    plan.Raw,
-		Schema: getServerGroupTestSchema(),
-	}
-}
-
 func getServerGroupTestSchema() schema.Schema {
 	r := &ServerGroupResource{}
 	var schemaResp resource.SchemaResponse
@@ -1045,7 +1006,7 @@ func TestServerGroupResource_Schema_RequiresReplace(t *testing.T) {
 		{"trust_domain_name", true},
 		{"id", false},
 		{"description", false},
-		{"node_attestation", false},
+		{"attestation", false},
 	}
 
 	const requiresReplaceDesc = "If the value of this attribute changes, Terraform will destroy and recreate the resource."
@@ -1097,10 +1058,7 @@ func TestServerGroupResource_CreateAndDelete(t *testing.T) {
 			ApplicationxSecretsmgrV2JSON201: &swaclient.ServerGroupResponse{
 				Name:            "test-sg",
 				TrustDomainName: "test-td",
-				NodeAttestation: &struct {
-					K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
-					X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
-				}{
+				Attestation: &swaclient.AttestationConfiguration{
 					X509pop: &swaclient.X509PopConfigurationInput{CaCertificates: cert},
 				},
 			},
@@ -1113,10 +1071,7 @@ func TestServerGroupResource_CreateAndDelete(t *testing.T) {
 			ApplicationxSecretsmgrV2JSON200: &swaclient.ServerGroupResponse{
 				Name:            "test-sg",
 				TrustDomainName: "test-td",
-				NodeAttestation: &struct {
-					K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
-					X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
-				}{
+				Attestation: &swaclient.AttestationConfiguration{
 					X509pop: &swaclient.X509PopConfigurationInput{CaCertificates: cert},
 				},
 			},
@@ -1134,7 +1089,7 @@ func TestServerGroupResource_CreateAndDelete(t *testing.T) {
 resource "conjur_swa_server_group" "test" {
   name              = "test-sg"
   trust_domain_name = "test-td"
-  node_attestation = {
+  attestation = {
     x509pop = {
       ca_certificates = "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"
     }
@@ -1157,10 +1112,7 @@ func TestServerGroupResource_NameChange_RequiresReplace(t *testing.T) {
 	mockClient := swamocks.NewMockClientWithResponsesInterface(t)
 
 	cert := "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"
-	nodeAtt := &struct {
-		K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
-		X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
-	}{
+	att := &swaclient.AttestationConfiguration{
 		X509pop: &swaclient.X509PopConfigurationInput{CaCertificates: cert},
 	}
 
@@ -1170,7 +1122,7 @@ func TestServerGroupResource_NameChange_RequiresReplace(t *testing.T) {
 		Return(&swaclient.PostServerGroupResponse{
 			HTTPResponse: makeHTTPResponse(http.StatusCreated),
 			ApplicationxSecretsmgrV2JSON201: &swaclient.ServerGroupResponse{
-				Name: "sg-one", TrustDomainName: "test-td", NodeAttestation: nodeAtt,
+				Name: "sg-one", TrustDomainName: "test-td", Attestation: att,
 			},
 		}, nil).Times(1)
 
@@ -1180,7 +1132,7 @@ func TestServerGroupResource_NameChange_RequiresReplace(t *testing.T) {
 		Return(&swaclient.PostServerGroupResponse{
 			HTTPResponse: makeHTTPResponse(http.StatusCreated),
 			ApplicationxSecretsmgrV2JSON201: &swaclient.ServerGroupResponse{
-				Name: "sg-two", TrustDomainName: "test-td", NodeAttestation: nodeAtt,
+				Name: "sg-two", TrustDomainName: "test-td", Attestation: att,
 			},
 		}, nil).Times(1)
 
@@ -1189,7 +1141,7 @@ func TestServerGroupResource_NameChange_RequiresReplace(t *testing.T) {
 		Return(&swaclient.GetServerGroupResponse{
 			HTTPResponse: makeHTTPResponse(http.StatusOK),
 			ApplicationxSecretsmgrV2JSON200: &swaclient.ServerGroupResponse{
-				Name: "sg-one", TrustDomainName: "test-td", NodeAttestation: nodeAtt,
+				Name: "sg-one", TrustDomainName: "test-td", Attestation: att,
 			},
 		}, nil).Maybe()
 
@@ -1198,7 +1150,7 @@ func TestServerGroupResource_NameChange_RequiresReplace(t *testing.T) {
 		Return(&swaclient.GetServerGroupResponse{
 			HTTPResponse: makeHTTPResponse(http.StatusOK),
 			ApplicationxSecretsmgrV2JSON200: &swaclient.ServerGroupResponse{
-				Name: "sg-two", TrustDomainName: "test-td", NodeAttestation: nodeAtt,
+				Name: "sg-two", TrustDomainName: "test-td", Attestation: att,
 			},
 		}, nil).Maybe()
 
@@ -1218,7 +1170,7 @@ func TestServerGroupResource_NameChange_RequiresReplace(t *testing.T) {
 resource "conjur_swa_server_group" "test" {
   name              = "sg-one"
   trust_domain_name = "test-td"
-  node_attestation = {
+  attestation = {
     x509pop = {
       ca_certificates = "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"
     }
@@ -1232,7 +1184,7 @@ resource "conjur_swa_server_group" "test" {
 resource "conjur_swa_server_group" "test" {
   name              = "sg-two"
   trust_domain_name = "test-td"
-  node_attestation = {
+  attestation = {
     x509pop = {
       ca_certificates = "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"
     }
@@ -1254,10 +1206,7 @@ func TestServerGroupResource_RemoveX509PopKeepK8sPsat(t *testing.T) {
 	audience := []string{"swa-server"}
 	cert := "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"
 
-	bothNodeAtt := &struct {
-		K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
-		X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
-	}{
+	bothAtt := &swaclient.AttestationConfiguration{
 		X509pop: &swaclient.X509PopConfigurationInput{CaCertificates: cert},
 		K8sPsat: &swaclient.K8sPsatConfigurationInput{
 			Clusters: &map[string]swaclient.K8sPsatCluster{
@@ -1265,10 +1214,7 @@ func TestServerGroupResource_RemoveX509PopKeepK8sPsat(t *testing.T) {
 			},
 		},
 	}
-	k8sOnlyNodeAtt := &struct {
-		K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
-		X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
-	}{
+	k8sOnlyAtt := &swaclient.AttestationConfiguration{
 		K8sPsat: &swaclient.K8sPsatConfigurationInput{
 			Clusters: &map[string]swaclient.K8sPsatCluster{
 				"cluster-1": {ServiceAccountAllowList: &saList, Audience: &audience},
@@ -1281,7 +1227,7 @@ func TestServerGroupResource_RemoveX509PopKeepK8sPsat(t *testing.T) {
 		Return(&swaclient.PostServerGroupResponse{
 			HTTPResponse: makeHTTPResponse(http.StatusCreated),
 			ApplicationxSecretsmgrV2JSON201: &swaclient.ServerGroupResponse{
-				Name: "test-sg", TrustDomainName: "test-td", NodeAttestation: bothNodeAtt,
+				Name: "test-sg", TrustDomainName: "test-td", Attestation: bothAtt,
 			},
 		}, nil).Times(1)
 
@@ -1291,21 +1237,21 @@ func TestServerGroupResource_RemoveX509PopKeepK8sPsat(t *testing.T) {
 		Return(&swaclient.GetServerGroupResponse{
 			HTTPResponse: makeHTTPResponse(http.StatusOK),
 			ApplicationxSecretsmgrV2JSON200: &swaclient.ServerGroupResponse{
-				Name: "test-sg", TrustDomainName: "test-td", NodeAttestation: bothNodeAtt,
+				Name: "test-sg", TrustDomainName: "test-td", Attestation: bothAtt,
 			},
 		}, nil).Times(2)
 
 	mockClient.EXPECT().
 		PatchServerGroupWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything,
 			mock.MatchedBy(func(body swaclient.PatchServerGroupJSONRequestBody) bool {
-				return body.NodeAttestation != nil &&
-					body.NodeAttestation.X509pop == nil &&
-					body.NodeAttestation.K8sPsat != nil
+				return body.Attestation != nil &&
+					body.Attestation.X509pop == nil &&
+					body.Attestation.K8sPsat != nil
 			})).
 		Return(&swaclient.PatchServerGroupResponse{
 			HTTPResponse: makeHTTPResponse(http.StatusOK),
 			ApplicationxSecretsmgrV2JSON200: &swaclient.ServerGroupResponse{
-				Name: "test-sg", TrustDomainName: "test-td", NodeAttestation: k8sOnlyNodeAtt,
+				Name: "test-sg", TrustDomainName: "test-td", Attestation: k8sOnlyAtt,
 			},
 		}, nil).Times(1)
 
@@ -1314,7 +1260,7 @@ func TestServerGroupResource_RemoveX509PopKeepK8sPsat(t *testing.T) {
 		Return(&swaclient.GetServerGroupResponse{
 			HTTPResponse: makeHTTPResponse(http.StatusOK),
 			ApplicationxSecretsmgrV2JSON200: &swaclient.ServerGroupResponse{
-				Name: "test-sg", TrustDomainName: "test-td", NodeAttestation: k8sOnlyNodeAtt,
+				Name: "test-sg", TrustDomainName: "test-td", Attestation: k8sOnlyAtt,
 			},
 		}, nil).Maybe()
 
@@ -1330,7 +1276,7 @@ func TestServerGroupResource_RemoveX509PopKeepK8sPsat(t *testing.T) {
 resource "conjur_swa_server_group" "test" {
   name              = "test-sg"
   trust_domain_name = "test-td"
-  node_attestation = {
+  attestation = {
     x509pop = {
       ca_certificates = "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"
     }
@@ -1346,8 +1292,8 @@ resource "conjur_swa_server_group" "test" {
 }
 `,
 				Check: tfresource.ComposeTestCheckFunc(
-					tfresource.TestCheckResourceAttrSet("conjur_swa_server_group.test", "node_attestation.x509pop.ca_certificates"),
-					tfresource.TestCheckResourceAttrSet("conjur_swa_server_group.test", "node_attestation.k8s_psat.clusters.cluster-1.service_account_allow_list.0"),
+					tfresource.TestCheckResourceAttrSet("conjur_swa_server_group.test", "attestation.x509pop.ca_certificates"),
+					tfresource.TestCheckResourceAttrSet("conjur_swa_server_group.test", "attestation.k8s_psat.clusters.cluster-1.service_account_allow_list.0"),
 				),
 			},
 			{
@@ -1355,7 +1301,7 @@ resource "conjur_swa_server_group" "test" {
 resource "conjur_swa_server_group" "test" {
   name              = "test-sg"
   trust_domain_name = "test-td"
-  node_attestation = {
+  attestation = {
     k8s_psat = {
       clusters = {
         "cluster-1" = {
@@ -1368,8 +1314,8 @@ resource "conjur_swa_server_group" "test" {
 }
 `,
 				Check: tfresource.ComposeTestCheckFunc(
-					tfresource.TestCheckNoResourceAttr("conjur_swa_server_group.test", "node_attestation.x509pop.ca_certificates"),
-					tfresource.TestCheckResourceAttrSet("conjur_swa_server_group.test", "node_attestation.k8s_psat.clusters.cluster-1.service_account_allow_list.0"),
+					tfresource.TestCheckNoResourceAttr("conjur_swa_server_group.test", "attestation.x509pop.ca_certificates"),
+					tfresource.TestCheckResourceAttrSet("conjur_swa_server_group.test", "attestation.k8s_psat.clusters.cluster-1.service_account_allow_list.0"),
 				),
 			},
 		},

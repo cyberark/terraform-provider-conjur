@@ -64,6 +64,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
         '500':
@@ -117,6 +119,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/TrustDomainNotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
         '500':
           $ref: '#/components/responses/InternalServerError'
     patch:
@@ -261,6 +265,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/TrustDomainNotFound'
         '422':
@@ -361,6 +367,12 @@ paths:
           $ref: '#/components/responses/NodeGroupListSuccess'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ServerGroupNotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
         '500':
           $ref: '#/components/responses/InternalServerError'
     post:
@@ -546,12 +558,41 @@ paths:
       responses:
         '204':
           description: Deleted successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/ServerNotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    patch:
+      summary: Update SWA server
+      description: Updates the authenticator configuration for the path `server-name`.
+      operationId: patch-server
+      tags:
+        - Servers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateServerRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/ServerSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/ServerNotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -814,6 +855,12 @@ components:
       value:
         code: server_already_exists
         message: "server with name 'example-server' already exists"
+    ServerLimitExceeded:
+      value:
+        code: server_limit_exceeded
+        message: >-
+          The maximum number of servers allowed for this tenant has been reached. Delete
+          an unused server before creating a new one.
     Unauthorized:
       value:
         code: unauthorized
@@ -893,7 +940,9 @@ components:
             ServerGroupAlreadyExists:
               $ref: '#/components/examples/ServerGroupAlreadyExists'
     ServerConflict:
-      description: A server with this name already exists.
+      description: >
+        A server with this name already exists, or the tenant has reached its maximum number of
+        allowed servers.
       headers:
         Content-Type:
           $ref: '#/components/headers/Content-Type-V2'
@@ -904,6 +953,8 @@ components:
           examples:
             ServerAlreadyExists:
               $ref: '#/components/examples/ServerAlreadyExists'
+            ServerLimitExceeded:
+              $ref: '#/components/examples/ServerLimitExceeded'
     ServerNotFound:
       description: The requested server does not exist.
       headers:
@@ -1120,7 +1171,6 @@ components:
       type: object
       required:
         - name
-        - node_attestation
       properties:
         name:
           type: string
@@ -1137,13 +1187,17 @@ components:
           description: Server group description.
           example: 'Production server group for application services'
         node_attestation:
-          type: object
-          description: Node attestation settings organized by type. Include at least one supported attestation object.
-          properties:
-            x509pop:
-              $ref: '#/components/schemas/X509PopConfigurationInput'
-            k8s_psat:
-              $ref: '#/components/schemas/K8sPsatConfigurationInput'
+          allOf:
+            - $ref: '#/components/schemas/DeprecatedAttestationConfiguration'
+          deprecated: true
+        attestation:
+          $ref: '#/components/schemas/AttestationConfiguration'
+      # attestation and node_attestation are aliases; providing both is invalid.
+      # Neither is also valid (server group with no attestation).
+      not:
+        required:
+          - node_attestation
+          - attestation
 
     UpdateTrustDomainRequest:
       type: object
@@ -1163,13 +1217,55 @@ components:
           description: Optional description of the server group.
           example: 'Production server group for application services'
         node_attestation:
-          type: object
-          description: Node attestation settings organized by type. Include at least one supported attestation object.
+          allOf:
+            - $ref: '#/components/schemas/DeprecatedAttestationConfiguration'
+          deprecated: true
+        attestation:
+          $ref: '#/components/schemas/AttestationConfiguration'
+      # attestation and node_attestation are aliases; providing both is invalid.
+      # Neither is also valid (e.g. description-only PATCH).
+      not:
+        required:
+          - node_attestation
+          - attestation
+
+    DeprecatedAttestationConfiguration:
+      type: object
+      description: Node attestation settings organized by type. Include at least one supported attestation object.
+      properties:
+        x509pop:
+          $ref: '#/components/schemas/X509PopConfigurationInput'
+        k8s_psat:
+          $ref: '#/components/schemas/K8sPsatConfigurationInput'
+
+
+    GcpServiceAccountAttestationConfiguration:
+      type: object
+      required: [allowed_project_ids]
+      properties:
+        audiences:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          default: [urn:panw:swa]
+          description: Expected audience values for the GCP identity token (`aud` claim). Defaults to `urn:panw:swa` when omitted.
+        allowed_project_ids:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          description: List of allowed GCP project IDs.
+
+    AttestationConfiguration:
+      type: object
+      description: Node attestation settings organized by type. Include at least one supported attestation object.
+      allOf:
+        - $ref: '#/components/schemas/DeprecatedAttestationConfiguration'
+        - type: object
           properties:
-            x509pop:
-              $ref: '#/components/schemas/X509PopConfigurationInput'
-            k8s_psat:
-              $ref: '#/components/schemas/K8sPsatConfigurationInput'
+            gcp_service_account:
+              $ref: '#/components/schemas/GcpServiceAccountAttestationConfiguration'
 
     X509PopConfigurationInput:
       type: object
@@ -1453,13 +1549,13 @@ components:
           format: uri
           maxLength: 2048
           description: OIDC discovery endpoint for the trust domain issuer.
-          example: 'https://prod.cyberark.cloud/api/swa/trust-domains/prod.cyberark.cloud/.well-known/openid-configuration'
+          example: 'https://example.secretsmgr.cyberark.cloud/api/swa/trust-domains/prod.example.com/.well-known/openid-configuration'
         jwks_uri:
           type: string
           format: uri
           maxLength: 2048
           description: JWKS endpoint for the trust domain issuer.
-          example: 'https://prod.cyberark.cloud/api/swa/trust-domains/prod.cyberark.cloud/.well-known/jwks'
+          example: 'https://example.secretsmgr.cyberark.cloud/api/swa/trust-domains/prod.example.com/.well-known/jwks'
 
     ServerGroupResponse:
       type: object
@@ -1483,13 +1579,11 @@ components:
           description: Server group description, if defined.
           example: 'Production server group for application services'
         node_attestation:
-          type: object
-          description: Node attestation configuration returned for the server group.
-          properties:
-            x509pop:
-              $ref: '#/components/schemas/X509PopConfigurationInput'
-            k8s_psat:
-              $ref: '#/components/schemas/K8sPsatConfigurationInput'
+          allOf:
+            - $ref: '#/components/schemas/DeprecatedAttestationConfiguration'
+          deprecated: true
+        attestation:
+          $ref: '#/components/schemas/AttestationConfiguration'
         created_at:
           type: string
           format: date-time
@@ -1537,6 +1631,123 @@ components:
           oneOf:
             # Add other authentication data types here in the future
             - $ref: '#/components/schemas/CreateServerJWTAuthenticationData'
+
+    UpdateServerRequest:
+      type: object
+      required:
+        - authentication
+      properties:
+        authentication:
+          $ref: '#/components/schemas/UpdateServerAuthenticationInput'
+
+    UpdateServerAuthenticationInput:
+      type: object
+      minProperties: 1
+      properties:
+        type:
+          type: string
+          description: Authentication type. Updating this field is not currently supported.
+          enum: [JWT]
+          example: "JWT"
+        data:
+          description: >
+            Authenticator data fields. The shape depends on the authentication type
+            used when the server was created. At least one field is required if provided.
+          oneOf:
+            - $ref: '#/components/schemas/UpdateServerJWTAuthenticationData'
+        annotations:
+          type: object
+          description: Metadata annotations. At least one field is required if provided.
+          minProperties: 1
+          properties:
+            env:
+              type: string
+              minLength: 1
+              maxLength: 255
+            kubernetes_cluster:
+              type: string
+              minLength: 1
+              maxLength: 255
+
+    UpdateServerJWTAuthenticationData:
+      type: object
+      description: >
+        JWT authenticator data fields. Only one of `jwks_uri` or `public_keys` may
+        be provided, matching whichever was set at creation time.
+
+        Updating the `sub` field is not currently supported.
+      minProperties: 1
+      properties:
+        sub:
+          type: string
+          description: Subject claim value. Updating this field is not currently supported.
+        issuer:
+          type: string
+          description: |-
+            Used to validate the JWT's `iss` claim.
+
+            When using `jwks_uri`, this field is optional; if not provided, the issuer is taken from the `jwks_uri`.
+          pattern: '[^<> ]'
+          minLength: 1
+          maxLength: 255
+        jwks_uri:
+          type: string
+          description: |-
+            **Only updatable if the server was originally created with `jwks_uri`.**
+
+            The resource for a set of JSON-encoded public keys (JWKS), one of which corresponds to
+            the key used to digitally sign the JWT. The keys must be encoded as a JWK Set (RFC7517).
+
+            Value: A JWKS URL, beginning with `https://`
+
+            If you are authenticating to an Edge, make sure that the Edge has access to the JWKS URL.
+
+            When using this option, we strongly recommend that you use TLS communication with the public-keys server provider, thereby following best security practices.
+          pattern: '[^<> ?]'
+          minLength: 1
+          maxLength: 255
+        audience:
+          type: string
+          description: |-
+            If the JWT has an audience claim (`aud`), you can include this variable to validate the
+            claim. The audience variable accepts a single value and must match at least one of the
+            JWT's `aud` values.
+          pattern: '[^<> ]'
+          minLength: 1
+          maxLength: 1000
+        public_keys:
+          type: object
+          description: |-
+            **Only updatable if the server was originally created with `public_keys`.**
+
+            When Secrets Manager is unable to reach a remote JWKS URL, you can use this variable to
+            provide a JWKS to the JWT Authenticator.
+
+            Value: A JSON object with these fields -
+            * `type` (string): must be `jwks`
+            * `value`: the JWKS
+
+            in the following format:
+
+            `{"type":"jwks", "value":<JWKS>}`
+
+            For example:
+
+            ```{
+              "type":"jwks",
+              "value": {
+                "keys":[
+                  {
+                    "use":"sig",
+                    "kty":"RSA",
+                    "kid":"D1wArl26HhE2bFf4o4lAnnr0xtxcKt2ElJgFQnRgXk",
+                    "alg":"RS256",   "n":"9gRcfAj1FsaX_hJ4__r6dXEs9AAETFPIG4pRti87XUyx-hi6z4dWvhkxLxZ12dKVGfWUkVRbLCUTfNlT9zueMib2HZ9mnk2oXJCBUuzi6JoIm1A5JyP-q_0GR6vCNH_Z7BVFI9cQKFprku6xpYZzdJcdAibzU12RuVsE0L3LKMolDS7Nhr6wKU1m8Ka-sNkFl1qciWO4oQcv3AUnOJvzMotCOzA_5MCyS6CGqWFXJo1KvzqrnIlJoA8tfnT5vnfSJhiWC_FYoeSPCmY3VnGvFs6PTJDa3Gfvb7U1X4S5ztnI6Y_ac3GtSdmVDnQPsOkKQI8669MHq-Bd-8C6Vp6UNQ",
+                    "e":"AQAB"
+                  }
+                ]
+              }
+            }
+          additionalProperties: {}
 
     JWTAuthenParams:
       # Auto-generated from https://github.com/CyberArk-docs/conjur-cloud-api.git
@@ -1726,9 +1937,9 @@ components:
       type: object
       description: |
         Conjur JWT authenticator configuration. The `sub` field is the subject claim value from the workload JWT
-        that identifies the server workload. All other fields pass through to the Conjur Cloud API.
+        that identifies the server workload. All other fields pass through to the Secrets Manager, SaaS API.
 
-        For more information, see the Conjur Cloud API documentation for supported fields and validation rules:
+        For more information, see the Secrets Manager, SaaS API documentation for supported fields and validation rules:
         https://docs.cyberark.com/secrets-manager-saas/latest/en/content/conjurcloud/apis/ccl-api-create-auth.htm?tocpath=Developer%20reference%7CSecrets%20Manager%20REST%20APIs%7CREST%20APIs%20v2%7CManage%20authenticators%7C_____1#Requestbody:~:text=JWT%20authenticator%20data%C2%A0object
       allOf:
         - $ref: '#/components/schemas/JWTAuthenParams'
@@ -2095,4 +2306,3 @@ components:
               items:
                 type: string
                 format: byte
-

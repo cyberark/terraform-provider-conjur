@@ -23,13 +23,13 @@ const (
 
 // Defines values for CreateServerAuthenticationType.
 const (
-	JWT CreateServerAuthenticationType = "JWT"
+	CreateServerAuthenticationTypeJWT CreateServerAuthenticationType = "JWT"
 )
 
 // Valid indicates whether the value is a known member of the CreateServerAuthenticationType enum.
 func (e CreateServerAuthenticationType) Valid() bool {
 	switch e {
-	case JWT:
+	case CreateServerAuthenticationTypeJWT:
 		return true
 	default:
 		return false
@@ -297,6 +297,21 @@ func (e UpdateJWTConfigurationInputSigningKeyType) Valid() bool {
 	}
 }
 
+// Defines values for UpdateServerAuthenticationInputType.
+const (
+	UpdateServerAuthenticationInputTypeJWT UpdateServerAuthenticationInputType = "JWT"
+)
+
+// Valid indicates whether the value is a known member of the UpdateServerAuthenticationInputType enum.
+func (e UpdateServerAuthenticationInputType) Valid() bool {
+	switch e {
+	case UpdateServerAuthenticationInputTypeJWT:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AcceptSwa.
 const (
 	ApplicationxSecretsmgrV2Json AcceptSwa = "application/x.secretsmgr.v2+json"
@@ -328,6 +343,13 @@ func (e GetCaBundlesParamsFormat) Valid() bool {
 	default:
 		return false
 	}
+}
+
+// AttestationConfiguration defines model for AttestationConfiguration.
+type AttestationConfiguration struct {
+	GcpServiceAccount *GcpServiceAccountAttestationConfiguration `json:"gcp_service_account,omitempty"`
+	K8sPsat           *K8sPsatConfigurationInput                 `json:"k8s_psat,omitempty"`
+	X509pop           *X509PopConfigurationInput                 `json:"x509pop,omitempty"`
 }
 
 // CABundleResponse defines model for CABundleResponse.
@@ -366,17 +388,16 @@ type CreateServerAuthenticationType string
 
 // CreateServerGroupRequest defines model for CreateServerGroupRequest.
 type CreateServerGroupRequest struct {
+	// Attestation Node attestation settings organized by type. Include at least one supported attestation object.
+	Attestation *AttestationConfiguration `json:"attestation,omitempty"`
+
 	// Description Server group description.
 	Description *string `json:"description,omitempty"`
 
 	// Name The server group name. This value is case-sensitive, must contain 1-60 characters, and can include letters, numbers, periods, underscores, and hyphens only.
 	Name string `json:"name"`
-
-	// NodeAttestation Node attestation settings organized by type. Include at least one supported attestation object.
-	NodeAttestation struct {
-		K8sPsat *K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
-		X509pop *X509PopConfigurationInput `json:"x509pop,omitempty"`
-	} `json:"node_attestation"`
+	// Deprecated: this property has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	NodeAttestation *DeprecatedAttestationConfiguration `json:"node_attestation,omitempty"`
 }
 
 // CreateServerJWTAuthenticationData defines model for CreateServerJWTAuthenticationData.
@@ -542,6 +563,12 @@ type CreateTrustDomainRequest struct {
 	X509 *X509ConfigurationInput `json:"x509,omitempty"`
 }
 
+// DeprecatedAttestationConfiguration Node attestation settings organized by type. Include at least one supported attestation object.
+type DeprecatedAttestationConfiguration struct {
+	K8sPsat *K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
+	X509pop *X509PopConfigurationInput `json:"x509pop,omitempty"`
+}
+
 // DiscoveryEndpoints OIDC and JWKS discovery endpoint URLs for the trust domain issuer.
 type DiscoveryEndpoints struct {
 	// JwksUri JWKS endpoint for the trust domain issuer.
@@ -558,6 +585,15 @@ type Error struct {
 
 	// Message Human-readable error message providing context and details.
 	Message string `json:"message"`
+}
+
+// GcpServiceAccountAttestationConfiguration defines model for GcpServiceAccountAttestationConfiguration.
+type GcpServiceAccountAttestationConfiguration struct {
+	// AllowedProjectIds List of allowed GCP project IDs.
+	AllowedProjectIds []string `json:"allowed_project_ids"`
+
+	// Audiences Expected audience values for the GCP identity token (`aud` claim). Defaults to `urn:panw:swa` when omitted.
+	Audiences *[]string `json:"audiences,omitempty"`
 }
 
 // JWK A single JSON Web Key.
@@ -918,6 +954,9 @@ type ServerGroupListResponse struct {
 
 // ServerGroupResponse defines model for ServerGroupResponse.
 type ServerGroupResponse struct {
+	// Attestation Node attestation settings organized by type. Include at least one supported attestation object.
+	Attestation *AttestationConfiguration `json:"attestation,omitempty"`
+
 	// CreatedAt Creation timestamp in date-time format.
 	CreatedAt *time.Time `json:"created_at,omitempty"`
 
@@ -926,12 +965,8 @@ type ServerGroupResponse struct {
 
 	// Name The server group name.
 	Name string `json:"name"`
-
-	// NodeAttestation Node attestation configuration returned for the server group.
-	NodeAttestation *struct {
-		K8sPsat *K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
-		X509pop *X509PopConfigurationInput `json:"x509pop,omitempty"`
-	} `json:"node_attestation,omitempty"`
+	// Deprecated: this property has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	NodeAttestation *DeprecatedAttestationConfiguration `json:"node_attestation,omitempty"`
 
 	// TrustDomainName Associated trust domain name.
 	TrustDomainName string `json:"trust_domain_name"`
@@ -1012,16 +1047,103 @@ type UpdateJWTConfigurationInputSignatureAlgorithm string
 // UpdateJWTConfigurationInputSigningKeyType Signing key type for JWT-SVIDs.
 type UpdateJWTConfigurationInputSigningKeyType string
 
+// UpdateServerAuthenticationInput defines model for UpdateServerAuthenticationInput.
+type UpdateServerAuthenticationInput struct {
+	// Annotations Metadata annotations. At least one field is required if provided.
+	Annotations *struct {
+		Env               *string `json:"env,omitempty"`
+		KubernetesCluster *string `json:"kubernetes_cluster,omitempty"`
+	} `json:"annotations,omitempty"`
+
+	// Data Authenticator data fields. The shape depends on the authentication type used when the server was created. At least one field is required if provided.
+	Data *UpdateServerAuthenticationInput_Data `json:"data,omitempty"`
+
+	// Type Authentication type. Updating this field is not currently supported.
+	Type *UpdateServerAuthenticationInputType `json:"type,omitempty"`
+}
+
+// UpdateServerAuthenticationInput_Data Authenticator data fields. The shape depends on the authentication type used when the server was created. At least one field is required if provided.
+type UpdateServerAuthenticationInput_Data struct {
+	union json.RawMessage
+}
+
+// UpdateServerAuthenticationInputType Authentication type. Updating this field is not currently supported.
+type UpdateServerAuthenticationInputType string
+
 // UpdateServerGroupRequest defines model for UpdateServerGroupRequest.
 type UpdateServerGroupRequest struct {
+	// Attestation Node attestation settings organized by type. Include at least one supported attestation object.
+	Attestation *AttestationConfiguration `json:"attestation,omitempty"`
+
 	// Description Optional description of the server group.
 	Description *string `json:"description,omitempty"`
+	// Deprecated: this property has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	NodeAttestation *DeprecatedAttestationConfiguration `json:"node_attestation,omitempty"`
+}
 
-	// NodeAttestation Node attestation settings organized by type. Include at least one supported attestation object.
-	NodeAttestation *struct {
-		K8sPsat *K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
-		X509pop *X509PopConfigurationInput `json:"x509pop,omitempty"`
-	} `json:"node_attestation,omitempty"`
+// UpdateServerJWTAuthenticationData JWT authenticator data fields. Only one of `jwks_uri` or `public_keys` may be provided, matching whichever was set at creation time.
+// Updating the `sub` field is not currently supported.
+type UpdateServerJWTAuthenticationData struct {
+	// Audience If the JWT has an audience claim (`aud`), you can include this variable to validate the
+	// claim. The audience variable accepts a single value and must match at least one of the
+	// JWT's `aud` values.
+	Audience *string `json:"audience,omitempty"`
+
+	// Issuer Used to validate the JWT's `iss` claim.
+	//
+	// When using `jwks_uri`, this field is optional; if not provided, the issuer is taken from the `jwks_uri`.
+	Issuer *string `json:"issuer,omitempty"`
+
+	// JwksUri **Only updatable if the server was originally created with `jwks_uri`.**
+	//
+	// The resource for a set of JSON-encoded public keys (JWKS), one of which corresponds to
+	// the key used to digitally sign the JWT. The keys must be encoded as a JWK Set (RFC7517).
+	//
+	// Value: A JWKS URL, beginning with `https://`
+	//
+	// If you are authenticating to an Edge, make sure that the Edge has access to the JWKS URL.
+	//
+	// When using this option, we strongly recommend that you use TLS communication with the public-keys server provider, thereby following best security practices.
+	JwksUri *string `json:"jwks_uri,omitempty"`
+
+	// PublicKeys **Only updatable if the server was originally created with `public_keys`.**
+	//
+	// When Secrets Manager is unable to reach a remote JWKS URL, you can use this variable to
+	// provide a JWKS to the JWT Authenticator.
+	//
+	// Value: A JSON object with these fields -
+	// * `type` (string): must be `jwks`
+	// * `value`: the JWKS
+	//
+	// in the following format:
+	//
+	// `{"type":"jwks", "value":<JWKS>}`
+	//
+	// For example:
+	//
+	// ```{
+	//   "type":"jwks",
+	//   "value": {
+	//     "keys":[
+	//       {
+	//         "use":"sig",
+	//         "kty":"RSA",
+	//         "kid":"D1wArl26HhE2bFf4o4lAnnr0xtxcKt2ElJgFQnRgXk",
+	//         "alg":"RS256",   "n":"9gRcfAj1FsaX_hJ4__r6dXEs9AAETFPIG4pRti87XUyx-hi6z4dWvhkxLxZ12dKVGfWUkVRbLCUTfNlT9zueMib2HZ9mnk2oXJCBUuzi6JoIm1A5JyP-q_0GR6vCNH_Z7BVFI9cQKFprku6xpYZzdJcdAibzU12RuVsE0L3LKMolDS7Nhr6wKU1m8Ka-sNkFl1qciWO4oQcv3AUnOJvzMotCOzA_5MCyS6CGqWFXJo1KvzqrnIlJoA8tfnT5vnfSJhiWC_FYoeSPCmY3VnGvFs6PTJDa3Gfvb7U1X4S5ztnI6Y_ac3GtSdmVDnQPsOkKQI8669MHq-Bd-8C6Vp6UNQ",
+	//         "e":"AQAB"
+	//       }
+	//     ]
+	//   }
+	// }
+	PublicKeys *map[string]interface{} `json:"public_keys,omitempty"`
+
+	// Sub Subject claim value. Updating this field is not currently supported.
+	Sub *string `json:"sub,omitempty"`
+}
+
+// UpdateServerRequest defines model for UpdateServerRequest.
+type UpdateServerRequest struct {
+	Authentication UpdateServerAuthenticationInput `json:"authentication"`
 }
 
 // UpdateTrustDomainRequest defines model for UpdateTrustDomainRequest.
@@ -1284,6 +1406,12 @@ type GetServerParams struct {
 	Accept AcceptSwa `json:"Accept"`
 }
 
+// PatchServerParams defines parameters for PatchServer.
+type PatchServerParams struct {
+	// Accept Include this `Accept` header on SWA management API requests. Use `application/x.secretsmgr.v2+json`.
+	Accept AcceptSwa `json:"Accept"`
+}
+
 // GetNodeGroupsParams defines parameters for GetNodeGroups.
 type GetNodeGroupsParams struct {
 	// Limit The maximum number of items to return (default 100, max 1000).
@@ -1334,6 +1462,9 @@ type PatchServerGroupJSONRequestBody = UpdateServerGroupRequest
 
 // PostServerJSONRequestBody defines body for PostServer for application/json ContentType.
 type PostServerJSONRequestBody = CreateServerRequest
+
+// PatchServerJSONRequestBody defines body for PatchServer for application/json ContentType.
+type PatchServerJSONRequestBody = UpdateServerRequest
 
 // PostNodeGroupsJSONRequestBody defines body for PostNodeGroups for application/json ContentType.
 type PostNodeGroupsJSONRequestBody = NodeGroupCreateRequest
@@ -1435,6 +1566,42 @@ func (t CreateServerAuthentication_Data) MarshalJSON() ([]byte, error) {
 }
 
 func (t *CreateServerAuthentication_Data) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsUpdateServerJWTAuthenticationData returns the union data inside the UpdateServerAuthenticationInput_Data as a UpdateServerJWTAuthenticationData
+func (t UpdateServerAuthenticationInput_Data) AsUpdateServerJWTAuthenticationData() (UpdateServerJWTAuthenticationData, error) {
+	var body UpdateServerJWTAuthenticationData
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromUpdateServerJWTAuthenticationData overwrites any union data inside the UpdateServerAuthenticationInput_Data as the provided UpdateServerJWTAuthenticationData
+func (t *UpdateServerAuthenticationInput_Data) FromUpdateServerJWTAuthenticationData(v UpdateServerJWTAuthenticationData) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeUpdateServerJWTAuthenticationData performs a merge with any union data inside the UpdateServerAuthenticationInput_Data, using the provided UpdateServerJWTAuthenticationData
+func (t *UpdateServerAuthenticationInput_Data) MergeUpdateServerJWTAuthenticationData(v UpdateServerJWTAuthenticationData) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t UpdateServerAuthenticationInput_Data) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *UpdateServerAuthenticationInput_Data) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -1575,6 +1742,11 @@ type ClientInterface interface {
 
 	// GetServer request
 	GetServer(ctx context.Context, trustDomainName TrustDomainName, serverGroupName ServerGroupName, serverName ServerName, params *GetServerParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PatchServerWithBody request with any body
+	PatchServerWithBody(ctx context.Context, trustDomainName TrustDomainName, serverGroupName ServerGroupName, serverName ServerName, params *PatchServerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PatchServer(ctx context.Context, trustDomainName TrustDomainName, serverGroupName ServerGroupName, serverName ServerName, params *PatchServerParams, body PatchServerJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetNodeGroups request
 	GetNodeGroups(ctx context.Context, trustDomainName TrustDomainName, serverGroupName ServerGroupName, params *GetNodeGroupsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1862,6 +2034,30 @@ func (c *Client) DeleteServer(ctx context.Context, trustDomainName TrustDomainNa
 
 func (c *Client) GetServer(ctx context.Context, trustDomainName TrustDomainName, serverGroupName ServerGroupName, serverName ServerName, params *GetServerParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetServerRequest(c.Server, trustDomainName, serverGroupName, serverName, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PatchServerWithBody(ctx context.Context, trustDomainName TrustDomainName, serverGroupName ServerGroupName, serverName ServerName, params *PatchServerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPatchServerRequestWithBody(c.Server, trustDomainName, serverGroupName, serverName, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PatchServer(ctx context.Context, trustDomainName TrustDomainName, serverGroupName ServerGroupName, serverName ServerName, params *PatchServerParams, body PatchServerJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPatchServerRequest(c.Server, trustDomainName, serverGroupName, serverName, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -3001,6 +3197,80 @@ func NewGetServerRequest(server string, trustDomainName TrustDomainName, serverG
 	return req, nil
 }
 
+// NewPatchServerRequest calls the generic PatchServer builder with application/json body
+func NewPatchServerRequest(server string, trustDomainName TrustDomainName, serverGroupName ServerGroupName, serverName ServerName, params *PatchServerParams, body PatchServerJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPatchServerRequestWithBody(server, trustDomainName, serverGroupName, serverName, params, "application/json", bodyReader)
+}
+
+// NewPatchServerRequestWithBody generates requests for PatchServer with any type of body
+func NewPatchServerRequestWithBody(server string, trustDomainName TrustDomainName, serverGroupName ServerGroupName, serverName ServerName, params *PatchServerParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "trust-domain-name", trustDomainName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "server-group-name", serverGroupName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "server-name", serverName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/swa/trust-domains/%s/server-groups/%s/components/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Accept", params.Accept, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Accept", headerParam0)
+
+	}
+
+	return req, nil
+}
+
 // NewGetNodeGroupsRequest generates requests for GetNodeGroups
 func NewGetNodeGroupsRequest(server string, trustDomainName TrustDomainName, serverGroupName ServerGroupName, params *GetNodeGroupsParams) (*http.Request, error) {
 	var err error
@@ -3464,6 +3734,11 @@ type ClientWithResponsesInterface interface {
 	// GetServerWithResponse request
 	GetServerWithResponse(ctx context.Context, trustDomainName TrustDomainName, serverGroupName ServerGroupName, serverName ServerName, params *GetServerParams, reqEditors ...RequestEditorFn) (*GetServerResponse, error)
 
+	// PatchServerWithBodyWithResponse request with any body
+	PatchServerWithBodyWithResponse(ctx context.Context, trustDomainName TrustDomainName, serverGroupName ServerGroupName, serverName ServerName, params *PatchServerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchServerResponse, error)
+
+	PatchServerWithResponse(ctx context.Context, trustDomainName TrustDomainName, serverGroupName ServerGroupName, serverName ServerName, params *PatchServerParams, body PatchServerJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchServerResponse, error)
+
 	// GetNodeGroupsWithResponse request
 	GetNodeGroupsWithResponse(ctx context.Context, trustDomainName TrustDomainName, serverGroupName ServerGroupName, params *GetNodeGroupsParams, reqEditors ...RequestEditorFn) (*GetNodeGroupsResponse, error)
 
@@ -3522,6 +3797,7 @@ type GetTrustDomainsResponse struct {
 	ApplicationxSecretsmgrV2JSON200 *TrustDomainListSuccess
 	ApplicationxSecretsmgrV2JSON400 *BadRequest
 	ApplicationxSecretsmgrV2JSON401 *Unauthorized
+	ApplicationxSecretsmgrV2JSON403 *Forbidden
 	ApplicationxSecretsmgrV2JSON422 *UnprocessableEntity
 	ApplicationxSecretsmgrV2JSON500 *InternalServerError
 }
@@ -3628,6 +3904,7 @@ type GetTrustDomainResponse struct {
 	ApplicationxSecretsmgrV2JSON400 *BadRequest
 	ApplicationxSecretsmgrV2JSON401 *Unauthorized
 	ApplicationxSecretsmgrV2JSON404 *TrustDomainNotFound
+	ApplicationxSecretsmgrV2JSON422 *UnprocessableEntity
 	ApplicationxSecretsmgrV2JSON500 *InternalServerError
 }
 
@@ -3809,6 +4086,7 @@ type GetServerGroupsResponse struct {
 	ApplicationxSecretsmgrV2JSON200 *ServerGroupListSuccess
 	ApplicationxSecretsmgrV2JSON400 *BadRequest
 	ApplicationxSecretsmgrV2JSON401 *Unauthorized
+	ApplicationxSecretsmgrV2JSON403 *Forbidden
 	ApplicationxSecretsmgrV2JSON404 *TrustDomainNotFound
 	ApplicationxSecretsmgrV2JSON422 *UnprocessableEntity
 	ApplicationxSecretsmgrV2JSON500 *InternalServerError
@@ -4054,6 +4332,7 @@ func (r PostServerResponse) ContentType() string {
 type DeleteServerResponse struct {
 	Body                            []byte
 	HTTPResponse                    *http.Response
+	ApplicationxSecretsmgrV2JSON400 *BadRequest
 	ApplicationxSecretsmgrV2JSON401 *Unauthorized
 	ApplicationxSecretsmgrV2JSON403 *Forbidden
 	ApplicationxSecretsmgrV2JSON404 *ServerNotFound
@@ -4118,11 +4397,50 @@ func (r GetServerResponse) ContentType() string {
 	return ""
 }
 
+type PatchServerResponse struct {
+	Body                            []byte
+	HTTPResponse                    *http.Response
+	ApplicationxSecretsmgrV2JSON200 *ServerSuccess
+	ApplicationxSecretsmgrV2JSON400 *BadRequest
+	ApplicationxSecretsmgrV2JSON401 *Unauthorized
+	ApplicationxSecretsmgrV2JSON403 *Forbidden
+	ApplicationxSecretsmgrV2JSON404 *ServerNotFound
+	ApplicationxSecretsmgrV2JSON422 *UnprocessableEntity
+	ApplicationxSecretsmgrV2JSON500 *InternalServerError
+}
+
+// Status returns HTTPResponse.Status
+func (r PatchServerResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PatchServerResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PatchServerResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetNodeGroupsResponse struct {
 	Body                            []byte
 	HTTPResponse                    *http.Response
 	ApplicationxSecretsmgrV2JSON200 *NodeGroupListSuccess
 	ApplicationxSecretsmgrV2JSON401 *Unauthorized
+	ApplicationxSecretsmgrV2JSON403 *Forbidden
+	ApplicationxSecretsmgrV2JSON404 *ServerGroupNotFound
+	ApplicationxSecretsmgrV2JSON422 *UnprocessableEntity
 	ApplicationxSecretsmgrV2JSON500 *InternalServerError
 }
 
@@ -4489,6 +4807,23 @@ func (c *ClientWithResponses) GetServerWithResponse(ctx context.Context, trustDo
 	return ParseGetServerResponse(rsp)
 }
 
+// PatchServerWithBodyWithResponse request with arbitrary body returning *PatchServerResponse
+func (c *ClientWithResponses) PatchServerWithBodyWithResponse(ctx context.Context, trustDomainName TrustDomainName, serverGroupName ServerGroupName, serverName ServerName, params *PatchServerParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchServerResponse, error) {
+	rsp, err := c.PatchServerWithBody(ctx, trustDomainName, serverGroupName, serverName, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePatchServerResponse(rsp)
+}
+
+func (c *ClientWithResponses) PatchServerWithResponse(ctx context.Context, trustDomainName TrustDomainName, serverGroupName ServerGroupName, serverName ServerName, params *PatchServerParams, body PatchServerJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchServerResponse, error) {
+	rsp, err := c.PatchServer(ctx, trustDomainName, serverGroupName, serverName, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePatchServerResponse(rsp)
+}
+
 // GetNodeGroupsWithResponse request returning *GetNodeGroupsResponse
 func (c *ClientWithResponses) GetNodeGroupsWithResponse(ctx context.Context, trustDomainName TrustDomainName, serverGroupName ServerGroupName, params *GetNodeGroupsParams, reqEditors ...RequestEditorFn) (*GetNodeGroupsResponse, error) {
 	rsp, err := c.GetNodeGroups(ctx, trustDomainName, serverGroupName, params, reqEditors...)
@@ -4612,6 +4947,13 @@ func ParseGetTrustDomainsResponse(rsp *http.Response) (*GetTrustDomainsResponse,
 			return nil, err
 		}
 		response.ApplicationxSecretsmgrV2JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationxSecretsmgrV2JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest UnprocessableEntity
@@ -4802,6 +5144,13 @@ func ParseGetTrustDomainResponse(rsp *http.Response) (*GetTrustDomainResponse, e
 			return nil, err
 		}
 		response.ApplicationxSecretsmgrV2JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest UnprocessableEntity
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationxSecretsmgrV2JSON422 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest InternalServerError
@@ -5077,6 +5426,13 @@ func ParseGetServerGroupsResponse(rsp *http.Response) (*GetServerGroupsResponse,
 			return nil, err
 		}
 		response.ApplicationxSecretsmgrV2JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationxSecretsmgrV2JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest TrustDomainNotFound
@@ -5505,6 +5861,13 @@ func ParseDeleteServerResponse(rsp *http.Response) (*DeleteServerResponse, error
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationxSecretsmgrV2JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Unauthorized
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -5592,6 +5955,74 @@ func ParseGetServerResponse(rsp *http.Response) (*GetServerResponse, error) {
 	return response, nil
 }
 
+// ParsePatchServerResponse parses an HTTP response from a PatchServerWithResponse call
+func ParsePatchServerResponse(rsp *http.Response) (*PatchServerResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PatchServerResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ServerSuccess
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationxSecretsmgrV2JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationxSecretsmgrV2JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationxSecretsmgrV2JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationxSecretsmgrV2JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ServerNotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationxSecretsmgrV2JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest UnprocessableEntity
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationxSecretsmgrV2JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationxSecretsmgrV2JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetNodeGroupsResponse parses an HTTP response from a GetNodeGroupsWithResponse call
 func ParseGetNodeGroupsResponse(rsp *http.Response) (*GetNodeGroupsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -5619,6 +6050,27 @@ func ParseGetNodeGroupsResponse(rsp *http.Response) (*GetNodeGroupsResponse, err
 			return nil, err
 		}
 		response.ApplicationxSecretsmgrV2JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationxSecretsmgrV2JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ServerGroupNotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationxSecretsmgrV2JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest UnprocessableEntity
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationxSecretsmgrV2JSON422 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest InternalServerError
