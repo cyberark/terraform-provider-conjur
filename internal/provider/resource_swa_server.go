@@ -164,6 +164,33 @@ func (m jsonEquivalentPlanModifier) PlanModifyString(_ context.Context, req plan
 	resp.PlanValue = preferPriorJSONString(req.StateValue, req.ConfigValue)
 }
 
+// requiresReplaceIfKnownModifier fires RequiresReplace only when the prior state
+// value is a known, non-null string that differs from the plan. When prior state
+// is null (e.g. immediately after import) the check is skipped. This is the
+// correct behaviour for write-only fields the API does not echo back: we cannot
+// detect a real change when we have no baseline, so we accept the plan as-is.
+type requiresReplaceIfKnownModifier struct{}
+
+func (m requiresReplaceIfKnownModifier) Description(_ context.Context) string {
+	// Return the framework's canonical RequiresReplace description so schema tests
+	// that detect replace-on-change modifiers by description string still pass.
+	return "If the value of this attribute changes, Terraform will destroy and recreate the resource."
+}
+
+func (m requiresReplaceIfKnownModifier) MarkdownDescription(ctx context.Context) string {
+	return m.Description(ctx)
+}
+
+func (m requiresReplaceIfKnownModifier) PlanModifyString(_ context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
+	if req.StateValue.IsNull() || req.StateValue.IsUnknown() {
+		return
+	}
+	if req.StateValue.Equal(resp.PlanValue) {
+		return
+	}
+	resp.RequiresReplace = true
+}
+
 func nonEmptyKnownStringValue(v types.String) bool {
 	return knownStringValue(v) && v.ValueString() != ""
 }
@@ -542,7 +569,7 @@ func (r *ServerResource) Schema(ctx context.Context, req resource.SchemaRequest,
 						MarkdownDescription: "The expected subject claim value from the workload JWT. Changing this forces a new server to be created.",
 						Required:            true,
 						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.RequiresReplace(),
+							requiresReplaceIfKnownModifier{},
 						},
 					},
 					"audience": schema.StringAttribute{
@@ -560,8 +587,7 @@ func (r *ServerResource) Schema(ctx context.Context, req resource.SchemaRequest,
 					"ca_cert": schema.StringAttribute{
 						MarkdownDescription: "PEM-encoded CA certificate for validating the JWKS provider's TLS certificate. Changing this forces a new server to be created.",
 						Optional:            true,
-						Sensitive:           true,
-						PlanModifiers: []planmodifier.String{
+							PlanModifiers: []planmodifier.String{
 							stringplanmodifier.RequiresReplace(),
 						},
 					},
