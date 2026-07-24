@@ -20,10 +20,9 @@ import (
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var (
-	_ resource.Resource                   = &ServerGroupResource{}
-	_ resource.ResourceWithConfigure      = &ServerGroupResource{}
-	_ resource.ResourceWithImportState    = &ServerGroupResource{}
-	_ resource.ResourceWithValidateConfig = &ServerGroupResource{}
+	_ resource.Resource                = &ServerGroupResource{}
+	_ resource.ResourceWithConfigure   = &ServerGroupResource{}
+	_ resource.ResourceWithImportState = &ServerGroupResource{}
 )
 
 type ServerGroupResource struct {
@@ -31,16 +30,17 @@ type ServerGroupResource struct {
 }
 
 type ServerGroupResourceModel struct {
-	ID              types.String          `tfsdk:"id"`
-	Name            types.String          `tfsdk:"name"`
-	Description     types.String          `tfsdk:"description"`
-	TrustDomainName types.String          `tfsdk:"trust_domain_name"`
-	NodeAttestation *NodeAttestationModel `tfsdk:"node_attestation"`
+	ID              types.String      `tfsdk:"id"`
+	Name            types.String      `tfsdk:"name"`
+	Description     types.String      `tfsdk:"description"`
+	TrustDomainName types.String      `tfsdk:"trust_domain_name"`
+	Attestation     *AttestationModel `tfsdk:"attestation"`
 }
 
-type NodeAttestationModel struct {
-	X509Pop *X509PopModel `tfsdk:"x509pop"`
-	K8sPsat *K8sPsatModel `tfsdk:"k8s_psat"`
+type AttestationModel struct {
+	X509Pop           *X509PopModel           `tfsdk:"x509pop"`
+	K8sPsat           *K8sPsatModel           `tfsdk:"k8s_psat"`
+	GcpServiceAccount *GcpServiceAccountModel `tfsdk:"gcp_service_account"`
 }
 
 type X509PopModel struct {
@@ -49,6 +49,11 @@ type X509PopModel struct {
 
 type K8sPsatModel struct {
 	Clusters types.Map `tfsdk:"clusters"`
+}
+
+type GcpServiceAccountModel struct {
+	AllowedProjectIDs types.List `tfsdk:"allowed_project_ids"`
+	Audiences         types.List `tfsdk:"audiences"`
 }
 
 type K8sPsatClusterModel struct {
@@ -71,32 +76,31 @@ func NewServerGroupResource() resource.Resource {
 	return &ServerGroupResource{}
 }
 
-// updateNodeAttestationFromResponse replaces the model's NodeAttestation with exactly what the
+// updateAttestationFromResponse replaces the model's Attestation with exactly what the
 // API response describes. This is a full reconciliation rather than a merge: attestation
 // methods or clusters that are no longer present in the response are removed from state, so
 // that out-of-band or server-side changes are surfaced on the next Read instead of silently
 // persisting stale values from a prior plan or state.
-func updateNodeAttestationFromResponse(ctx context.Context, model *ServerGroupResourceModel, na *struct {
-	K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
-	X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
-}) diag.Diagnostics {
+func updateAttestationFromResponse(ctx context.Context, model *ServerGroupResourceModel, at *swaclient.AttestationConfiguration) diag.Diagnostics {
 	var diags diag.Diagnostics
-	if na == nil {
-		model.NodeAttestation = nil
+
+	if at == nil {
+		model.Attestation = nil
 		return diags
 	}
+	x509pop, k8sPsat, gcp := at.X509pop, at.K8sPsat, at.GcpServiceAccount
 
-	attestation := &NodeAttestationModel{}
+	attestation := &AttestationModel{}
 
-	if na.X509pop != nil {
+	if x509pop != nil {
 		attestation.X509Pop = &X509PopModel{
-			CaCertificates: types.StringValue(na.X509pop.CaCertificates),
+			CaCertificates: types.StringValue(x509pop.CaCertificates),
 		}
 	}
 
-	if na.K8sPsat != nil && na.K8sPsat.Clusters != nil {
-		clusterObjs := make(map[string]attr.Value, len(*na.K8sPsat.Clusters))
-		for clusterName, clusterConfig := range *na.K8sPsat.Clusters {
+	if k8sPsat != nil && k8sPsat.Clusters != nil {
+		clusterObjs := make(map[string]attr.Value, len(*k8sPsat.Clusters))
+		for clusterName, clusterConfig := range *k8sPsat.Clusters {
 			cluster := K8sPsatClusterModel{}
 			appendOptionalStringList(ctx, clusterConfig.ServiceAccountAllowList, &cluster.ServiceAccountAllowList, &diags)
 			appendOptionalStringList(ctx, clusterConfig.Audience, &cluster.Audience, &diags)
@@ -114,7 +118,15 @@ func updateNodeAttestationFromResponse(ctx context.Context, model *ServerGroupRe
 		attestation.K8sPsat = &K8sPsatModel{Clusters: clustersMap}
 	}
 
-	model.NodeAttestation = attestation
+	if gcp != nil {
+		gcpModel := &GcpServiceAccountModel{}
+		allowed := append([]string(nil), gcp.AllowedProjectIds...)
+		appendOptionalStringList(ctx, &allowed, &gcpModel.AllowedProjectIDs, &diags)
+		appendOptionalStringList(ctx, gcp.Audiences, &gcpModel.Audiences, &diags)
+		attestation.GcpServiceAccount = gcpModel
+	}
+
+	model.Attestation = attestation
 	return diags
 }
 
@@ -161,31 +173,51 @@ func buildK8sPsatClusters(ctx context.Context, k8sPsat *K8sPsatModel) (map[strin
 	return clusters, diags
 }
 
-// buildNodeAttestationParts resolves the x509pop and k8s_psat parts from the model,
-// ready to be assigned to a CreateServerGroupRequest or UpdateServerGroupRequest.
-func buildNodeAttestationParts(ctx context.Context, na *NodeAttestationModel) (
-	x509pop *swaclient.X509PopConfigurationInput,
-	k8sPsat *swaclient.K8sPsatConfigurationInput,
-	diags diag.Diagnostics,
-) {
-	if na == nil {
-		return nil, nil, nil
+// buildGcpServiceAccount resolves the gcp_service_account part from the model.
+func buildGcpServiceAccount(ctx context.Context, gcp *GcpServiceAccountModel) (*swaclient.GcpServiceAccountAttestationConfiguration, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	if gcp == nil {
+		return nil, diags
 	}
-	if na.X509Pop != nil {
-		x509pop = &swaclient.X509PopConfigurationInput{
-			CaCertificates: na.X509Pop.CaCertificates.ValueString(),
-		}
+
+	config := &swaclient.GcpServiceAccountAttestationConfiguration{}
+	if !gcp.AllowedProjectIDs.IsNull() && !gcp.AllowedProjectIDs.IsUnknown() {
+		diags.Append(gcp.AllowedProjectIDs.ElementsAs(ctx, &config.AllowedProjectIds, false)...)
 	}
-	clusters, clusterDiags := buildK8sPsatClusters(ctx, na.K8sPsat)
-	diags.Append(clusterDiags...)
-	if clusters != nil {
-		k8sPsat = &swaclient.K8sPsatConfigurationInput{Clusters: &clusters}
+	if !gcp.Audiences.IsNull() && !gcp.Audiences.IsUnknown() {
+		var audiences []string
+		diags.Append(gcp.Audiences.ElementsAs(ctx, &audiences, false)...)
+		config.Audiences = &audiences
 	}
-	return x509pop, k8sPsat, diags
+	return config, diags
 }
 
-func hasAtLeastOneNodeAttestationMethod(na *NodeAttestationModel) bool {
-	return na != nil && (na.X509Pop != nil || na.K8sPsat != nil)
+// buildAttestationRequest resolves the attestation model into the API request field.
+func buildAttestationRequest(ctx context.Context, at *AttestationModel) (*swaclient.AttestationConfiguration, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	if at == nil {
+		return nil, diags
+	}
+
+	attestation := &swaclient.AttestationConfiguration{}
+
+	if at.X509Pop != nil {
+		attestation.X509pop = &swaclient.X509PopConfigurationInput{
+			CaCertificates: at.X509Pop.CaCertificates.ValueString(),
+		}
+	}
+
+	clusters, clusterDiags := buildK8sPsatClusters(ctx, at.K8sPsat)
+	diags.Append(clusterDiags...)
+	if clusters != nil {
+		attestation.K8sPsat = &swaclient.K8sPsatConfigurationInput{Clusters: &clusters}
+	}
+
+	gcp, gcpDiags := buildGcpServiceAccount(ctx, at.GcpServiceAccount)
+	diags.Append(gcpDiags...)
+	attestation.GcpServiceAccount = gcp
+
+	return attestation, diags
 }
 
 func (r *ServerGroupResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -221,9 +253,9 @@ func (r *ServerGroupResource) Schema(ctx context.Context, req resource.SchemaReq
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"node_attestation": schema.SingleNestedAttribute{
-				MarkdownDescription: "Node attestation configuration. At least one of x509pop or k8s_psat must be specified.",
-				Required:            true,
+			"attestation": schema.SingleNestedAttribute{
+				MarkdownDescription: "Node attestation configuration. Optionally specify any of x509pop, k8s_psat, or gcp_service_account; omit entirely for a server group with no attestation.",
+				Optional:            true,
 				Attributes: map[string]schema.Attribute{
 					"x509pop": schema.SingleNestedAttribute{
 						MarkdownDescription: "X.509 Proof of Possession attestation configuration.",
@@ -270,24 +302,25 @@ func (r *ServerGroupResource) Schema(ctx context.Context, req resource.SchemaReq
 							},
 						},
 					},
+					"gcp_service_account": schema.SingleNestedAttribute{
+						MarkdownDescription: "GCP service account attestation configuration.",
+						Optional:            true,
+						Attributes: map[string]schema.Attribute{
+							"allowed_project_ids": schema.ListAttribute{
+								MarkdownDescription: "List of allowed GCP project IDs.",
+								Required:            true,
+								ElementType:         types.StringType,
+							},
+							"audiences": schema.ListAttribute{
+								MarkdownDescription: "Expected audience values for the GCP identity token (`aud` claim). Defaults to `urn:panw:swa` when omitted.",
+								Optional:            true,
+								ElementType:         types.StringType,
+							},
+						},
+					},
 				},
 			},
 		},
-	}
-}
-
-func (r *ServerGroupResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	var data ServerGroupResourceModel
-	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
-	if resp.Diagnostics.HasError() || data.NodeAttestation == nil {
-		return
-	}
-
-	if !hasAtLeastOneNodeAttestationMethod(data.NodeAttestation) {
-		resp.Diagnostics.AddError(
-			"Invalid node_attestation",
-			"At least one of x509pop or k8s_psat must be specified in node_attestation.",
-		)
 	}
 }
 
@@ -311,26 +344,15 @@ func (r *ServerGroupResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	if !hasAtLeastOneNodeAttestationMethod(plan.NodeAttestation) {
-		resp.Diagnostics.AddError(
-			"Missing node attestation",
-			"At least one of x509pop or k8s_psat must be specified in node_attestation.",
-		)
-		return
-	}
-
-	x509pop, k8sPsat, naDiags := buildNodeAttestationParts(ctx, plan.NodeAttestation)
-	resp.Diagnostics.Append(naDiags...)
+	attestation, attDiags := buildAttestationRequest(ctx, plan.Attestation)
+	resp.Diagnostics.Append(attDiags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	createReq := swaclient.PostServerGroupJSONRequestBody{
-		Name: plan.Name.ValueString(),
-		NodeAttestation: struct {
-			K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
-			X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
-		}{K8sPsat: k8sPsat, X509pop: x509pop},
+		Name:        plan.Name.ValueString(),
+		Attestation: attestation,
 	}
 
 	if !plan.Description.IsNull() {
@@ -361,7 +383,7 @@ func (r *ServerGroupResource) Create(ctx context.Context, req resource.CreateReq
 	plan.Name = types.StringValue(sgResp.Name)
 	plan.TrustDomainName = types.StringValue(sgResp.TrustDomainName)
 	plan.Description = optionalStringValue(sgResp.Description)
-	resp.Diagnostics.Append(updateNodeAttestationFromResponse(ctx, &plan, sgResp.NodeAttestation)...)
+	resp.Diagnostics.Append(updateAttestationFromResponse(ctx, &plan, sgResp.Attestation)...)
 
 	tflog.Trace(ctx, "created server group resource")
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
@@ -402,7 +424,7 @@ func (r *ServerGroupResource) Read(ctx context.Context, req resource.ReadRequest
 		state.ID = types.StringValue(fmt.Sprintf("%s/%s", state.TrustDomainName.ValueString(), result.ApplicationxSecretsmgrV2JSON200.Name))
 		state.Name = types.StringValue(result.ApplicationxSecretsmgrV2JSON200.Name)
 		state.Description = optionalStringValue(result.ApplicationxSecretsmgrV2JSON200.Description)
-		resp.Diagnostics.Append(updateNodeAttestationFromResponse(ctx, &state, result.ApplicationxSecretsmgrV2JSON200.NodeAttestation)...)
+		resp.Diagnostics.Append(updateAttestationFromResponse(ctx, &state, result.ApplicationxSecretsmgrV2JSON200.Attestation)...)
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
@@ -426,23 +448,12 @@ func (r *ServerGroupResource) Update(ctx context.Context, req resource.UpdateReq
 		updateReq.Description = new(plan.Description.ValueString())
 	}
 
-	if !hasAtLeastOneNodeAttestationMethod(plan.NodeAttestation) {
-		resp.Diagnostics.AddError(
-			"Missing node attestation",
-			"At least one of x509pop or k8s_psat must be specified in node_attestation.",
-		)
-		return
-	}
-
-	x509pop, k8sPsat, naDiags := buildNodeAttestationParts(ctx, plan.NodeAttestation)
-	resp.Diagnostics.Append(naDiags...)
+	attestation, attDiags := buildAttestationRequest(ctx, plan.Attestation)
+	resp.Diagnostics.Append(attDiags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	updateReq.NodeAttestation = &struct {
-		K8sPsat *swaclient.K8sPsatConfigurationInput `json:"k8s_psat,omitempty"`
-		X509pop *swaclient.X509PopConfigurationInput `json:"x509pop,omitempty"`
-	}{K8sPsat: k8sPsat, X509pop: x509pop}
+	updateReq.Attestation = attestation
 
 	params := &swaclient.PatchServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}
 
@@ -464,7 +475,7 @@ func (r *ServerGroupResource) Update(ctx context.Context, req resource.UpdateReq
 		plan.Name = types.StringValue(result.ApplicationxSecretsmgrV2JSON200.Name)
 		plan.TrustDomainName = types.StringValue(result.ApplicationxSecretsmgrV2JSON200.TrustDomainName)
 		plan.Description = optionalStringValue(result.ApplicationxSecretsmgrV2JSON200.Description)
-		resp.Diagnostics.Append(updateNodeAttestationFromResponse(ctx, &plan, result.ApplicationxSecretsmgrV2JSON200.NodeAttestation)...)
+		resp.Diagnostics.Append(updateAttestationFromResponse(ctx, &plan, result.ApplicationxSecretsmgrV2JSON200.Attestation)...)
 	}
 
 	tflog.Trace(ctx, "updated server group resource")

@@ -1933,6 +1933,226 @@ func (_c *MockClientWithResponsesInterface_PatchServerGroupWithResponse_Call) Ru
 	return _c
 }
 
+// PatchServerWithBodyWithResponse provides a mock function for the type MockClientWithResponsesInterface
+func (_mock *MockClientWithResponsesInterface) PatchServerWithBodyWithResponse(ctx context.Context, trustDomainName client.TrustDomainName, serverGroupName client.ServerGroupName, serverName client.ServerName, params *client.PatchServerParams, contentType string, body io.Reader, reqEditors ...client.RequestEditorFn) (*client.PatchServerResponse, error) {
+	var tmpRet mock.Arguments
+	if len(reqEditors) > 0 {
+		tmpRet = _mock.Called(ctx, trustDomainName, serverGroupName, serverName, params, contentType, body, reqEditors)
+	} else {
+		tmpRet = _mock.Called(ctx, trustDomainName, serverGroupName, serverName, params, contentType, body)
+	}
+	ret := tmpRet
+
+	if len(ret) == 0 {
+		panic("no return value specified for PatchServerWithBodyWithResponse")
+	}
+
+	var r0 *client.PatchServerResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, client.TrustDomainName, client.ServerGroupName, client.ServerName, *client.PatchServerParams, string, io.Reader, ...client.RequestEditorFn) (*client.PatchServerResponse, error)); ok {
+		return returnFunc(ctx, trustDomainName, serverGroupName, serverName, params, contentType, body, reqEditors...)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, client.TrustDomainName, client.ServerGroupName, client.ServerName, *client.PatchServerParams, string, io.Reader, ...client.RequestEditorFn) *client.PatchServerResponse); ok {
+		r0 = returnFunc(ctx, trustDomainName, serverGroupName, serverName, params, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*client.PatchServerResponse)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, client.TrustDomainName, client.ServerGroupName, client.ServerName, *client.PatchServerParams, string, io.Reader, ...client.RequestEditorFn) error); ok {
+		r1 = returnFunc(ctx, trustDomainName, serverGroupName, serverName, params, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClientWithResponsesInterface_PatchServerWithBodyWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PatchServerWithBodyWithResponse'
+type MockClientWithResponsesInterface_PatchServerWithBodyWithResponse_Call struct {
+	*mock.Call
+}
+
+// PatchServerWithBodyWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - trustDomainName client.TrustDomainName
+//   - serverGroupName client.ServerGroupName
+//   - serverName client.ServerName
+//   - params *client.PatchServerParams
+//   - contentType string
+//   - body io.Reader
+//   - reqEditors ...client.RequestEditorFn
+func (_e *MockClientWithResponsesInterface_Expecter) PatchServerWithBodyWithResponse(ctx any, trustDomainName any, serverGroupName any, serverName any, params any, contentType any, body any, reqEditors ...any) *MockClientWithResponsesInterface_PatchServerWithBodyWithResponse_Call {
+	return &MockClientWithResponsesInterface_PatchServerWithBodyWithResponse_Call{Call: _e.mock.On("PatchServerWithBodyWithResponse",
+		append([]any{ctx, trustDomainName, serverGroupName, serverName, params, contentType, body}, reqEditors...)...)}
+}
+
+func (_c *MockClientWithResponsesInterface_PatchServerWithBodyWithResponse_Call) Run(run func(ctx context.Context, trustDomainName client.TrustDomainName, serverGroupName client.ServerGroupName, serverName client.ServerName, params *client.PatchServerParams, contentType string, body io.Reader, reqEditors ...client.RequestEditorFn)) *MockClientWithResponsesInterface_PatchServerWithBodyWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 client.TrustDomainName
+		if args[1] != nil {
+			arg1 = args[1].(client.TrustDomainName)
+		}
+		var arg2 client.ServerGroupName
+		if args[2] != nil {
+			arg2 = args[2].(client.ServerGroupName)
+		}
+		var arg3 client.ServerName
+		if args[3] != nil {
+			arg3 = args[3].(client.ServerName)
+		}
+		var arg4 *client.PatchServerParams
+		if args[4] != nil {
+			arg4 = args[4].(*client.PatchServerParams)
+		}
+		var arg5 string
+		if args[5] != nil {
+			arg5 = args[5].(string)
+		}
+		var arg6 io.Reader
+		if args[6] != nil {
+			arg6 = args[6].(io.Reader)
+		}
+		var arg7 []client.RequestEditorFn
+		var variadicArgs []client.RequestEditorFn
+		if len(args) > 7 {
+			variadicArgs = args[7].([]client.RequestEditorFn)
+		}
+		arg7 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+			arg5,
+			arg6,
+			arg7...,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClientWithResponsesInterface_PatchServerWithBodyWithResponse_Call) Return(patchServerResponse *client.PatchServerResponse, err error) *MockClientWithResponsesInterface_PatchServerWithBodyWithResponse_Call {
+	_c.Call.Return(patchServerResponse, err)
+	return _c
+}
+
+func (_c *MockClientWithResponsesInterface_PatchServerWithBodyWithResponse_Call) RunAndReturn(run func(ctx context.Context, trustDomainName client.TrustDomainName, serverGroupName client.ServerGroupName, serverName client.ServerName, params *client.PatchServerParams, contentType string, body io.Reader, reqEditors ...client.RequestEditorFn) (*client.PatchServerResponse, error)) *MockClientWithResponsesInterface_PatchServerWithBodyWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PatchServerWithResponse provides a mock function for the type MockClientWithResponsesInterface
+func (_mock *MockClientWithResponsesInterface) PatchServerWithResponse(ctx context.Context, trustDomainName client.TrustDomainName, serverGroupName client.ServerGroupName, serverName client.ServerName, params *client.PatchServerParams, body client.PatchServerJSONRequestBody, reqEditors ...client.RequestEditorFn) (*client.PatchServerResponse, error) {
+	var tmpRet mock.Arguments
+	if len(reqEditors) > 0 {
+		tmpRet = _mock.Called(ctx, trustDomainName, serverGroupName, serverName, params, body, reqEditors)
+	} else {
+		tmpRet = _mock.Called(ctx, trustDomainName, serverGroupName, serverName, params, body)
+	}
+	ret := tmpRet
+
+	if len(ret) == 0 {
+		panic("no return value specified for PatchServerWithResponse")
+	}
+
+	var r0 *client.PatchServerResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, client.TrustDomainName, client.ServerGroupName, client.ServerName, *client.PatchServerParams, client.PatchServerJSONRequestBody, ...client.RequestEditorFn) (*client.PatchServerResponse, error)); ok {
+		return returnFunc(ctx, trustDomainName, serverGroupName, serverName, params, body, reqEditors...)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, client.TrustDomainName, client.ServerGroupName, client.ServerName, *client.PatchServerParams, client.PatchServerJSONRequestBody, ...client.RequestEditorFn) *client.PatchServerResponse); ok {
+		r0 = returnFunc(ctx, trustDomainName, serverGroupName, serverName, params, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*client.PatchServerResponse)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, client.TrustDomainName, client.ServerGroupName, client.ServerName, *client.PatchServerParams, client.PatchServerJSONRequestBody, ...client.RequestEditorFn) error); ok {
+		r1 = returnFunc(ctx, trustDomainName, serverGroupName, serverName, params, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClientWithResponsesInterface_PatchServerWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PatchServerWithResponse'
+type MockClientWithResponsesInterface_PatchServerWithResponse_Call struct {
+	*mock.Call
+}
+
+// PatchServerWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - trustDomainName client.TrustDomainName
+//   - serverGroupName client.ServerGroupName
+//   - serverName client.ServerName
+//   - params *client.PatchServerParams
+//   - body client.PatchServerJSONRequestBody
+//   - reqEditors ...client.RequestEditorFn
+func (_e *MockClientWithResponsesInterface_Expecter) PatchServerWithResponse(ctx any, trustDomainName any, serverGroupName any, serverName any, params any, body any, reqEditors ...any) *MockClientWithResponsesInterface_PatchServerWithResponse_Call {
+	return &MockClientWithResponsesInterface_PatchServerWithResponse_Call{Call: _e.mock.On("PatchServerWithResponse",
+		append([]any{ctx, trustDomainName, serverGroupName, serverName, params, body}, reqEditors...)...)}
+}
+
+func (_c *MockClientWithResponsesInterface_PatchServerWithResponse_Call) Run(run func(ctx context.Context, trustDomainName client.TrustDomainName, serverGroupName client.ServerGroupName, serverName client.ServerName, params *client.PatchServerParams, body client.PatchServerJSONRequestBody, reqEditors ...client.RequestEditorFn)) *MockClientWithResponsesInterface_PatchServerWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 client.TrustDomainName
+		if args[1] != nil {
+			arg1 = args[1].(client.TrustDomainName)
+		}
+		var arg2 client.ServerGroupName
+		if args[2] != nil {
+			arg2 = args[2].(client.ServerGroupName)
+		}
+		var arg3 client.ServerName
+		if args[3] != nil {
+			arg3 = args[3].(client.ServerName)
+		}
+		var arg4 *client.PatchServerParams
+		if args[4] != nil {
+			arg4 = args[4].(*client.PatchServerParams)
+		}
+		var arg5 client.PatchServerJSONRequestBody
+		if args[5] != nil {
+			arg5 = args[5].(client.PatchServerJSONRequestBody)
+		}
+		var arg6 []client.RequestEditorFn
+		var variadicArgs []client.RequestEditorFn
+		if len(args) > 6 {
+			variadicArgs = args[6].([]client.RequestEditorFn)
+		}
+		arg6 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+			arg5,
+			arg6...,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClientWithResponsesInterface_PatchServerWithResponse_Call) Return(patchServerResponse *client.PatchServerResponse, err error) *MockClientWithResponsesInterface_PatchServerWithResponse_Call {
+	_c.Call.Return(patchServerResponse, err)
+	return _c
+}
+
+func (_c *MockClientWithResponsesInterface_PatchServerWithResponse_Call) RunAndReturn(run func(ctx context.Context, trustDomainName client.TrustDomainName, serverGroupName client.ServerGroupName, serverName client.ServerName, params *client.PatchServerParams, body client.PatchServerJSONRequestBody, reqEditors ...client.RequestEditorFn) (*client.PatchServerResponse, error)) *MockClientWithResponsesInterface_PatchServerWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // PatchTrustDomainWithBodyWithResponse provides a mock function for the type MockClientWithResponsesInterface
 func (_mock *MockClientWithResponsesInterface) PatchTrustDomainWithBodyWithResponse(ctx context.Context, trustDomainName client.TrustDomainName, params *client.PatchTrustDomainParams, contentType string, body io.Reader, reqEditors ...client.RequestEditorFn) (*client.PatchTrustDomainResponse, error) {
 	var tmpRet mock.Arguments
