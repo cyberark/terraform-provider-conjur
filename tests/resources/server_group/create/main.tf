@@ -36,7 +36,7 @@ resource "conjur_swa_server_group" "test" {
   trust_domain_name = conjur_swa_trust_domain.td.name
   description       = "Server group managed by Terraform"
 
-  node_attestation = {
+  attestation = {
     x509pop = {
       ca_certificates = var.conjur_ssl_cert
     }
