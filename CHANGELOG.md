@@ -6,11 +6,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-27
+
 ### Added
-- New `conjur_swa_trust_domain` resource for managing SWA Trust Domains.
-- New `conjur_swa_server_group` resource for managing SWA Server Groups within a Trust Domain.
-- New `conjur_swa_node_group` resource for managing SWA Node Groups within a Server Group.
-- New `conjur_swa_server` resource for managing SWA Servers (agents) within a Server Group.
+- Support for managing SWA Trust Domains via the `conjur_swa_trust_domain` resource. 
+- Support for managing SWA Server Groups via the `conjur_swa_server_group` resource. 
+- Support for managing SWA Node Groups via the `conjur_swa_node_group` resource.
+- Support for managing SWA Servers via the `conjur_swa_server` resource.
 
 ## [0.8.4] - 2026-03-25
 
