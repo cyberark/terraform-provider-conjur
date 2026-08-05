@@ -65,7 +65,7 @@ resource "conjur_swa_server" "inline_keys" {
 
 ### Read-Only
 
-- `authn_id` (String, Sensitive) Opaque Base64-encoded authenticator identifier for this server.
+- `authn_id` (String) Opaque Base64-encoded authenticator identifier for this server.
 - `id` (String) The unique identifier of the server.
 
 <a id="nestedatt--auth"></a>
@@ -73,16 +73,27 @@ resource "conjur_swa_server" "inline_keys" {
 
 Required:
 
-- `subject` (String) The expected subject claim value from the workload JWT.
-- `type` (String) The authentication type (e.g., 'JWT').
+- `subject` (String) The expected subject claim value from the workload JWT. Changing this forces a new server to be created.
+- `type` (String) The authentication type (e.g., 'JWT'). Changing this forces a new server to be created.
 
 Optional:
 
 - `audience` (String) The expected audience for JWT authentication.
-- `ca_cert` (String, Sensitive) PEM-encoded CA certificate for validating the JWKS provider's TLS certificate.
+- `ca_cert` (String) PEM-encoded CA certificate for validating the JWKS provider's TLS certificate. Changing this forces a new server to be created.
+- `identity` (Attributes) Identity mapping configuration for the JWT authenticator. Changing this forces a new server to be created. (see [below for nested schema](#nestedatt--auth--identity))
 - `issuer` (String) The expected issuer for JWT authentication.
 - `jwks_uri` (String) The JWKS URI for JWT verification.
 - `public_keys` (String) Inline JWKS as a JSON string. Sent to the server as compact, canonical JSON.
+
+<a id="nestedatt--auth--identity"></a>
+### Nested Schema for `auth.identity`
+
+Optional:
+
+- `claim_aliases` (Map of String) A map of claim aliases to JWT claim names.
+- `enforced_claims` (List of String) A list of enforced claims.
+- `identity_path` (String) The workload's policy ID in Secrets Manager.
+- `token_app_property` (String) The name of the JWT claim whose value identifies the workload.
 
 ## Import
 

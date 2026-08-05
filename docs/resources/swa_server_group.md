@@ -46,6 +46,20 @@ resource "conjur_swa_server_group" "k8s" {
   }
 }
 
+# Server group using GCP Service Account attestation
+resource "conjur_swa_server_group" "gcp" {
+  trust_domain_name = "prod.example.org"
+  name              = "gcp-servers"
+  description       = "GCP workload server group"
+
+  attestation = {
+    gcp_service_account = {
+      allowed_project_ids = ["project-a", "project-b"]
+      audiences           = ["urn:panw:swa"]
+    }
+  }
+}
+
 # Server group with no node attestation (attestation is optional)
 resource "conjur_swa_server_group" "no_attestation" {
   trust_domain_name = "prod.example.org"
@@ -76,14 +90,26 @@ resource "conjur_swa_server_group" "no_attestation" {
 
 Optional:
 
+- `gcp_service_account` (Attributes) GCP service account attestation configuration. (see [below for nested schema](#nestedatt--attestation--gcp_service_account))
 - `k8s_psat` (Attributes) Kubernetes Projected Service Account Token attestation configuration. (see [below for nested schema](#nestedatt--attestation--k8s_psat))
 - `x509pop` (Attributes) X.509 Proof of Possession attestation configuration. (see [below for nested schema](#nestedatt--attestation--x509pop))
+
+<a id="nestedatt--attestation--gcp_service_account"></a>
+### Nested Schema for `attestation.gcp_service_account`
+
+Required:
+
+- `allowed_project_ids` (List of String) List of allowed GCP project IDs.
+
+Optional:
+
+- `audiences` (List of String) Expected audience values for the GCP identity token (`aud` claim). Defaults to `urn:panw:swa` when omitted.
 
 
 <a id="nestedatt--attestation--k8s_psat"></a>
 ### Nested Schema for `attestation.k8s_psat`
 
-Required:
+Optional:
 
 - `clusters` (Attributes Map) Map of cluster names to cluster configurations. (see [below for nested schema](#nestedatt--attestation--k8s_psat--clusters))
 

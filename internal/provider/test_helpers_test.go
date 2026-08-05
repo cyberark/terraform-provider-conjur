@@ -9,7 +9,6 @@ import (
 	"github.com/cyberark/conjur-api-go/conjurapi"
 	apimocks "github.com/cyberark/terraform-provider-conjur/internal/conjur/api/mocks"
 	swaclient "github.com/cyberark/terraform-provider-conjur/internal/swa/client"
-	"github.com/stretchr/testify/mock"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	frameworkprovider "github.com/hashicorp/terraform-plugin-framework/provider"
@@ -18,8 +17,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
-	tfprotov6 "github.com/hashicorp/terraform-plugin-go/tfprotov6"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"github.com/stretchr/testify/mock"
 )
 
 // contains reports whether substr is within str.
@@ -71,7 +71,7 @@ func newStateWithSchema(s schema.Schema) tfsdk.State {
 // swaTestProvider implements provider.Provider with a mock SWA client injected,
 // bypassing real Conjur authentication for lifecycle tests.
 type swaTestProvider struct {
-	t          interface {
+	t interface {
 		mock.TestingT
 		Cleanup(func())
 	}

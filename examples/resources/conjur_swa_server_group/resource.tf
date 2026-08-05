@@ -31,6 +31,20 @@ resource "conjur_swa_server_group" "k8s" {
   }
 }
 
+# Server group using GCP Service Account attestation
+resource "conjur_swa_server_group" "gcp" {
+  trust_domain_name = "prod.example.org"
+  name              = "gcp-servers"
+  description       = "GCP workload server group"
+
+  attestation = {
+    gcp_service_account = {
+      allowed_project_ids = ["project-a", "project-b"]
+      audiences           = ["urn:panw:swa"]
+    }
+  }
+}
+
 # Server group with no node attestation (attestation is optional)
 resource "conjur_swa_server_group" "no_attestation" {
   trust_domain_name = "prod.example.org"

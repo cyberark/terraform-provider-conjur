@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -14,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -141,69 +143,72 @@ func (r *TrustDomainResource) Metadata(ctx context.Context, req resource.Metadat
 
 func (r *TrustDomainResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription:"Manages an SWA Trust Domain.",
+		MarkdownDescription: "Manages an SWA Trust Domain.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				MarkdownDescription:"The unique identifier of the trust domain.",
-				Computed:    true,
+				MarkdownDescription: "The unique identifier of the trust domain.",
+				Computed:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"name": schema.StringAttribute{
-				MarkdownDescription:"The name of the trust domain (e.g., 'prod.example.org').",
-				Required:    true,
+				MarkdownDescription: "The name of the trust domain (e.g., 'prod.example.org').",
+				Required:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"jwt": schema.SingleNestedAttribute{
-				MarkdownDescription:"JWT SVID configuration for the trust domain.",
-				Optional:    true,
-				Computed:    true,
+				MarkdownDescription: "JWT SVID configuration for the trust domain.",
+				Optional:            true,
+				Computed:            true,
 				PlanModifiers: []planmodifier.Object{
 					objectplanmodifier.UseStateForUnknown(),
 				},
 				Attributes: map[string]schema.Attribute{
 					"signature_algorithm": schema.StringAttribute{
-						MarkdownDescription:"The signature algorithm for JWTs (e.g., 'ES256', 'RS256').",
-						Optional:    true,
-						Computed:    true,
-						Default:     stringdefault.StaticString("RS512"),
+						MarkdownDescription: "The signature algorithm for JWTs (e.g., 'ES256', 'RS256').",
+						Optional:            true,
+						Computed:            true,
+						Default:             stringdefault.StaticString("RS512"),
 					},
 					"signing_key_type": schema.StringAttribute{
-						MarkdownDescription:"The type of signing key (e.g., 'EC_P256', 'RSA_2048').",
-						Optional:    true,
-						Computed:    true,
-						Default:     stringdefault.StaticString("RSA_4096"),
+						MarkdownDescription: "The type of signing key (e.g., 'EC_P256', 'RSA_2048').",
+						Optional:            true,
+						Computed:            true,
+						Default:             stringdefault.StaticString("RSA_4096"),
 					},
 					"signing_key_ttl": schema.Int64Attribute{
-						MarkdownDescription:"TTL for signing keys in seconds.",
-						Optional:    true,
-						Computed:    true,
-						Default:     int64default.StaticInt64(86400),
+						MarkdownDescription: "TTL for signing keys in seconds.",
+						Optional:            true,
+						Computed:            true,
+						Default:             int64default.StaticInt64(86400),
 					},
 					"token_ttl": schema.Int64Attribute{
-						MarkdownDescription:"TTL for JWT tokens in seconds.",
-						Optional:    true,
-						Computed:    true,
-						Default:     int64default.StaticInt64(300),
+						MarkdownDescription: "TTL for JWT tokens in seconds.",
+						Optional:            true,
+						Computed:            true,
+						Default:             int64default.StaticInt64(300),
 					},
 				},
 			},
 			"x509": schema.SingleNestedAttribute{
-				MarkdownDescription:"X.509 SVID configuration for the trust domain.",
-				Optional:    true,
-				Computed:    true,
+				MarkdownDescription: "X.509 SVID configuration for the trust domain.",
+				Optional:            true,
+				Computed:            true,
 				PlanModifiers: []planmodifier.Object{
 					objectplanmodifier.UseStateForUnknown(),
 				},
 				Attributes: map[string]schema.Attribute{
 					"workload_ttl": schema.Int64Attribute{
-						MarkdownDescription:"TTL for workload X.509 SVIDs in seconds.",
-						Optional:    true,
-						Computed:    true,
-						Default:     int64default.StaticInt64(3600),
+						MarkdownDescription: "TTL for workload X.509 SVIDs in seconds.",
+						Optional:            true,
+						Computed:            true,
+						Default:             int64default.StaticInt64(3600),
+						Validators: []validator.Int64{
+							int64validator.Between(600, 86400),
+						},
 					},
 				},
 			},
@@ -212,17 +217,9 @@ func (r *TrustDomainResource) Schema(ctx context.Context, req resource.SchemaReq
 }
 
 func (r *TrustDomainResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	// OpenAPI only requires name on create; jwt/x509 are optional.
 	var data TrustDomainResourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	if data.JWT.IsNull() && data.X509.IsNull() {
-		resp.Diagnostics.AddError(
-			"Invalid trust domain configuration",
-			"At least one of jwt or x509 must be set.",
-		)
-	}
 }
 
 func (r *TrustDomainResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {

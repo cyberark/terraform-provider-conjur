@@ -12,11 +12,31 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	tfresource "github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
+
+// workloadConfigObject builds a types.Object value for the workload_configuration
+// attribute from a WorkloadConfigurationModel, for use in test fixtures.
+func workloadConfigObject(t *testing.T, model WorkloadConfigurationModel) types.Object {
+	t.Helper()
+	obj, diags := types.ObjectValueFrom(context.Background(), workloadConfigurationAttrTypes, model)
+	require.False(t, diags.HasError())
+	return obj
+}
+
+// normalizeWorkloadConfiguration ensures a test fixture's zero-value
+// WorkloadConfiguration (types.Object{}) is converted to a properly typed
+// null object matching the schema, since the framework cannot convert a
+// struct-literal zero value (which has no attribute types) into state/plan.
+func normalizeWorkloadConfiguration(m *NodeGroupResourceModel) {
+	if len(m.WorkloadConfiguration.AttributeTypes(context.Background())) != len(workloadConfigurationAttrTypes) {
+		m.WorkloadConfiguration = types.ObjectNull(workloadConfigurationAttrTypes)
+	}
+}
 
 func makeNodeGroupResponse(name string) *swaclient.NodeGroupResponse {
 	return &swaclient.NodeGroupResponse{
@@ -65,10 +85,10 @@ func TestNodeGroupResource_Create(t *testing.T) {
 				ServerGroupName: types.StringValue("k8s-servers"),
 				WorkloadType:    types.StringValue("kubernetes"),
 				Description:     types.StringNull(),
-				WorkloadConfiguration: &WorkloadConfigurationModel{
+				WorkloadConfiguration: workloadConfigObject(t, WorkloadConfigurationModel{
 					SpiffeIDTemplate:             types.StringValue("spiffe://{{ .trustdomain }}/{{ .nodegroup }}/{{ .k8s.ns }}/{{ .k8s.sa }}"),
 					WorkloadRegistrationPolicies: types.ListNull(types.StringType),
-				},
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				ng := makeNodeGroupResponse("k8s-nodes")
@@ -143,6 +163,7 @@ func TestNodeGroupResource_Create(t *testing.T) {
 			}
 
 			ctx := context.Background()
+			normalizeWorkloadConfiguration(&tt.data)
 			if diags := req.Plan.Set(ctx, &tt.data); diags.HasError() {
 				t.Fatalf("failed to set plan: %v", diags)
 			}
@@ -218,10 +239,10 @@ func TestNodeGroupResource_Read(t *testing.T) {
 				ServerGroupName: types.StringValue("prod-servers"),
 				WorkloadType:    types.StringValue("unix"),
 				Description:     types.StringNull(),
-				WorkloadConfiguration: &WorkloadConfigurationModel{
+				WorkloadConfiguration: workloadConfigObject(t, WorkloadConfigurationModel{
 					SpiffeIDTemplate:             types.StringValue("spiffe://{{ .trustdomain }}/{{ .nodegroup }}/{{ .unix.user }}"),
 					WorkloadRegistrationPolicies: types.ListNull(types.StringType),
-				},
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				tmpl := "spiffe://{{ .trustdomain }}/{{ .nodegroup }}/{{ .unix.user }}"
@@ -235,12 +256,14 @@ func TestNodeGroupResource_Read(t *testing.T) {
 			},
 			expectedError: false,
 			verify: func(t *testing.T, result NodeGroupResourceModel) {
-				require.NotNil(t, result.WorkloadConfiguration)
-				assert.Equal(t, "spiffe://{{ .trustdomain }}/{{ .nodegroup }}/{{ .unix.user }}", result.WorkloadConfiguration.SpiffeIDTemplate.ValueString())
+				assert.False(t, result.WorkloadConfiguration.IsNull())
+				var wc WorkloadConfigurationModel
+				require.False(t, result.WorkloadConfiguration.As(context.Background(), &wc, basetypes.ObjectAsOptions{}).HasError())
+				assert.Equal(t, "spiffe://{{ .trustdomain }}/{{ .nodegroup }}/{{ .unix.user }}", wc.SpiffeIDTemplate.ValueString())
 			},
 		},
 		{
-			name: "read with no workload_configuration on server keeps state nil",
+			name: "read with empty workload_configuration results in null object in state",
 			data: NodeGroupResourceModel{
 				ID:              types.StringValue("prod.example.org/prod-servers/prod-nodes"),
 				Name:            types.StringValue("prod-nodes"),
@@ -260,7 +283,11 @@ func TestNodeGroupResource_Read(t *testing.T) {
 			},
 			expectedError: false,
 			verify: func(t *testing.T, result NodeGroupResourceModel) {
-				assert.Nil(t, result.WorkloadConfiguration, "workload_configuration should stay absent in state when the server reports none")
+				// An all-nil WorkloadConfiguration from the API is treated as "not
+				// configured", so the object itself must be null (not present with
+				// null sub-fields), otherwise Terraform state incorrectly shows the
+				// workload_configuration block as set.
+				assert.True(t, result.WorkloadConfiguration.IsNull())
 			},
 		},
 		{
@@ -297,6 +324,7 @@ func TestNodeGroupResource_Read(t *testing.T) {
 			}
 
 			ctx := context.Background()
+			normalizeWorkloadConfiguration(&tt.data)
 			if diags := req.State.Set(ctx, &tt.data); diags.HasError() {
 				t.Fatalf("failed to set state: %v", diags)
 			}
@@ -419,6 +447,7 @@ func TestNodeGroupResource_Delete(t *testing.T) {
 			}
 
 			ctx := context.Background()
+			normalizeWorkloadConfiguration(&tt.data)
 			if diags := req.State.Set(ctx, &tt.data); diags.HasError() {
 				t.Fatalf("failed to set state: %v", diags)
 			}
@@ -485,10 +514,10 @@ func TestNodeGroupResource_Update(t *testing.T) {
 				ServerGroupName: types.StringValue("prod-servers"),
 				WorkloadType:    types.StringValue("unix"),
 				Description:     types.StringNull(),
-				WorkloadConfiguration: &WorkloadConfigurationModel{
+				WorkloadConfiguration: workloadConfigObject(t, WorkloadConfigurationModel{
 					SpiffeIDTemplate:             types.StringValue("spiffe://{{ .trustdomain }}/{{ .nodegroup }}/{{ .unix.user }}"),
 					WorkloadRegistrationPolicies: types.ListNull(types.StringType),
-				},
+				}),
 			},
 			state: NodeGroupResourceModel{
 				ID:              types.StringValue("prod.example.org/prod-servers/prod-nodes"),
@@ -530,10 +559,10 @@ func TestNodeGroupResource_Update(t *testing.T) {
 				ServerGroupName: types.StringValue("prod-servers"),
 				WorkloadType:    types.StringValue("unix"),
 				Description:     types.StringNull(),
-				WorkloadConfiguration: &WorkloadConfigurationModel{
+				WorkloadConfiguration: workloadConfigObject(t, WorkloadConfigurationModel{
 					SpiffeIDTemplate:             types.StringValue("spiffe://{{ .trustdomain }}/{{ .nodegroup }}/{{ .unix.user }}"),
 					WorkloadRegistrationPolicies: types.ListNull(types.StringType),
-				},
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				ng := makeNodeGroupResponse("prod-nodes")
@@ -619,6 +648,8 @@ func TestNodeGroupResource_Update(t *testing.T) {
 			}
 
 			ctx := context.Background()
+			normalizeWorkloadConfiguration(&tt.plan)
+			normalizeWorkloadConfiguration(&tt.state)
 			if diags := req.Plan.Set(ctx, &tt.plan); diags.HasError() {
 				t.Fatalf("failed to set plan: %v", diags)
 			}
@@ -756,10 +787,10 @@ func TestNodeGroupResource_WorkloadRegistrationPoliciesRoundTrip(t *testing.T) {
 		ServerGroupName: types.StringValue("prod-servers"),
 		WorkloadType:    types.StringValue("unix"),
 		Description:     types.StringNull(),
-		WorkloadConfiguration: &WorkloadConfigurationModel{
+		WorkloadConfiguration: workloadConfigObject(t, WorkloadConfigurationModel{
 			SpiffeIDTemplate:             types.StringNull(),
 			WorkloadRegistrationPolicies: policyList,
-		},
+		}),
 	}
 	require.False(t, req.Plan.Set(ctx, &data).HasError())
 
@@ -768,10 +799,13 @@ func TestNodeGroupResource_WorkloadRegistrationPoliciesRoundTrip(t *testing.T) {
 
 	var result NodeGroupResourceModel
 	require.False(t, resp.State.Get(ctx, &result).HasError())
-	require.NotNil(t, result.WorkloadConfiguration)
+	require.False(t, result.WorkloadConfiguration.IsNull())
+
+	var wc WorkloadConfigurationModel
+	require.False(t, result.WorkloadConfiguration.As(ctx, &wc, basetypes.ObjectAsOptions{}).HasError())
 
 	var gotPolicies []string
-	require.False(t, result.WorkloadConfiguration.WorkloadRegistrationPolicies.ElementsAs(ctx, &gotPolicies, false).HasError())
+	require.False(t, wc.WorkloadRegistrationPolicies.ElementsAs(ctx, &gotPolicies, false).HasError())
 	assert.Equal(t, policies, gotPolicies)
 }
 

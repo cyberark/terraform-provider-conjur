@@ -1,10 +1,10 @@
 package main
 
 import (
-	"github.com/cyberark/terraform-provider-conjur/internal/provider"
 	"context"
-	"log"
 	"flag"
+	"github.com/cyberark/terraform-provider-conjur/internal/provider"
+	"log"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 )

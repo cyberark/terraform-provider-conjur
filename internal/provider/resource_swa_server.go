@@ -549,7 +549,6 @@ func (r *ServerResource) Schema(ctx context.Context, req resource.SchemaRequest,
 			"authn_id": schema.StringAttribute{
 				MarkdownDescription: "Opaque Base64-encoded authenticator identifier for this server.",
 				Computed:            true,
-				Sensitive:           true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -587,7 +586,7 @@ func (r *ServerResource) Schema(ctx context.Context, req resource.SchemaRequest,
 					"ca_cert": schema.StringAttribute{
 						MarkdownDescription: "PEM-encoded CA certificate for validating the JWKS provider's TLS certificate. Changing this forces a new server to be created.",
 						Optional:            true,
-							PlanModifiers: []planmodifier.String{
+						PlanModifiers: []planmodifier.String{
 							stringplanmodifier.RequiresReplace(),
 						},
 					},

@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-08-05
+
+### Added
+- Support for GCP attestation in SWA Server Groups via the `conjur_swa_server_group` resource.
+
 ## [0.9.0] - 2026-07-27
 
 ### Added
