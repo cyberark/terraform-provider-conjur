@@ -581,6 +581,25 @@ func TestServerGroupResource_Read(t *testing.T) {
 			expectedError: true,
 			errorContains: "Error reading server group",
 		},
+		{
+			name: "nil response body on 200",
+			data: ServerGroupResourceModel{
+				ID:              types.StringValue("prod.example.org/prod-servers"),
+				Name:            types.StringValue("prod-servers"),
+				TrustDomainName: types.StringValue("prod.example.org"),
+				Attestation: &AttestationModel{
+					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
+				},
+			},
+			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
+				m.On("GetServerGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.GetServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+					Return(&swaclient.GetServerGroupResponse{
+						HTTPResponse: makeHTTPResponse(http.StatusOK),
+					}, nil)
+			},
+			expectedError: true,
+			errorContains: "No response body",
+		},
 	}
 
 	for _, tt := range tests {
@@ -876,6 +895,38 @@ func TestServerGroupResource_Update(t *testing.T) {
 			},
 			expectedError: true,
 			errorContains: "Error updating server group",
+		},
+		{
+			name: "nil response body on 200",
+			plan: ServerGroupResourceModel{
+				ID:              types.StringValue("prod.example.org/prod-servers"),
+				Name:            types.StringValue("prod-servers"),
+				TrustDomainName: types.StringValue("prod.example.org"),
+				Description:     types.StringNull(),
+				Attestation: &AttestationModel{
+					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
+				},
+			},
+			state: ServerGroupResourceModel{
+				ID:              types.StringValue("prod.example.org/prod-servers"),
+				Name:            types.StringValue("prod-servers"),
+				TrustDomainName: types.StringValue("prod.example.org"),
+				Description:     types.StringNull(),
+				Attestation: &AttestationModel{
+					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
+				},
+			},
+			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
+				m.On("PatchServerGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.PatchServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchServerGroupJSONRequestBody{
+					Attestation: &swaclient.AttestationConfiguration{
+						X509pop: &swaclient.X509PopConfigurationInput{CaCertificates: "cert"},
+					},
+				}).Return(&swaclient.PatchServerGroupResponse{
+					HTTPResponse: makeHTTPResponse(http.StatusOK),
+				}, nil)
+			},
+			expectedError: true,
+			errorContains: "No response body",
 		},
 	}
 
@@ -1381,4 +1432,3 @@ resource "conjur_swa_server_group" "test" {
 		},
 	})
 }
-

@@ -307,6 +307,45 @@ func TestNodeGroupResource_Read(t *testing.T) {
 			expectedError: true,
 			errorContains: "Error reading node group",
 		},
+		{
+			name: "non-200 status code during read",
+			data: NodeGroupResourceModel{
+				ID:              types.StringValue("prod.example.org/prod-servers/prod-nodes"),
+				Name:            types.StringValue("prod-nodes"),
+				TrustDomainName: types.StringValue("prod.example.org"),
+				ServerGroupName: types.StringValue("prod-servers"),
+				WorkloadType:    types.StringValue("unix"),
+				Description:     types.StringNull(),
+			},
+			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
+				m.On("GetNodeGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", "prod-nodes", &swaclient.GetNodeGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+					Return(&swaclient.GetNodeGroupResponse{
+						HTTPResponse: makeHTTPResponse(http.StatusInternalServerError),
+						Body:         []byte(`{"message":"internal error"}`),
+					}, nil)
+			},
+			expectedError: true,
+			errorContains: "Error reading node group",
+		},
+		{
+			name: "nil response body on 200",
+			data: NodeGroupResourceModel{
+				ID:              types.StringValue("prod.example.org/prod-servers/prod-nodes"),
+				Name:            types.StringValue("prod-nodes"),
+				TrustDomainName: types.StringValue("prod.example.org"),
+				ServerGroupName: types.StringValue("prod-servers"),
+				WorkloadType:    types.StringValue("unix"),
+				Description:     types.StringNull(),
+			},
+			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
+				m.On("GetNodeGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", "prod-nodes", &swaclient.GetNodeGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+					Return(&swaclient.GetNodeGroupResponse{
+						HTTPResponse: makeHTTPResponse(http.StatusOK),
+					}, nil)
+			},
+			expectedError: true,
+			errorContains: "No response body",
+		},
 	}
 
 	for _, tt := range tests {
