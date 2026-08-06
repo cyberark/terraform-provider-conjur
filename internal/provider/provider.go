@@ -56,17 +56,21 @@ type providerImpl struct {
 
 // providerModel describes the provider data model.
 type providerModel struct {
-	AuthnType    types.String `tfsdk:"authn_type"`
-	ApplianceUrl types.String `tfsdk:"appliance_url"`
-	Account      types.String `tfsdk:"account"`
-	Login        types.String `tfsdk:"login"`
-	APIKey       types.String `tfsdk:"api_key"`
-	ServiceID    types.String `tfsdk:"service_id"`
-	ClientID     types.String `tfsdk:"client_id"`
-	HostID       types.String `tfsdk:"host_id"`
-	SSLCert      types.String `tfsdk:"ssl_cert"`
-	SSLCertPath  types.String `tfsdk:"ssl_cert_path"`
-	AuthnJWT     types.String `tfsdk:"authn_jwt_token"`
+	AuthnType         types.String `tfsdk:"authn_type"`
+	ApplianceUrl      types.String `tfsdk:"appliance_url"`
+	Account           types.String `tfsdk:"account"`
+	Login             types.String `tfsdk:"login"`
+	APIKey            types.String `tfsdk:"api_key"`
+	ServiceID         types.String `tfsdk:"service_id"`
+	ClientID          types.String `tfsdk:"client_id"`
+	HostID            types.String `tfsdk:"host_id"`
+	SSLCert           types.String `tfsdk:"ssl_cert"`
+	SSLCertPath       types.String `tfsdk:"ssl_cert_path"`
+	AuthnJWT          types.String `tfsdk:"authn_jwt_token"`
+	ClientCertFile    types.String `tfsdk:"authn_cert_file"`
+	ClientCertKeyFile types.String `tfsdk:"authn_cert_key_file"`
+	ClientCert        types.String `tfsdk:"authn_cert"`
+	ClientCertKey     types.String `tfsdk:"authn_cert_key"`
 }
 
 // Metadata returns the provider type name.
@@ -125,6 +129,26 @@ func (p *providerImpl) Schema(_ context.Context, _ provider.SchemaRequest, resp 
 				Description: "Authn JWT Token",
 				Sensitive:   true,
 			},
+			"authn_cert_file": schema.StringAttribute{
+				Optional:    true,
+				Description: "Path to the PEM-encoded client certificate file for authn-cert mTLS authentication",
+				Sensitive:   true,
+			},
+			"authn_cert_key_file": schema.StringAttribute{
+				Optional:    true,
+				Description: "Path to the PEM-encoded private key file for the authn-cert client certificate",
+				Sensitive:   true,
+			},
+			"authn_cert": schema.StringAttribute{
+				Optional:    true,
+				Description: "Inline PEM content of the client certificate for authn-cert mTLS authentication. Use authn_cert_file to specify a file path instead",
+				Sensitive:   true,
+			},
+			"authn_cert_key": schema.StringAttribute{
+				Optional:    true,
+				Description: "Inline PEM content of the private key for the authn-cert client certificate. Use authn_cert_key_file to specify a file path instead",
+				Sensitive:   true,
+			},
 		},
 	}
 }
@@ -138,7 +162,7 @@ func (p *providerImpl) ValidateConfig(ctx context.Context, req provider.Validate
 	}
 
 	// Validate Authentication Types
-	validAuthnTypes := []string{"api", "aws", "azure", "gcp", "jwt"}
+	validAuthnTypes := []string{"api", "aws", "azure", "gcp", "jwt", "cert"}
 	if data.AuthnType.ValueString() != "" {
 		valid := false
 		for _, method := range validAuthnTypes {
@@ -176,6 +200,13 @@ func (p *providerImpl) ValidateConfig(ctx context.Context, req provider.Validate
 		// authn_jwt_token omitted - may come from TFC_WORKLOAD_IDENTITY_TOKEN env var
 	}
 
+	// service_id is required; host_id is optional (empty = SPIFFE mode).
+	// cert/key can come from env vars (CONJUR_AUTHN_CERT_FILE / CONJUR_AUTHN_CERT_KEY_FILE).
+	authCertAttributes := map[string]types.String{
+		"appliance_url": data.ApplianceUrl,
+		"service_id":    data.ServiceID,
+	}
+
 	switch data.AuthnType.ValueString() {
 	case "aws", "azure":
 		validateAttributes(authIamAzureAttributes, data.AuthnType.ValueString(), resp)
@@ -183,6 +214,8 @@ func (p *providerImpl) ValidateConfig(ctx context.Context, req provider.Validate
 		validateAttributes(authGcpAttributes, "gcp", resp)
 	case "jwt":
 		validateAttributes(authnJWTAttributes, "jwt", resp)
+	case "cert":
+		validateAttributes(authCertAttributes, "cert", resp)
 	case "api":
 		validateAttributes(authApiAttributes, "api", resp)
 		// authn_type is explicitly "api" but createAPIKeyClient only performs a
@@ -385,6 +418,8 @@ func (p *providerImpl) createClient(config *conjurapi.Config, data *providerMode
 		return p.createIAMClient(config, data)
 	case "jwt":
 		return p.createJWTClient(config, data)
+	case "cert":
+		return p.createCertClient(config, data)
 	case "", "api":
 		return p.createAPIKeyClient(config, data)
 	default:
@@ -432,6 +467,33 @@ func (p *providerImpl) createIAMClient(config *conjurapi.Config, data *providerM
 	config.JWTHostID = strings.TrimPrefix(data.HostID.ValueString(), "host/")
 
 	return conjurapi.NewClientFromAWSCredentials(*config, telemetryData)
+}
+
+// createCertClient creates a Conjur client that authenticates via the authn-cert authenticator (mTLS).
+// The appliance_url must point to a Secrets Manager Edge instance — certificate authentication
+// is only supported through Edge, not directly against the Conjur API.
+// Reference: POST https://<edge-url>/api/authn-cert/<service-id>/conjur/<workload-id>/authenticate
+func (p *providerImpl) createCertClient(config *conjurapi.Config, data *providerModel) (*conjurapi.Client, error) {
+	config.AuthnType = "cert"
+	config.ServiceID = data.ServiceID.ValueString()
+	// CertHostID is the URL-encoded workload ID (e.g. "host/data/vm-workloads/vm-01").
+	// Leave empty only for SPIFFE mode — the host is then derived from the cert SAN URI.
+	config.CertHostID = data.HostID.ValueString()
+
+	if cert := data.ClientCert.ValueString(); cert != "" {
+		config.ClientCert = cert
+	}
+	if certKey := data.ClientCertKey.ValueString(); certKey != "" {
+		config.ClientCertKey = certKey
+	}
+	if certFile := data.ClientCertFile.ValueString(); certFile != "" {
+		config.ClientCertFile = certFile
+	}
+	if certKeyFile := data.ClientCertKeyFile.ValueString(); certKeyFile != "" {
+		config.ClientCertKeyFile = certKeyFile
+	}
+
+	return conjurapi.NewClientFromCertificate(*config, telemetryData)
 }
 
 func (p *providerImpl) createAPIKeyClient(config *conjurapi.Config, data *providerModel) (*conjurapi.Client, error) {

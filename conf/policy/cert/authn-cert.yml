@@ -1,0 +1,20 @@
+# Loaded to: conjur/authn-cert
+# conjur policy load -f authn-cert.yml -b conjur/authn-cert
+- !policy
+  id: test-service
+  body:
+  - !webservice
+
+  - !variable ca-cert
+
+  - !group apps
+  - !permit
+    role: !group apps
+    privilege: [ read, authenticate ]
+    resource: !webservice
+
+  - !group operators
+  - !permit
+    role: !group operators
+    privilege: [ read, update ]
+    resource: !webservice

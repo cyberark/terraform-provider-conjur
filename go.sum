@@ -58,6 +58,8 @@ github.com/cloudflare/circl v1.6.3/go.mod h1:2eXP6Qfat4O/Yhh8BznvKnJ+uzEoTQ6jVKJ
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/cyberark/conjur-api-go v0.15.0 h1:xjZIYz9R59ZC1dB9bJKPpgki+aZPpxFGhib80Y4FgWA=
 github.com/cyberark/conjur-api-go v0.15.0/go.mod h1:POjKgJwnniONTnWySx6Yq87hYsdPD6Ohwm7x1UGio7E=
+github.com/cyberark/conjur-api-go v0.15.5 h1:dGf5QDtSmNX8LdIE3x3hGnOg5FdnwM/QTsBb5GtGi5I=
+github.com/cyberark/conjur-api-go v0.15.5/go.mod h1:IxsTkDhEewa3iU/W7DMaJ6/snX208F4PYVTjzofRjzc=
 github.com/cyphar/filepath-securejoin v0.4.1 h1:JyxxyPEaktOD+GAnqIqTf9A8tHyAG22rowi7HkoSU1s=
 github.com/cyphar/filepath-securejoin v0.4.1/go.mod h1:Sdj7gXlvMcPZsbhwhQ33GguGLDGQL7h7bg04C/+u9jI=
 github.com/danieljoos/wincred v1.2.2 h1:774zMFJrqaeYCK2W57BgAem/MLi6mtSE47MB6BOJ0i0=

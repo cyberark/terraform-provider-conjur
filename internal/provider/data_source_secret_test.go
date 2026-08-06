@@ -102,6 +102,23 @@ func TestJWTSecretDataSource(t *testing.T) {
 	})
 }
 
+func TestCertSecretDataSource(t *testing.T) {
+	if os.Getenv("TF_AUTHN_CERT") == "" {
+		t.Skip("TF_AUTHN_CERT not set — skipping cert acceptance test (requires a live authn-cert-enabled Conjur with client certificate)")
+	}
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: providerCertConfig + testCertRetrieveSecret(),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("data.conjur_secret.test", "value", os.Getenv("TF_CERT_SECRET_VALUE")),
+				),
+			},
+		},
+	})
+}
+
 func TestConfigFromEnvVars(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -130,4 +147,12 @@ func testJwtRetrieveSecret() string {
 		name               = %[1]q
     }
 	`, os.Getenv("TF_JWT_CONJUR_SECRET_VARIABLE"))
+}
+
+func testCertRetrieveSecret() string {
+	return fmt.Sprintf(`
+	data "conjur_secret" "test" {
+		name = %[1]q
+	}
+	`, os.Getenv("TF_CERT_SECRET_VARIABLE"))
 }

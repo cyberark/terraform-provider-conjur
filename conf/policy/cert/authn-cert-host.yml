@@ -1,0 +1,15 @@
+# Loaded to: data
+# conjur policy load -f authn-cert-host.yml -b data
+- !policy
+  id: cert-apps
+  body:
+  - !group
+
+  - !host
+    id: vm-01
+    annotations:
+      authn-cert/test-service/cn: vm-01
+
+  - !grant
+    role: !group
+    member: !host vm-01
