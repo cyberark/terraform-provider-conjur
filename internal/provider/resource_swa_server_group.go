@@ -22,9 +22,10 @@ import (
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var (
-	_ resource.Resource                = &ServerGroupResource{}
-	_ resource.ResourceWithConfigure   = &ServerGroupResource{}
-	_ resource.ResourceWithImportState = &ServerGroupResource{}
+	_ resource.Resource                   = &ServerGroupResource{}
+	_ resource.ResourceWithConfigure      = &ServerGroupResource{}
+	_ resource.ResourceWithImportState    = &ServerGroupResource{}
+	_ resource.ResourceWithValidateConfig = &ServerGroupResource{}
 )
 
 type ServerGroupResource struct {
@@ -37,6 +38,12 @@ type ServerGroupResourceModel struct {
 	Description     types.String      `tfsdk:"description"`
 	TrustDomainName types.String      `tfsdk:"trust_domain_name"`
 	Attestation     *AttestationModel `tfsdk:"attestation"`
+	// NodeAttestation is the old provider's name for Attestation. It was renamed to
+	// `attestation` before this provider's initial release, so this field exists solely
+	// so ValidateConfig can detect stale configs written against the old provider and
+	// return an actionable error instead of Terraform core's generic
+	// "unsupported argument" message.
+	NodeAttestation *AttestationModel `tfsdk:"node_attestation"`
 }
 
 type AttestationModel struct {
@@ -76,6 +83,84 @@ func k8sPsatClusterAttrTypes() map[string]attr.Type {
 
 func NewServerGroupResource() resource.Resource {
 	return &ServerGroupResource{}
+}
+
+// attestationNestedAttributes returns the nested attribute schema shared by both the
+// current `attestation` attribute and the deprecated,
+// `node_attestation` attribute (see ServerGroupResourceModel.NodeAttestation). Keeping
+// them identical ensures configs written against the old attribute name still parse
+// successfully at the Terraform-core level, so the provider can surface a helpful
+// rename error via ValidateConfig instead of core's generic "unsupported argument".
+func attestationNestedAttributes() map[string]schema.Attribute {
+	return map[string]schema.Attribute{
+		"x509pop": schema.SingleNestedAttribute{
+			MarkdownDescription: "X.509 Proof of Possession attestation configuration.",
+			Optional:            true,
+			Attributes: map[string]schema.Attribute{
+				"ca_certificates": schema.StringAttribute{
+					MarkdownDescription: "PEM-encoded CA certificates for X.509 POP node attestation.",
+					Required:            true,
+					Sensitive:           true,
+				},
+			},
+		},
+		"k8s_psat": schema.SingleNestedAttribute{
+			MarkdownDescription: "Kubernetes Projected Service Account Token attestation configuration.",
+			Optional:            true,
+			Attributes: map[string]schema.Attribute{
+				"clusters": schema.MapNestedAttribute{
+					MarkdownDescription: "Map of cluster names to cluster configurations.",
+					Optional:            true,
+					NestedObject: schema.NestedAttributeObject{
+						Attributes: map[string]schema.Attribute{
+							"service_account_allow_list": schema.ListAttribute{
+								MarkdownDescription: "List of allowed service accounts in namespace/name format.",
+								Optional:            true,
+								ElementType:         types.StringType,
+							},
+							"audience": schema.ListAttribute{
+								MarkdownDescription: "Expected audience values for the PSAT token.",
+								Optional:            true,
+								ElementType:         types.StringType,
+							},
+							"allowed_pod_label_keys": schema.ListAttribute{
+								MarkdownDescription: "Pod label keys to include in attestation.",
+								Optional:            true,
+								ElementType:         types.StringType,
+							},
+							"allowed_node_label_keys": schema.ListAttribute{
+								MarkdownDescription: "Node label keys to include in attestation.",
+								Optional:            true,
+								ElementType:         types.StringType,
+							},
+						},
+					},
+				},
+			},
+		},
+		"gcp_service_account": schema.SingleNestedAttribute{
+			MarkdownDescription: "GCP service account attestation configuration.",
+			Optional:            true,
+			Attributes: map[string]schema.Attribute{
+				"allowed_project_ids": schema.ListAttribute{
+					MarkdownDescription: "List of allowed GCP project IDs.",
+					Required:            true,
+					ElementType:         types.StringType,
+					Validators: []validator.List{
+						listvalidator.SizeAtLeast(1),
+					},
+				},
+				"audiences": schema.ListAttribute{
+					MarkdownDescription: "Expected audience values for the GCP identity token (`aud` claim). Defaults to `urn:panw:swa` when omitted.",
+					Optional:            true,
+					ElementType:         types.StringType,
+					Validators: []validator.List{
+						listvalidator.SizeAtLeast(1),
+					},
+				},
+			},
+		},
+	}
 }
 
 // updateAttestationFromResponse replaces the model's Attestation with exactly what the
@@ -258,77 +343,42 @@ func (r *ServerGroupResource) Schema(ctx context.Context, req resource.SchemaReq
 			"attestation": schema.SingleNestedAttribute{
 				MarkdownDescription: "Node attestation configuration. Optionally specify any of x509pop, k8s_psat, or gcp_service_account; omit entirely for a server group with no attestation.",
 				Optional:            true,
-				Attributes: map[string]schema.Attribute{
-					"x509pop": schema.SingleNestedAttribute{
-						MarkdownDescription: "X.509 Proof of Possession attestation configuration.",
-						Optional:            true,
-						Attributes: map[string]schema.Attribute{
-							"ca_certificates": schema.StringAttribute{
-								MarkdownDescription: "PEM-encoded CA certificates for X.509 POP node attestation.",
-								Required:            true,
-								Sensitive:           true,
-							},
-						},
-					},
-					"k8s_psat": schema.SingleNestedAttribute{
-						MarkdownDescription: "Kubernetes Projected Service Account Token attestation configuration.",
-						Optional:            true,
-						Attributes: map[string]schema.Attribute{
-							"clusters": schema.MapNestedAttribute{
-								MarkdownDescription: "Map of cluster names to cluster configurations.",
-								Optional:            true,
-								NestedObject: schema.NestedAttributeObject{
-									Attributes: map[string]schema.Attribute{
-										"service_account_allow_list": schema.ListAttribute{
-											MarkdownDescription: "List of allowed service accounts in namespace/name format.",
-											Optional:            true,
-											ElementType:         types.StringType,
-										},
-										"audience": schema.ListAttribute{
-											MarkdownDescription: "Expected audience values for the PSAT token.",
-											Optional:            true,
-											ElementType:         types.StringType,
-										},
-										"allowed_pod_label_keys": schema.ListAttribute{
-											MarkdownDescription: "Pod label keys to include in attestation.",
-											Optional:            true,
-											ElementType:         types.StringType,
-										},
-										"allowed_node_label_keys": schema.ListAttribute{
-											MarkdownDescription: "Node label keys to include in attestation.",
-											Optional:            true,
-											ElementType:         types.StringType,
-										},
-									},
-								},
-							},
-						},
-					},
-					"gcp_service_account": schema.SingleNestedAttribute{
-						MarkdownDescription: "GCP service account attestation configuration.",
-						Optional:            true,
-						Attributes: map[string]schema.Attribute{
-							"allowed_project_ids": schema.ListAttribute{
-								MarkdownDescription: "List of allowed GCP project IDs.",
-								Required:            true,
-								ElementType:         types.StringType,
-								Validators: []validator.List{
-									listvalidator.SizeAtLeast(1),
-								},
-							},
-							"audiences": schema.ListAttribute{
-								MarkdownDescription: "Expected audience values for the GCP identity token (`aud` claim). Defaults to `urn:panw:swa` when omitted.",
-								Optional:            true,
-								ElementType:         types.StringType,
-								Validators: []validator.List{
-									listvalidator.SizeAtLeast(1),
-								},
-							},
-						},
-					},
-				},
+				Attributes:          attestationNestedAttributes(),
+			},
+			// node_attestation was the attribute name used prior to this provider's
+			// initial release; it was renamed to `attestation` before release and has
+			// never been functional. It is kept in the schema
+			// so that stale configs written against the old provider still pass
+			// Terraform-core's config validation, allowing ValidateConfig below to
+			// return a clear, actionable rename error instead of core's generic
+			// "unsupported argument" message.
+			"node_attestation": schema.SingleNestedAttribute{
+				MarkdownDescription: "Deprecated: use `attestation` instead.",
+				DeprecationMessage:  "node_attestation was used by the previous Terraform provider this one replaces. Update your configuration to use `attestation` instead.",
+				Optional:            true,
+				Attributes:          attestationNestedAttributes(),
 			},
 		},
+	}
+}
+
+
+
+func (r *ServerGroupResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var data ServerGroupResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if data.NodeAttestation != nil {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("node_attestation"),
+			"Unsupported Attribute: node_attestation",
+			"The `node_attestation` attribute was used by the previous Terraform provider that "+
+				"this one replaces. Update your configuration to use "+
+				"`attestation` instead.",
+		)
 	}
 }
 

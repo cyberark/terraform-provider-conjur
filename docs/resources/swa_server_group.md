@@ -80,6 +80,7 @@ resource "conjur_swa_server_group" "no_attestation" {
 
 - `attestation` (Attributes) Node attestation configuration. Optionally specify any of x509pop, k8s_psat, or gcp_service_account; omit entirely for a server group with no attestation. (see [below for nested schema](#nestedatt--attestation))
 - `description` (String) A description of the server group.
+- `node_attestation` (Attributes, Deprecated) Deprecated: this attribute was renamed to `attestation` before this provider's initial release and is not functional. Use `attestation` instead. (see [below for nested schema](#nestedatt--node_attestation))
 
 ### Read-Only
 
@@ -127,6 +128,55 @@ Optional:
 
 <a id="nestedatt--attestation--x509pop"></a>
 ### Nested Schema for `attestation.x509pop`
+
+Required:
+
+- `ca_certificates` (String, Sensitive) PEM-encoded CA certificates for X.509 POP node attestation.
+
+
+
+<a id="nestedatt--node_attestation"></a>
+### Nested Schema for `node_attestation`
+
+Optional:
+
+- `gcp_service_account` (Attributes) GCP service account attestation configuration. (see [below for nested schema](#nestedatt--node_attestation--gcp_service_account))
+- `k8s_psat` (Attributes) Kubernetes Projected Service Account Token attestation configuration. (see [below for nested schema](#nestedatt--node_attestation--k8s_psat))
+- `x509pop` (Attributes) X.509 Proof of Possession attestation configuration. (see [below for nested schema](#nestedatt--node_attestation--x509pop))
+
+<a id="nestedatt--node_attestation--gcp_service_account"></a>
+### Nested Schema for `node_attestation.gcp_service_account`
+
+Required:
+
+- `allowed_project_ids` (List of String) List of allowed GCP project IDs.
+
+Optional:
+
+- `audiences` (List of String) Expected audience values for the GCP identity token (`aud` claim). Defaults to `urn:panw:swa` when omitted.
+
+
+<a id="nestedatt--node_attestation--k8s_psat"></a>
+### Nested Schema for `node_attestation.k8s_psat`
+
+Optional:
+
+- `clusters` (Attributes Map) Map of cluster names to cluster configurations. (see [below for nested schema](#nestedatt--node_attestation--k8s_psat--clusters))
+
+<a id="nestedatt--node_attestation--k8s_psat--clusters"></a>
+### Nested Schema for `node_attestation.k8s_psat.clusters`
+
+Optional:
+
+- `allowed_node_label_keys` (List of String) Node label keys to include in attestation.
+- `allowed_pod_label_keys` (List of String) Pod label keys to include in attestation.
+- `audience` (List of String) Expected audience values for the PSAT token.
+- `service_account_allow_list` (List of String) List of allowed service accounts in namespace/name format.
+
+
+
+<a id="nestedatt--node_attestation--x509pop"></a>
+### Nested Schema for `node_attestation.x509pop`
 
 Required:
 
