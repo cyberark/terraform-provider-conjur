@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"regexp"
 	"testing"
 	"time"
 
@@ -1317,6 +1318,33 @@ resource "conjur_swa_server_group" "test" {
 					tfresource.TestCheckNoResourceAttr("conjur_swa_server_group.test", "attestation.x509pop.ca_certificates"),
 					tfresource.TestCheckResourceAttrSet("conjur_swa_server_group.test", "attestation.k8s_psat.clusters.cluster-1.service_account_allow_list.0"),
 				),
+			},
+		},
+	})
+}
+
+func TestServerGroupResource_ValidateConfig_RejectsEmptyGCPAllowedProjectIDs(t *testing.T) {
+	t.Parallel()
+
+	mockClient := swamocks.NewMockClientWithResponsesInterface(t)
+
+	tfresource.Test(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
+		Steps: []tfresource.TestStep{
+			{
+				Config: `
+resource "conjur_swa_server_group" "test" {
+  name              = "test-sg"
+  trust_domain_name = "test-td"
+
+  attestation = {
+    gcp_service_account = {
+      allowed_project_ids = []
+    }
+  }
+}
+`,
+				ExpectError: regexp.MustCompile(`(?s)allowed_project_ids.*at least 1`),
 			},
 		},
 	})

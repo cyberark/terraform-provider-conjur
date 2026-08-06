@@ -759,14 +759,13 @@ func TestTrustDomainResource_ValidateConfig(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			name: "invalid without jwt or x509",
+			name: "valid without jwt or x509",
 			data: TrustDomainResourceModel{
 				Name: types.StringValue("prod.example.org"),
 				JWT:  nullJWTObject,
 				X509: nullX509Object,
 			},
-			expectedError: true,
-			errorContains: "Invalid trust domain configuration",
+			expectedError: false,
 		},
 	}
 

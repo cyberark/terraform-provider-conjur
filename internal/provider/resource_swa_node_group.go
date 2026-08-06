@@ -7,6 +7,7 @@ import (
 	"regexp"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -15,6 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	swaclient "github.com/cyberark/terraform-provider-conjur/internal/swa/client"
@@ -36,13 +38,13 @@ type NodeGroupResource struct {
 }
 
 type NodeGroupResourceModel struct {
-	ID                    types.String                `tfsdk:"id"`
-	Name                  types.String                `tfsdk:"name"`
-	Description           types.String                `tfsdk:"description"`
-	TrustDomainName       types.String                `tfsdk:"trust_domain_name"`
-	ServerGroupName       types.String                `tfsdk:"server_group_name"`
-	WorkloadType          types.String                `tfsdk:"workload_type"`
-	WorkloadConfiguration *WorkloadConfigurationModel `tfsdk:"workload_configuration"`
+	ID                    types.String `tfsdk:"id"`
+	Name                  types.String `tfsdk:"name"`
+	Description           types.String `tfsdk:"description"`
+	TrustDomainName       types.String `tfsdk:"trust_domain_name"`
+	ServerGroupName       types.String `tfsdk:"server_group_name"`
+	WorkloadType          types.String `tfsdk:"workload_type"`
+	WorkloadConfiguration types.Object `tfsdk:"workload_configuration"`
 }
 
 type WorkloadConfigurationModel struct {
@@ -50,17 +52,34 @@ type WorkloadConfigurationModel struct {
 	WorkloadRegistrationPolicies types.List   `tfsdk:"workload_registration_policies"`
 }
 
+// workloadConfigurationAttrTypes describes the object type of the
+// workload_configuration nested attribute. It is used to build/parse
+// types.Object values so that null/unknown/known states are represented
+// correctly (a plain Go struct cannot represent "unknown").
+var workloadConfigurationAttrTypes = map[string]attr.Type{
+	"spiffe_id_template":             types.StringType,
+	"workload_registration_policies": types.ListType{ElemType: types.StringType},
+}
+
 func NewNodeGroupResource() resource.Resource {
 	return &NodeGroupResource{}
 }
 
 // buildWorkloadConfiguration converts the Terraform model to the API client WorkloadConfiguration.
-func buildWorkloadConfiguration(ctx context.Context, wc *WorkloadConfigurationModel) (*swaclient.WorkloadConfiguration, diag.Diagnostics) {
-	if wc == nil {
-		return nil, nil
+// An unknown or null object is treated as "not configured" (nil), which means the
+// request will omit workload_configuration entirely and let the server decide.
+func buildWorkloadConfiguration(ctx context.Context, wcObj types.Object) (*swaclient.WorkloadConfiguration, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	if wcObj.IsNull() || wcObj.IsUnknown() {
+		return nil, diags
 	}
 
-	var diags diag.Diagnostics
+	var wc WorkloadConfigurationModel
+	diags.Append(wcObj.As(ctx, &wc, basetypes.ObjectAsOptions{})...)
+	if diags.HasError() {
+		return nil, diags
+	}
+
 	result := &swaclient.WorkloadConfiguration{}
 	if !wc.SpiffeIDTemplate.IsNull() {
 		t := wc.SpiffeIDTemplate.ValueString()
@@ -80,18 +99,18 @@ func (r *NodeGroupResource) Metadata(ctx context.Context, req resource.MetadataR
 
 func (r *NodeGroupResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription:"Manages an SWA Node Group.",
+		MarkdownDescription: "Manages an SWA Node Group.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				MarkdownDescription:"The unique identifier of the node group.",
-				Computed:    true,
+				MarkdownDescription: "The unique identifier of the node group.",
+				Computed:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"name": schema.StringAttribute{
-				MarkdownDescription:"The name of the node group. Must be 1-60 characters and may include letters, numbers, periods, underscores, and hyphens only.",
-				Required:    true,
+				MarkdownDescription: "The name of the node group. Must be 1-60 characters and may include letters, numbers, periods, underscores, and hyphens only.",
+				Required:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -101,26 +120,26 @@ func (r *NodeGroupResource) Schema(ctx context.Context, req resource.SchemaReque
 				},
 			},
 			"description": schema.StringAttribute{
-				MarkdownDescription:"A description of the node group.",
-				Optional:    true,
+				MarkdownDescription: "A description of the node group.",
+				Optional:            true,
 			},
 			"trust_domain_name": schema.StringAttribute{
-				MarkdownDescription:"The name of the trust domain.",
-				Required:    true,
+				MarkdownDescription: "The name of the trust domain.",
+				Required:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"server_group_name": schema.StringAttribute{
-				MarkdownDescription:"The name of the server group.",
-				Required:    true,
+				MarkdownDescription: "The name of the server group.",
+				Required:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"workload_type": schema.StringAttribute{
-				MarkdownDescription:"Type of workload for this node group. Valid values: 'unix', 'kubernetes'.",
-				Required:    true,
+				MarkdownDescription: "Type of workload for this node group. Valid values: 'unix', 'kubernetes'.",
+				Required:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -129,17 +148,23 @@ func (r *NodeGroupResource) Schema(ctx context.Context, req resource.SchemaReque
 				},
 			},
 			"workload_configuration": schema.SingleNestedAttribute{
-				MarkdownDescription:"Workload configuration for the node group.",
-				Optional:    true,
+				MarkdownDescription: "Workload configuration for the node group.",
+				Optional:            true,
+				Computed:            true,
+				// Intentionally no UseStateForUnknown plan modifier: this attribute
+				// must be able to transition from a known object back to null when a
+				// user removes the block from their configuration (to reset defaults).
+				// UseStateForUnknown would instead carry the prior known value forward,
+				// making an explicit "clear" indistinguishable from "never configured".
 				Attributes: map[string]schema.Attribute{
 					"spiffe_id_template": schema.StringAttribute{
-						MarkdownDescription:"SPIFFE ID template for workload identification. Uses Go template syntax.",
-						Optional:    true,
+						MarkdownDescription: "SPIFFE ID template for workload identification. Uses Go template syntax.",
+						Optional:            true,
 					},
 					"workload_registration_policies": schema.ListAttribute{
-						MarkdownDescription:"List of CEL expressions for workload registration policies.",
-						Optional:    true,
-						ElementType: types.StringType,
+						MarkdownDescription: "List of CEL expressions for workload registration policies.",
+						Optional:            true,
+						ElementType:         types.StringType,
 					},
 				},
 			},
@@ -206,8 +231,7 @@ func (r *NodeGroupResource) Create(ctx context.Context, req resource.CreateReque
 	plan.Name = types.StringValue(ngResp.Name)
 	plan.WorkloadType = types.StringValue(string(ngResp.WorkloadType))
 	plan.Description = optionalStringValue(ngResp.Description)
-	// Always sync workload_configuration from the API response.
-	// If no fields are set server-side the optional block stays absent (nil) in state.
+	// Keep state aligned with API response; workload_configuration is required in NodeGroupResponse.
 	resp.Diagnostics.Append(syncWorkloadConfigFromResponse(ctx, &plan, &ngResp.WorkloadConfiguration)...)
 
 	tflog.Trace(ctx, "created node group resource")
@@ -248,8 +272,7 @@ func (r *NodeGroupResource) Read(ctx context.Context, req resource.ReadRequest, 
 		state.Name = types.StringValue(ngResp.Name)
 		state.WorkloadType = types.StringValue(string(ngResp.WorkloadType))
 		state.Description = optionalStringValue(ngResp.Description)
-		// Always sync workload_configuration from the API response.
-		// If no fields are set server-side the optional block stays absent (nil) in state.
+		// Keep state aligned with API response; workload_configuration is required in NodeGroupResponse.
 		resp.Diagnostics.Append(syncWorkloadConfigFromResponse(ctx, &state, &ngResp.WorkloadConfiguration)...)
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
@@ -288,7 +311,7 @@ func (r *NodeGroupResource) Update(ctx context.Context, req resource.UpdateReque
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		if state.WorkloadConfiguration != nil {
+		if !state.WorkloadConfiguration.IsNull() {
 			updateReq.WorkloadConfiguration = &swaclient.WorkloadConfiguration{}
 		}
 	}
@@ -311,8 +334,7 @@ func (r *NodeGroupResource) Update(ctx context.Context, req resource.UpdateReque
 	}
 	ngResp := result.ApplicationxSecretsmgrV2JSON200
 	plan.Description = optionalStringValue(ngResp.Description)
-	// Always sync workload_configuration from the API response.
-	// If no fields are set server-side the optional block stays absent (nil) in state.
+	// Keep state aligned with API response; workload_configuration is required in NodeGroupResponse.
 	resp.Diagnostics.Append(syncWorkloadConfigFromResponse(ctx, &plan, &ngResp.WorkloadConfiguration)...)
 
 	tflog.Trace(ctx, "updated node group resource")
@@ -359,24 +381,28 @@ func (r *NodeGroupResource) ImportState(ctx context.Context, req resource.Import
 }
 
 // syncWorkloadConfigFromResponse updates model.WorkloadConfiguration from the API response.
-// If the server returned no workload configuration fields (all nil), the optional block is
-// removed from state (set to nil) so users who omit the block in config see no diff.
+// NodeGroupResponse requires workload_configuration, but the API returns an
+// all-nil object when nothing is configured server-side. In that case we
+// represent it as a null object so Terraform state correctly shows the
+// workload_configuration block as absent, rather than present-but-empty.
 func syncWorkloadConfigFromResponse(ctx context.Context, model *NodeGroupResourceModel, wc *swaclient.WorkloadConfiguration) diag.Diagnostics {
-	if wc == nil || (wc.SpiffeIdTemplate == nil && wc.WorkloadRegistrationPolicies == nil) {
-		// Server returned nothing — keep the optional block absent in state.
-		model.WorkloadConfiguration = nil
-		return nil
-	}
 	var diags diag.Diagnostics
-	if model.WorkloadConfiguration == nil {
-		model.WorkloadConfiguration = &WorkloadConfigurationModel{}
+	if wc == nil || (wc.SpiffeIdTemplate == nil && wc.WorkloadRegistrationPolicies == nil) {
+		model.WorkloadConfiguration = types.ObjectNull(workloadConfigurationAttrTypes)
+		return diags
 	}
+
+	wcModel := WorkloadConfigurationModel{}
 	if wc.SpiffeIdTemplate != nil {
-		model.WorkloadConfiguration.SpiffeIDTemplate = types.StringValue(*wc.SpiffeIdTemplate)
+		wcModel.SpiffeIDTemplate = types.StringValue(*wc.SpiffeIdTemplate)
 	} else {
-		model.WorkloadConfiguration.SpiffeIDTemplate = types.StringNull()
+		wcModel.SpiffeIDTemplate = types.StringNull()
 	}
-	appendOptionalStringList(ctx, wc.WorkloadRegistrationPolicies, &model.WorkloadConfiguration.WorkloadRegistrationPolicies, &diags)
+	appendOptionalStringList(ctx, wc.WorkloadRegistrationPolicies, &wcModel.WorkloadRegistrationPolicies, &diags)
+
+	obj, objDiags := types.ObjectValueFrom(ctx, workloadConfigurationAttrTypes, wcModel)
+	diags.Append(objDiags...)
+	model.WorkloadConfiguration = obj
 
 	return diags
 }

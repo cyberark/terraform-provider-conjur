@@ -103,17 +103,17 @@ func TestJWTSecretDataSource(t *testing.T) {
 }
 
 func TestConfigFromEnvVars(t *testing.T) {
-    resource.Test(t, resource.TestCase{
-        ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-        Steps: []resource.TestStep{
-            {
-                Config: `provider "conjur" {}` + testRetrieveSecret(),
-                Check: resource.ComposeTestCheckFunc(
-                    resource.TestCheckResourceAttr("data.conjur_secret.test", "value", os.Getenv("TF_SECRET_VALUE")),
-                ),
-            },
-        },
-    })
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: `provider "conjur" {}` + testRetrieveSecret(),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("data.conjur_secret.test", "value", os.Getenv("TF_SECRET_VALUE")),
+				),
+			},
+		},
+	})
 }
 
 func testRetrieveSecret() string {
