@@ -1349,3 +1349,36 @@ resource "conjur_swa_server_group" "test" {
 		},
 	})
 }
+
+// TestServerGroupResource_ValidateConfig_RejectsNodeAttestation exercises the
+// deprecated node_attestation attribute: configs written against the old,
+// never-released attribute name must still parse (so the schema keeps the
+// attribute defined) but ValidateConfig must reject them with a clear message
+// pointing users to the renamed `attestation` attribute.
+func TestServerGroupResource_ValidateConfig_RejectsNodeAttestation(t *testing.T) {
+	t.Parallel()
+
+	mockClient := swamocks.NewMockClientWithResponsesInterface(t)
+
+	tfresource.Test(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
+		Steps: []tfresource.TestStep{
+			{
+				Config: `
+resource "conjur_swa_server_group" "test" {
+  name              = "test-sg"
+  trust_domain_name = "test-td"
+
+  node_attestation = {
+    x509pop = {
+      ca_certificates = "dummy"
+    }
+  }
+}
+`,
+				ExpectError: regexp.MustCompile(`(?s)node_attestation.*.?attestation`),
+			},
+		},
+	})
+}
+

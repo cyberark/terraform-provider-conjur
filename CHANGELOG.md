@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-08-06
+
+### Added
+- Informative `node_attestation` deprecation message.
+
+
 ## [0.9.1] - 2026-08-05
 
 ### Added
