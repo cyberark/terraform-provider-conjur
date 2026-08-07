@@ -699,14 +699,11 @@ func (r *ServerResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	if result.StatusCode() != http.StatusCreated {
-		summary, detail := apiStatusError("creating server", result.StatusCode(), result.Body)
-		resp.Diagnostics.AddError(summary, detail)
+	if !doSWARequest("creating server", result.StatusCode(), result.Body, &resp.Diagnostics, http.StatusCreated) {
 		return
 	}
 
-	if result.ApplicationxSecretsmgrV2JSON201 == nil {
-		resp.Diagnostics.AddError("Error creating server", "No response body")
+	if !requireSWAResponseBody("creating server", result.ApplicationxSecretsmgrV2JSON201, &resp.Diagnostics) {
 		return
 	}
 
@@ -760,14 +757,11 @@ func (r *ServerResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	if result.StatusCode() != http.StatusOK {
-		summary, detail := apiStatusError("reading server", result.StatusCode(), result.Body)
-		resp.Diagnostics.AddError(summary, detail)
+	if !doSWARequest("reading server", result.StatusCode(), result.Body, &resp.Diagnostics, http.StatusOK) {
 		return
 	}
 
-	if result.ApplicationxSecretsmgrV2JSON200 == nil {
-		resp.Diagnostics.AddError("Error reading server", "No response body")
+	if !requireSWAResponseBody("reading server", result.ApplicationxSecretsmgrV2JSON200, &resp.Diagnostics) {
 		return
 	}
 
@@ -840,14 +834,11 @@ func (r *ServerResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	if result.StatusCode() != http.StatusOK {
-		summary, detail := apiStatusError("updating server", result.StatusCode(), result.Body)
-		resp.Diagnostics.AddError(summary, detail)
+	if !doSWARequest("updating server", result.StatusCode(), result.Body, &resp.Diagnostics, http.StatusOK) {
 		return
 	}
 
-	if result.ApplicationxSecretsmgrV2JSON200 == nil {
-		resp.Diagnostics.AddError("Error updating server", "No response body")
+	if !requireSWAResponseBody("updating server", result.ApplicationxSecretsmgrV2JSON200, &resp.Diagnostics) {
 		return
 	}
 
@@ -896,9 +887,7 @@ func (r *ServerResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		return
 	}
 
-	if result.StatusCode() != http.StatusNoContent && result.StatusCode() != http.StatusNotFound {
-		summary, detail := apiStatusError("deleting server", result.StatusCode(), result.Body)
-		resp.Diagnostics.AddError(summary, detail)
+	if !doSWARequest("deleting server", result.StatusCode(), result.Body, &resp.Diagnostics, http.StatusNoContent, http.StatusNotFound) {
 		return
 	}
 

@@ -924,6 +924,28 @@ func TestServerResource_Read(t *testing.T) {
 			errorContains: "Invalid server ID",
 		},
 		{
+			name: "non-200 status code during read",
+			data: ServerResourceModel{
+				ID:            types.StringValue("prod.example.org/prod-servers/my-server"),
+				Name:          types.StringValue("my-server"),
+				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
+				Auth: &ServerAuthenticationModel{
+					Type:    types.StringValue("JWT"),
+					Subject: types.StringValue("sub"),
+					Issuer:  types.StringValue("https://issuer.example.org"),
+				},
+			},
+			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
+				m.On("GetServerWithResponse", context.Background(), "prod.example.org", "prod-servers", "my-server", &swaclient.GetServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+					Return(&swaclient.GetServerResponse{
+						HTTPResponse: makeHTTPResponse(http.StatusInternalServerError),
+						Body:         []byte(`{"message":"internal error"}`),
+					}, nil)
+			},
+			expectedError: true,
+			errorContains: "Error reading server",
+		},
+		{
 			name: "API error during read",
 			data: ServerResourceModel{
 				ID:            types.StringValue("prod.example.org/prod-servers/my-server"),
