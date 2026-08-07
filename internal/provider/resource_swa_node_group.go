@@ -33,7 +33,8 @@ var (
 )
 
 type NodeGroupResource struct {
-	client swaclient.ClientWithResponsesInterface
+	typeName string
+	client   swaclient.ClientWithResponsesInterface
 }
 
 type NodeGroupResourceModel struct {
@@ -61,7 +62,7 @@ var workloadConfigurationAttrTypes = map[string]attr.Type{
 }
 
 func NewNodeGroupResource() resource.Resource {
-	return &NodeGroupResource{}
+	return &NodeGroupResource{typeName: "conjur_swa_node_group"}
 }
 
 // buildWorkloadConfiguration converts the Terraform model to the API client WorkloadConfiguration.
@@ -167,7 +168,7 @@ func (r *NodeGroupResource) Schema(ctx context.Context, req resource.SchemaReque
 }
 
 func (r *NodeGroupResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	client, ok := configureSWAClient(req, resp)
+	client, ok := configureSWAClient(req, resp, r.typeName)
 	if !ok {
 		return
 	}
@@ -224,6 +225,9 @@ func (r *NodeGroupResource) Create(ctx context.Context, req resource.CreateReque
 	plan.Description = optionalStringValue(ngResp.Description)
 	// Keep state aligned with API response; workload_configuration is required in NodeGroupResponse.
 	resp.Diagnostics.Append(syncWorkloadConfigFromResponse(ctx, &plan, &ngResp.WorkloadConfiguration)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	tflog.Trace(ctx, "created node group resource")
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
@@ -327,6 +331,9 @@ func (r *NodeGroupResource) Update(ctx context.Context, req resource.UpdateReque
 	plan.Description = optionalStringValue(ngResp.Description)
 	// Keep state aligned with API response; workload_configuration is required in NodeGroupResponse.
 	resp.Diagnostics.Append(syncWorkloadConfigFromResponse(ctx, &plan, &ngResp.WorkloadConfiguration)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	tflog.Trace(ctx, "updated node group resource")
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)

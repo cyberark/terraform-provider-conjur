@@ -29,7 +29,8 @@ var (
 )
 
 type ServerGroupResource struct {
-	client swaclient.ClientWithResponsesInterface
+	typeName string
+	client   swaclient.ClientWithResponsesInterface
 }
 
 type ServerGroupResourceModel struct {
@@ -82,7 +83,7 @@ func k8sPsatClusterAttrTypes() map[string]attr.Type {
 }
 
 func NewServerGroupResource() resource.Resource {
-	return &ServerGroupResource{}
+	return &ServerGroupResource{typeName: "conjur_swa_server_group"}
 }
 
 // attestationNestedAttributes returns the nested attribute schema shared by both the
@@ -381,7 +382,7 @@ func (r *ServerGroupResource) ValidateConfig(ctx context.Context, req resource.V
 }
 
 func (r *ServerGroupResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	client, ok := configureSWAClient(req, resp)
+	client, ok := configureSWAClient(req, resp, r.typeName)
 	if !ok {
 		return
 	}
