@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Fixed
+- `conjur_swa_server_group` no longer fails with "Provider produced inconsistent
+  result after apply" when a `gcp_service_account` attestation block omits
+  `audiences`; the server-side default (`urn:panw:swa`) is now reflected correctly.
+
 ## [0.9.2] - 2026-08-06
 
 ### Added
