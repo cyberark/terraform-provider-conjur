@@ -1374,6 +1374,70 @@ resource "conjur_swa_server_group" "test" {
 	})
 }
 
+// Regression test: creating a gcp_service_account server group without an explicit
+// `audiences` list used to fail with "Provider produced inconsistent result after
+// apply", because the API applies a server-side default (`urn:panw:swa`) that the
+// `audiences` attribute's schema didn't mark Computed. Terraform core saw the config's
+// null value as final at plan time, then rejected the non-null value the mocked Create
+// response returns, exactly reproducing the failure this test guards against.
+func TestServerGroupResource_GcpServiceAccount_DefaultAudienceOmitted(t *testing.T) {
+	t.Parallel()
+
+	mockClient := swamocks.NewMockClientWithResponsesInterface(t)
+
+	defaultAudiences := []string{"urn:panw:swa"}
+	att := &swaclient.AttestationConfiguration{
+		GcpServiceAccount: &swaclient.GcpServiceAccountAttestationConfiguration{
+			AllowedProjectIds: []string{"project-a"},
+			Audiences:         &defaultAudiences,
+		},
+	}
+
+	mockClient.EXPECT().
+		PostServerGroupWithResponse(mock.Anything, "test-td", mock.Anything, mock.Anything).
+		Return(&swaclient.PostServerGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusCreated),
+			ApplicationxSecretsmgrV2JSON201: &swaclient.ServerGroupResponse{
+				Name: "test-sg", TrustDomainName: "test-td", Attestation: att,
+			},
+		}, nil).Times(1)
+
+	mockClient.EXPECT().
+		GetServerGroupWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything).
+		Return(&swaclient.GetServerGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: &swaclient.ServerGroupResponse{
+				Name: "test-sg", TrustDomainName: "test-td", Attestation: att,
+			},
+		}, nil).Maybe()
+
+	mockClient.EXPECT().
+		DeleteServerGroupWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything).
+		Return(&swaclient.DeleteServerGroupResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
+
+	tfresource.Test(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
+		Steps: []tfresource.TestStep{
+			{
+				Config: `
+resource "conjur_swa_server_group" "test" {
+  name              = "test-sg"
+  trust_domain_name = "test-td"
+  attestation = {
+    gcp_service_account = {
+      allowed_project_ids = ["project-a"]
+    }
+  }
+}
+`,
+				Check: tfresource.TestCheckResourceAttr(
+					"conjur_swa_server_group.test", "attestation.gcp_service_account.audiences.0", "urn:panw:swa",
+				),
+			},
+		},
+	})
+}
+
 func TestServerGroupResource_ValidateConfig_RejectsEmptyGCPAllowedProjectIDs(t *testing.T) {
 	t.Parallel()
 

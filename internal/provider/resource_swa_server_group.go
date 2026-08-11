@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -154,7 +155,15 @@ func attestationNestedAttributes() map[string]schema.Attribute {
 				"audiences": schema.ListAttribute{
 					MarkdownDescription: "Expected audience values for the GCP identity token (`aud` claim). Defaults to `urn:panw:swa` when omitted.",
 					Optional:            true,
+					Computed:            true,
 					ElementType:         types.StringType,
+					// The API applies this same default server-side when the field is
+					// omitted. Without Computed+Default here, the plan sees the config's
+					// null value as final, and the value the API actually returns on
+					// create/update looks like an inconsistent result to Terraform core.
+					Default: listdefault.StaticValue(
+						types.ListValueMust(types.StringType, []attr.Value{types.StringValue("urn:panw:swa")}),
+					),
 					Validators: []validator.List{
 						listvalidator.SizeAtLeast(1),
 					},
