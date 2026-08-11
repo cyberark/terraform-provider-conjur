@@ -44,7 +44,8 @@ var x509AttrTypes = map[string]attr.Type{
 }
 
 type TrustDomainResource struct {
-	client swaclient.ClientWithResponsesInterface
+	typeName string
+	client   swaclient.ClientWithResponsesInterface
 }
 
 // TrustDomainResourceModel uses types.Object for jwt and x509 so the framework
@@ -110,7 +111,7 @@ func setTrustDomainStateFromResponse(ctx context.Context, model *TrustDomainReso
 }
 
 func NewTrustDomainResource() resource.Resource {
-	return &TrustDomainResource{}
+	return &TrustDomainResource{typeName: "conjur_swa_trust_domain"}
 }
 
 func (r *TrustDomainResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -193,7 +194,7 @@ func (r *TrustDomainResource) Schema(ctx context.Context, req resource.SchemaReq
 }
 
 func (r *TrustDomainResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	client, ok := configureSWAClient(req, resp)
+	client, ok := configureSWAClient(req, resp, r.typeName)
 	if !ok {
 		return
 	}

@@ -26,11 +26,16 @@ func (c *apiWrapper) CertificateSign(issuerName string, sign conjurapi.Sign) (*c
 }
 
 func NewCertificateSignDataSource() datasource.DataSource {
-	return &certificateSignDataSource{}
+	return &certificateSignDataSource{
+		typeName:   "conjur_certificate_sign",
+		capability: CapabilityIssuersV2,
+	}
 }
 
 type certificateSignDataSource struct {
-	client certificateSigner
+	typeName   string
+	capability Capability
+	client     certificateSigner
 }
 
 type certificateSignDataSourceModel struct {
@@ -88,16 +93,12 @@ func (d *certificateSignDataSource) Schema(_ context.Context, _ datasource.Schem
 }
 
 func (d *certificateSignDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	if req.ProviderData == nil {
-		return
-	}
-	client, ok := req.ProviderData.(*providerClients)
+	clients, ok := configureDataSourceClient(req, resp, d.capability, d.typeName)
 	if !ok {
-		AddUnexpectedConfigureTypeError(&resp.Diagnostics, "*providerClients", req.ProviderData)
 		return
 	}
 
-	d.client = &apiWrapper{client.conjurClient}
+	d.client = &apiWrapper{clients.conjurClient}
 }
 
 func (d *certificateSignDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {

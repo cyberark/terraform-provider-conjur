@@ -32,7 +32,8 @@ var (
 )
 
 type ServerResource struct {
-	client swaclient.ClientWithResponsesInterface
+	typeName string
+	client   swaclient.ClientWithResponsesInterface
 }
 
 type ServerResourceModel struct {
@@ -62,7 +63,7 @@ type ServerAuthenticationIdentityModel struct {
 }
 
 func NewServerResource() resource.Resource {
-	return &ServerResource{}
+	return &ServerResource{typeName: "conjur_swa_server"}
 }
 
 func stringValueFromAuthData(data map[string]any, key string) types.String {
@@ -640,7 +641,7 @@ func (r *ServerResource) ValidateConfig(ctx context.Context, req resource.Valida
 }
 
 func (r *ServerResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	client, ok := configureSWAClient(req, resp)
+	client, ok := configureSWAClient(req, resp, r.typeName)
 	if !ok {
 		return
 	}

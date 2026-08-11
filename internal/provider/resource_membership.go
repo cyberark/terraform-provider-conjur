@@ -26,7 +26,9 @@ var (
 )
 
 type membershipResource struct {
-	client api.ClientV2
+	typeName   string
+	capability Capability
+	client     api.ClientV2
 }
 
 type membershipResourceModel struct {
@@ -37,7 +39,10 @@ type membershipResourceModel struct {
 }
 
 func NewMembershipResource() resource.Resource {
-	return &membershipResource{}
+	return &membershipResource{
+		typeName:   "conjur_membership",
+		capability: CapabilityGroupsV2,
+	}
 }
 
 func (r *membershipResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -90,15 +95,11 @@ func (r *membershipResource) ValidateConfig(ctx context.Context, req resource.Va
 }
 
 func (r *membershipResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	if req.ProviderData == nil {
-		return
-	}
-	client, ok := req.ProviderData.(*providerClients)
+	clients, ok := configureConjurClient(req, resp, r.capability, r.typeName)
 	if !ok {
-		AddUnexpectedConfigureTypeError(&resp.Diagnostics, "*providerClients", req.ProviderData)
 		return
 	}
-	r.client = client.conjurClient
+	r.client = clients.conjurClient
 }
 
 func (r *membershipResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

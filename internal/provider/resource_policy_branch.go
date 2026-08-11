@@ -24,11 +24,16 @@ var _ resource.ResourceWithImportState = &PolicyBranchResource{}
 var _ resource.ResourceWithValidateConfig = &PolicyBranchResource{}
 
 func NewPolicyBranchResource() resource.Resource {
-	return &PolicyBranchResource{}
+	return &PolicyBranchResource{
+		typeName:   "conjur_policy_branch",
+		capability: CapabilityCoreV2,
+	}
 }
 
 type PolicyBranchResource struct {
-	client api.ClientV2
+	typeName   string
+	capability Capability
+	client     api.ClientV2
 }
 
 type PolicyBranchResourceModel struct {
@@ -116,15 +121,11 @@ func (r *PolicyBranchResource) ValidateConfig(ctx context.Context, req resource.
 }
 
 func (r *PolicyBranchResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	if req.ProviderData == nil {
-		return
-	}
-	client, ok := req.ProviderData.(*providerClients)
+	clients, ok := configureConjurClient(req, resp, r.capability, r.typeName)
 	if !ok {
-		AddUnexpectedConfigureTypeError(&resp.Diagnostics, "*providerClients", req.ProviderData)
 		return
 	}
-	r.client = client.conjurClient
+	r.client = clients.conjurClient
 }
 
 func (r *PolicyBranchResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

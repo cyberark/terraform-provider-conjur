@@ -8,6 +8,7 @@ import (
 	"github.com/cyberark/conjur-api-go/conjurapi"
 	apimocks "github.com/cyberark/terraform-provider-conjur/internal/conjur/api/mocks"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	swamocks "github.com/cyberark/terraform-provider-conjur/internal/swa/client/mocks"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/stretchr/testify/assert"
@@ -18,7 +19,7 @@ func TestConfigureSWAClient_NilProviderData(t *testing.T) {
 	req := resource.ConfigureRequest{ProviderData: nil}
 	resp := &resource.ConfigureResponse{}
 
-	client, ok := configureSWAClient(req, resp)
+	client, ok := configureSWAClient(req, resp, "conjur_swa_trust_domain")
 
 	assert.False(t, ok)
 	assert.Nil(t, client)
@@ -29,7 +30,7 @@ func TestConfigureSWAClient_WrongType(t *testing.T) {
 	req := resource.ConfigureRequest{ProviderData: "not-a-providerClients"}
 	resp := &resource.ConfigureResponse{}
 
-	client, ok := configureSWAClient(req, resp)
+	client, ok := configureSWAClient(req, resp, "conjur_swa_trust_domain")
 
 	assert.False(t, ok)
 	assert.Nil(t, client)
@@ -48,12 +49,13 @@ func TestConfigureSWAClient_SelfHostedReturnsError(t *testing.T) {
 	req := resource.ConfigureRequest{ProviderData: clients}
 	resp := &resource.ConfigureResponse{}
 
-	client, ok := configureSWAClient(req, resp)
+	client, ok := configureSWAClient(req, resp, "conjur_swa_trust_domain")
 
 	assert.False(t, ok)
 	assert.Nil(t, client)
 	require.True(t, resp.Diagnostics.HasError())
-	assertDiagContains(t, resp.Diagnostics, "SWA resources require Idira Secrets Manager SaaS")
+	assertDiagContains(t, resp.Diagnostics, "conjur_swa_trust_domain")
+	assertDiagContains(t, resp.Diagnostics, "Secure Workload Access (SWA)")
 	assertDiagContains(t, resp.Diagnostics, "Self-Hosted")
 }
 
@@ -68,29 +70,33 @@ func TestConfigureSWAClient_OSSReturnsError(t *testing.T) {
 	req := resource.ConfigureRequest{ProviderData: clients}
 	resp := &resource.ConfigureResponse{}
 
-	client, ok := configureSWAClient(req, resp)
+	client, ok := configureSWAClient(req, resp, "conjur_swa_server")
 
 	assert.False(t, ok)
 	assert.Nil(t, client)
 	require.True(t, resp.Diagnostics.HasError())
-	assertDiagContains(t, resp.Diagnostics, "SWA resources require Idira Secrets Manager SaaS")
+	assertDiagContains(t, resp.Diagnostics, "conjur_swa_server")
+	assertDiagContains(t, resp.Diagnostics, "Secure Workload Access (SWA)")
+	assertDiagContains(t, resp.Diagnostics, "Conjur Open Source")
 }
 
-func TestConfigureSWAClient_SaaSReturnsClient(t *testing.T) {
+// The SWA client, not the Conjur client, must be what reaches the resource.
+func TestConfigureSWAClient_SaaSReturnsSWAClient(t *testing.T) {
 	mockConjur := apimocks.NewMockClientV2(t)
 	mockConjur.On("GetConfig").Return(conjurapi.Config{
 		ApplianceURL: "https://myorg-secretsmanager.cyberark.cloud",
 		Environment:  conjurapi.EnvironmentSaaS,
 	})
+	mockSWA := swamocks.NewMockClientWithResponsesInterface(t)
 
-	clients := &providerClients{conjurClient: mockConjur, swaClient: nil}
+	clients := &providerClients{conjurClient: mockConjur, swaClient: mockSWA}
 	req := resource.ConfigureRequest{ProviderData: clients}
 	resp := &resource.ConfigureResponse{}
 
-	client, ok := configureSWAClient(req, resp)
+	client, ok := configureSWAClient(req, resp, "conjur_swa_trust_domain")
 
 	assert.True(t, ok)
-	assert.Nil(t, client) // swaClient is nil in this test; the important thing is ok=true and no error
+	assert.Same(t, mockSWA, client)
 	assert.False(t, resp.Diagnostics.HasError())
 }
 

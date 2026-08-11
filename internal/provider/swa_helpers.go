@@ -13,27 +13,13 @@ import (
 	swaclient "github.com/cyberark/terraform-provider-conjur/internal/swa/client"
 )
 
-// configureSWAClient centralizes ProviderData type assertion for SWA resources.
-func configureSWAClient(req resource.ConfigureRequest, resp *resource.ConfigureResponse) (swaclient.ClientWithResponsesInterface, bool) {
-	if req.ProviderData == nil {
-		return nil, false
-	}
-
-	clients, ok := req.ProviderData.(*providerClients)
+// configureSWAClient centralizes ProviderData type assertion for SWA resources
+// and enforces that the deployment offers CapabilitySWA. It delegates the
+// environment check to requireCapability so SWA shares one code path with every
+// other capability-gated resource.
+func configureSWAClient(req resource.ConfigureRequest, resp *resource.ConfigureResponse, resourceName string) (swaclient.ClientWithResponsesInterface, bool) {
+	clients, ok := configureConjurClient(req, resp, CapabilitySWA, resourceName)
 	if !ok {
-		// Use the shared diagnostics helper for consistency with other resources.
-		AddUnexpectedConfigureTypeError(&resp.Diagnostics, "*providerClients", req.ProviderData)
-		return nil, false
-	}
-
-	cfg := clients.conjurClient.GetConfig()
-	if !cfg.IsSaaS() {
-		resp.Diagnostics.AddError(
-			"SWA resources require Idira Secrets Manager SaaS",
-			"SWA resources (conjur_swa_*) are only supported against Idira Secrets Manager SaaS "+
-				"endpoints. The configured appliance URL does not appear to be a SaaS instance. "+
-				"Remove any conjur_swa_* resources from your configuration when targeting a Self-Hosted deployment.",
-		)
 		return nil, false
 	}
 

@@ -40,12 +40,17 @@ var (
 )
 
 func NewSecretResource() resource.Resource {
-	return &SecretResource{}
+	return &SecretResource{
+		typeName:   "conjur_secret",
+		capability: CapabilityStaticSecretsV2,
+	}
 }
 
 // SecretResource defines the resource implementation.
 type SecretResource struct {
-	client api.ClientV2
+	typeName   string
+	capability Capability
+	client     api.ClientV2
 }
 
 type SecretResourceModel struct {
@@ -167,15 +172,11 @@ func (r *SecretResource) Schema(ctx context.Context, req resource.SchemaRequest,
 }
 
 func (r *SecretResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	if req.ProviderData == nil {
-		return
-	}
-	client, ok := req.ProviderData.(*providerClients)
+	clients, ok := configureConjurClient(req, resp, r.capability, r.typeName)
 	if !ok {
-		AddUnexpectedConfigureTypeError(&resp.Diagnostics, "*providerClients", req.ProviderData)
 		return
 	}
-	r.client = client.conjurClient
+	r.client = clients.conjurClient
 }
 
 func (r *SecretResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
