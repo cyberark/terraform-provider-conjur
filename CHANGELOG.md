@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-08-12
+### Added
+- Documentation update.
+
 ## [0.9.3] - 2026-08-12
 ### Fixed
 - `conjur_swa_server_group` no longer fails with "Provider produced inconsistent
