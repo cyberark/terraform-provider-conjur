@@ -16,7 +16,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	swaclient "github.com/cyberark/terraform-provider-conjur/internal/swa/client"
@@ -34,7 +33,8 @@ var (
 )
 
 type NodeGroupResource struct {
-	client swaclient.ClientWithResponsesInterface
+	typeName string
+	client   swaclient.ClientWithResponsesInterface
 }
 
 type NodeGroupResourceModel struct {
@@ -62,7 +62,7 @@ var workloadConfigurationAttrTypes = map[string]attr.Type{
 }
 
 func NewNodeGroupResource() resource.Resource {
-	return &NodeGroupResource{}
+	return &NodeGroupResource{typeName: "conjur_swa_node_group"}
 }
 
 // buildWorkloadConfiguration converts the Terraform model to the API client WorkloadConfiguration.
@@ -70,13 +70,8 @@ func NewNodeGroupResource() resource.Resource {
 // request will omit workload_configuration entirely and let the server decide.
 func buildWorkloadConfiguration(ctx context.Context, wcObj types.Object) (*swaclient.WorkloadConfiguration, diag.Diagnostics) {
 	var diags diag.Diagnostics
-	if wcObj.IsNull() || wcObj.IsUnknown() {
-		return nil, diags
-	}
-
-	var wc WorkloadConfigurationModel
-	diags.Append(wcObj.As(ctx, &wc, basetypes.ObjectAsOptions{})...)
-	if diags.HasError() {
+	wc := modelFromObject[WorkloadConfigurationModel](ctx, wcObj, &diags)
+	if wc == nil || diags.HasError() {
 		return nil, diags
 	}
 
@@ -173,7 +168,7 @@ func (r *NodeGroupResource) Schema(ctx context.Context, req resource.SchemaReque
 }
 
 func (r *NodeGroupResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	client, ok := configureSWAClient(req, resp)
+	client, ok := configureSWAClient(req, resp, r.typeName)
 	if !ok {
 		return
 	}
@@ -215,14 +210,11 @@ func (r *NodeGroupResource) Create(ctx context.Context, req resource.CreateReque
 		resp.Diagnostics.AddError("Error creating node group", err.Error())
 		return
 	}
-	if result.StatusCode() != http.StatusCreated {
-		summary, detail := apiStatusError("creating node group", result.StatusCode(), result.Body)
-		resp.Diagnostics.AddError(summary, detail)
+	if !doSWARequest("creating node group", result.StatusCode(), result.Body, &resp.Diagnostics, http.StatusCreated) {
 		return
 	}
 
-	if result.ApplicationxSecretsmgrV2JSON201 == nil {
-		resp.Diagnostics.AddError("Error creating node group", "No response body")
+	if !requireSWAResponseBody("creating node group", result.ApplicationxSecretsmgrV2JSON201, &resp.Diagnostics) {
 		return
 	}
 	ngResp := result.ApplicationxSecretsmgrV2JSON201
@@ -233,6 +225,9 @@ func (r *NodeGroupResource) Create(ctx context.Context, req resource.CreateReque
 	plan.Description = optionalStringValue(ngResp.Description)
 	// Keep state aligned with API response; workload_configuration is required in NodeGroupResponse.
 	resp.Diagnostics.Append(syncWorkloadConfigFromResponse(ctx, &plan, &ngResp.WorkloadConfiguration)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	tflog.Trace(ctx, "created node group resource")
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
@@ -260,20 +255,23 @@ func (r *NodeGroupResource) Read(ctx context.Context, req resource.ReadRequest, 
 		resp.State.RemoveResource(ctx)
 		return
 	}
-	if result.StatusCode() != http.StatusOK {
-		summary, detail := apiStatusError("reading node group", result.StatusCode(), result.Body)
-		resp.Diagnostics.AddError(summary, detail)
+	if !doSWARequest("reading node group", result.StatusCode(), result.Body, &resp.Diagnostics, http.StatusOK) {
 		return
 	}
 
-	if result.ApplicationxSecretsmgrV2JSON200 != nil {
-		ngResp := result.ApplicationxSecretsmgrV2JSON200
-		state.ID = types.StringValue(fmt.Sprintf("%s/%s/%s", state.TrustDomainName.ValueString(), state.ServerGroupName.ValueString(), ngResp.Name))
-		state.Name = types.StringValue(ngResp.Name)
-		state.WorkloadType = types.StringValue(string(ngResp.WorkloadType))
-		state.Description = optionalStringValue(ngResp.Description)
-		// Keep state aligned with API response; workload_configuration is required in NodeGroupResponse.
-		resp.Diagnostics.Append(syncWorkloadConfigFromResponse(ctx, &state, &ngResp.WorkloadConfiguration)...)
+	if !requireSWAResponseBody("reading node group", result.ApplicationxSecretsmgrV2JSON200, &resp.Diagnostics) {
+		return
+	}
+
+	ngResp := result.ApplicationxSecretsmgrV2JSON200
+	state.ID = types.StringValue(fmt.Sprintf("%s/%s/%s", state.TrustDomainName.ValueString(), state.ServerGroupName.ValueString(), ngResp.Name))
+	state.Name = types.StringValue(ngResp.Name)
+	state.WorkloadType = types.StringValue(string(ngResp.WorkloadType))
+	state.Description = optionalStringValue(ngResp.Description)
+	// Keep state aligned with API response; workload_configuration is required in NodeGroupResponse.
+	resp.Diagnostics.Append(syncWorkloadConfigFromResponse(ctx, &state, &ngResp.WorkloadConfiguration)...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
 }
@@ -322,20 +320,20 @@ func (r *NodeGroupResource) Update(ctx context.Context, req resource.UpdateReque
 		resp.Diagnostics.AddError("Error updating node group", err.Error())
 		return
 	}
-	if result.StatusCode() != http.StatusOK {
-		summary, detail := apiStatusError("updating node group", result.StatusCode(), result.Body)
-		resp.Diagnostics.AddError(summary, detail)
+	if !doSWARequest("updating node group", result.StatusCode(), result.Body, &resp.Diagnostics, http.StatusOK) {
 		return
 	}
 
-	if result.ApplicationxSecretsmgrV2JSON200 == nil {
-		resp.Diagnostics.AddError("Error updating node group", "No response body")
+	if !requireSWAResponseBody("updating node group", result.ApplicationxSecretsmgrV2JSON200, &resp.Diagnostics) {
 		return
 	}
 	ngResp := result.ApplicationxSecretsmgrV2JSON200
 	plan.Description = optionalStringValue(ngResp.Description)
 	// Keep state aligned with API response; workload_configuration is required in NodeGroupResponse.
 	resp.Diagnostics.Append(syncWorkloadConfigFromResponse(ctx, &plan, &ngResp.WorkloadConfiguration)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	tflog.Trace(ctx, "updated node group resource")
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
@@ -359,9 +357,7 @@ func (r *NodeGroupResource) Delete(ctx context.Context, req resource.DeleteReque
 		resp.Diagnostics.AddError("Error deleting node group", err.Error())
 		return
 	}
-	if result.StatusCode() != http.StatusNoContent && result.StatusCode() != http.StatusNotFound {
-		summary, detail := apiStatusError("deleting node group", result.StatusCode(), result.Body)
-		resp.Diagnostics.AddError(summary, detail)
+	if !doSWARequest("deleting node group", result.StatusCode(), result.Body, &resp.Diagnostics, http.StatusNoContent, http.StatusNotFound) {
 		return
 	}
 

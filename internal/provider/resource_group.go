@@ -25,12 +25,17 @@ var (
 )
 
 func NewGroupResource() resource.Resource {
-	return &GroupResource{}
+	return &GroupResource{
+		typeName:   "conjur_group",
+		capability: CapabilityGroupsV2,
+	}
 }
 
 // GroupResource defines the resource implementation.
 type GroupResource struct {
-	client api.ClientV2
+	typeName   string
+	capability Capability
+	client     api.ClientV2
 }
 
 // GroupResourceModel describes the resource data model.
@@ -113,15 +118,11 @@ func (r *GroupResource) ValidateConfig(ctx context.Context, req resource.Validat
 }
 
 func (r *GroupResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	if req.ProviderData == nil {
-		return
-	}
-	client, ok := req.ProviderData.(*providerClients)
+	clients, ok := configureConjurClient(req, resp, r.capability, r.typeName)
 	if !ok {
-		AddUnexpectedConfigureTypeError(&resp.Diagnostics, "*providerClients", req.ProviderData)
 		return
 	}
-	r.client = client.conjurClient
+	r.client = clients.conjurClient
 }
 
 func (r *GroupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

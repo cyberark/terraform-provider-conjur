@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 
@@ -384,7 +385,7 @@ func (p *providerImpl) buildConfig(data *providerModel) (*conjurapi.Config, erro
 
 func (p *providerImpl) applyConfigOverrides(config *conjurapi.Config, data *providerModel) {
 	if url := data.ApplianceUrl.ValueString(); url != "" {
-		config.ApplianceURL = url
+		config.ApplianceURL = canonicalizeApplianceURL(url)
 	}
 
 	if account := data.Account.ValueString(); account != "" {
@@ -404,6 +405,31 @@ func (p *providerImpl) applyConfigOverrides(config *conjurapi.Config, data *prov
 	if os.Getenv("CONJUR_CREDENTIAL_STORAGE_MODE") == "" {
 		config.CredentialStorageMode = conjurapi.CredentialStorageModeReadOnly
 	}
+}
+
+// canonicalizeApplianceURL normalizes a Conjur Cloud appliance URL to always
+// include the "/api" path segment, regardless of what the caller supplied.
+// `conjur init saas` writes appliance_url with a "/api" suffix to .conjurrc,
+// so `conjur login` always caches OIDC tokens under an "/api"-suffixed key
+// (conjur-api-go's credential cache key is derived directly from
+// ApplianceURL). Without this, a provider block that omits "/api" computes a
+// different cache key than the one `conjur login` wrote, and stored
+// credentials silently fail to be found. On-prem appliance URLs never use
+// this convention, so non-cloud URLs are left untouched.
+func canonicalizeApplianceURL(rawURL string) string {
+	parsed, err := url.Parse(rawURL)
+	if err != nil || !conjurapi.ConjurCloudRegexp.MatchString(strings.ToLower(parsed.Hostname())) {
+		return rawURL
+	}
+
+	trimmedPath := strings.TrimRight(parsed.Path, "/")
+	if trimmedPath != "" && !strings.EqualFold(trimmedPath, "/api") {
+		// Unexpected path shape -- don't guess, leave it as-is.
+		return rawURL
+	}
+
+	parsed.Path = "/api"
+	return parsed.String()
 }
 
 func (p *providerImpl) createClient(config *conjurapi.Config, data *providerModel) (*conjurapi.Client, error) {

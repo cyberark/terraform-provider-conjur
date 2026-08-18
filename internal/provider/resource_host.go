@@ -24,12 +24,17 @@ var (
 )
 
 func NewHostResource() resource.Resource {
-	return &HostResource{}
+	return &HostResource{
+		typeName:   "conjur_host",
+		capability: CapabilityWorkloadAuthnDescriptors,
+	}
 }
 
 // HostResource defines the resource implementation.
 type HostResource struct {
-	client api.ClientV2
+	typeName   string
+	capability Capability
+	client     api.ClientV2
 }
 
 // HostResourceModel describes the resource data model.
@@ -184,17 +189,12 @@ func (r *HostResource) ValidateConfig(ctx context.Context, req resource.Validate
 }
 
 func (r *HostResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	if req.ProviderData == nil {
-		return
-	}
-
-	client, ok := req.ProviderData.(*providerClients)
+	clients, ok := configureConjurClient(req, resp, r.capability, r.typeName)
 	if !ok {
-		AddUnexpectedConfigureTypeError(&resp.Diagnostics, "*providerClients", req.ProviderData)
 		return
 	}
 
-	r.client = client.conjurClient
+	r.client = clients.conjurClient
 }
 
 func (r *HostResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

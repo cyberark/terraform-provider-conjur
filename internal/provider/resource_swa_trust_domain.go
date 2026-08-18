@@ -17,7 +17,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	swaclient "github.com/cyberark/terraform-provider-conjur/internal/swa/client"
@@ -25,10 +24,9 @@ import (
 
 // Ensure provider defined types fully satisfy framework interfaces.
 var (
-	_ resource.Resource                   = &TrustDomainResource{}
-	_ resource.ResourceWithConfigure      = &TrustDomainResource{}
-	_ resource.ResourceWithImportState    = &TrustDomainResource{}
-	_ resource.ResourceWithValidateConfig = &TrustDomainResource{}
+	_ resource.Resource                = &TrustDomainResource{}
+	_ resource.ResourceWithConfigure   = &TrustDomainResource{}
+	_ resource.ResourceWithImportState = &TrustDomainResource{}
 )
 
 // jwtAttrTypes and x509AttrTypes define the attribute type maps for the
@@ -46,7 +44,8 @@ var x509AttrTypes = map[string]attr.Type{
 }
 
 type TrustDomainResource struct {
-	client swaclient.ClientWithResponsesInterface
+	typeName string
+	client   swaclient.ClientWithResponsesInterface
 }
 
 // TrustDomainResourceModel uses types.Object for jwt and x509 so the framework
@@ -85,28 +84,6 @@ func trustDomainX509Object(ctx context.Context, x509 swaclient.X509Configuration
 	})
 }
 
-// jwtConfigFromObject deserializes a types.Object into a JWTConfigModel.
-// Returns nil (without adding diagnostics) when the object is null or unknown.
-func jwtConfigFromObject(ctx context.Context, obj types.Object, diags *diag.Diagnostics) *JWTConfigModel {
-	if obj.IsNull() || obj.IsUnknown() {
-		return nil
-	}
-	var cfg JWTConfigModel
-	diags.Append(obj.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
-	return &cfg
-}
-
-// x509ConfigFromObject deserializes a types.Object into an X509ConfigModel.
-// Returns nil (without adding diagnostics) when the object is null or unknown.
-func x509ConfigFromObject(ctx context.Context, obj types.Object, diags *diag.Diagnostics) *X509ConfigModel {
-	if obj.IsNull() || obj.IsUnknown() {
-		return nil
-	}
-	var cfg X509ConfigModel
-	diags.Append(obj.As(ctx, &cfg, basetypes.ObjectAsOptions{})...)
-	return &cfg
-}
-
 func setTrustDomainStateFromResponse(ctx context.Context, model *TrustDomainResourceModel, td *swaclient.TrustDomainResponse) diag.Diagnostics {
 	var diags diag.Diagnostics
 	if td == nil {
@@ -134,7 +111,7 @@ func setTrustDomainStateFromResponse(ctx context.Context, model *TrustDomainReso
 }
 
 func NewTrustDomainResource() resource.Resource {
-	return &TrustDomainResource{}
+	return &TrustDomainResource{typeName: "conjur_swa_trust_domain"}
 }
 
 func (r *TrustDomainResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -216,14 +193,8 @@ func (r *TrustDomainResource) Schema(ctx context.Context, req resource.SchemaReq
 	}
 }
 
-func (r *TrustDomainResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	// OpenAPI only requires name on create; jwt/x509 are optional.
-	var data TrustDomainResourceModel
-	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
-}
-
 func (r *TrustDomainResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	client, ok := configureSWAClient(req, resp)
+	client, ok := configureSWAClient(req, resp, r.typeName)
 	if !ok {
 		return
 	}
@@ -246,25 +217,23 @@ func (r *TrustDomainResource) Create(ctx context.Context, req resource.CreateReq
 		Name: plan.Name.ValueString(),
 	}
 
-	if jwtCfg := jwtConfigFromObject(ctx, plan.JWT, &resp.Diagnostics); jwtCfg != nil {
-		if resp.Diagnostics.HasError() {
-			return
-		}
+	if !applyOptionalModel(ctx, plan.JWT, &resp.Diagnostics, func(jwtCfg *JWTConfigModel) {
 		createReq.Jwt = &swaclient.JWTConfigurationInput{
 			SignatureAlgorithm: new(swaclient.JWTConfigurationInputSignatureAlgorithm(jwtCfg.SignatureAlgorithm.ValueString())),
 			SigningKeyType:     new(swaclient.JWTConfigurationInputSigningKeyType(jwtCfg.SigningKeyType.ValueString())),
 			SigningKeyTtl:      new(int32(jwtCfg.SigningKeyTTL.ValueInt64())),
 			TokenTtl:           new(int32(jwtCfg.TokenTTL.ValueInt64())),
 		}
+	}) {
+		return
 	}
 
-	if x509Cfg := x509ConfigFromObject(ctx, plan.X509, &resp.Diagnostics); x509Cfg != nil {
-		if resp.Diagnostics.HasError() {
-			return
-		}
+	if !applyOptionalModel(ctx, plan.X509, &resp.Diagnostics, func(x509Cfg *X509ConfigModel) {
 		createReq.X509 = &swaclient.X509ConfigurationInput{
 			WorkloadTtl: new(int32(x509Cfg.WorkloadTTL.ValueInt64())),
 		}
+	}) {
+		return
 	}
 
 	params := &swaclient.PostTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}
@@ -275,14 +244,11 @@ func (r *TrustDomainResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	if result.StatusCode() != http.StatusCreated {
-		summary, detail := apiStatusError("creating trust domain", result.StatusCode(), result.Body)
-		resp.Diagnostics.AddError(summary, detail)
+	if !doSWARequest("creating trust domain", result.StatusCode(), result.Body, &resp.Diagnostics, http.StatusCreated) {
 		return
 	}
 
-	if result.ApplicationxSecretsmgrV2JSON201 == nil {
-		resp.Diagnostics.AddError("Error creating trust domain", "No response body")
+	if !requireSWAResponseBody("creating trust domain", result.ApplicationxSecretsmgrV2JSON201, &resp.Diagnostics) {
 		return
 	}
 
@@ -320,17 +286,17 @@ func (r *TrustDomainResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	if result.StatusCode() != http.StatusOK {
-		summary, detail := apiStatusError("reading trust domain", result.StatusCode(), result.Body)
-		resp.Diagnostics.AddError(summary, detail)
+	if !doSWARequest("reading trust domain", result.StatusCode(), result.Body, &resp.Diagnostics, http.StatusOK) {
 		return
 	}
 
-	if result.ApplicationxSecretsmgrV2JSON200 != nil {
-		resp.Diagnostics.Append(setTrustDomainStateFromResponse(ctx, &state, result.ApplicationxSecretsmgrV2JSON200)...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
+	if !requireSWAResponseBody("reading trust domain", result.ApplicationxSecretsmgrV2JSON200, &resp.Diagnostics) {
+		return
+	}
+
+	resp.Diagnostics.Append(setTrustDomainStateFromResponse(ctx, &state, result.ApplicationxSecretsmgrV2JSON200)...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
@@ -357,25 +323,23 @@ func (r *TrustDomainResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	if jwtCfg := jwtConfigFromObject(ctx, plan.JWT, &resp.Diagnostics); jwtCfg != nil {
-		if resp.Diagnostics.HasError() {
-			return
-		}
+	if !applyOptionalModel(ctx, plan.JWT, &resp.Diagnostics, func(jwtCfg *JWTConfigModel) {
 		updateReq.Jwt = &swaclient.UpdateJWTConfigurationInput{
 			SignatureAlgorithm: new(swaclient.UpdateJWTConfigurationInputSignatureAlgorithm(jwtCfg.SignatureAlgorithm.ValueString())),
 			SigningKeyType:     new(swaclient.UpdateJWTConfigurationInputSigningKeyType(jwtCfg.SigningKeyType.ValueString())),
 			SigningKeyTtl:      new(int32(jwtCfg.SigningKeyTTL.ValueInt64())),
 			TokenTtl:           new(int32(jwtCfg.TokenTTL.ValueInt64())),
 		}
+	}) {
+		return
 	}
 
-	if x509Cfg := x509ConfigFromObject(ctx, plan.X509, &resp.Diagnostics); x509Cfg != nil {
-		if resp.Diagnostics.HasError() {
-			return
-		}
+	if !applyOptionalModel(ctx, plan.X509, &resp.Diagnostics, func(x509Cfg *X509ConfigModel) {
 		updateReq.X509 = &swaclient.UpdateX509ConfigurationInput{
 			WorkloadTtl: int32(x509Cfg.WorkloadTTL.ValueInt64()),
 		}
+	}) {
+		return
 	}
 
 	params := &swaclient.PatchTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}
@@ -387,17 +351,17 @@ func (r *TrustDomainResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	if result.StatusCode() != http.StatusOK {
-		summary, detail := apiStatusError("updating trust domain", result.StatusCode(), result.Body)
-		resp.Diagnostics.AddError(summary, detail)
+	if !doSWARequest("updating trust domain", result.StatusCode(), result.Body, &resp.Diagnostics, http.StatusOK) {
 		return
 	}
 
-	if result.ApplicationxSecretsmgrV2JSON200 != nil {
-		resp.Diagnostics.Append(setTrustDomainStateFromResponse(ctx, &plan, result.ApplicationxSecretsmgrV2JSON200)...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
+	if !requireSWAResponseBody("updating trust domain", result.ApplicationxSecretsmgrV2JSON200, &resp.Diagnostics) {
+		return
+	}
+
+	resp.Diagnostics.Append(setTrustDomainStateFromResponse(ctx, &plan, result.ApplicationxSecretsmgrV2JSON200)...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	tflog.Trace(ctx, "updated trust domain resource")
@@ -424,9 +388,7 @@ func (r *TrustDomainResource) Delete(ctx context.Context, req resource.DeleteReq
 		return
 	}
 
-	if result.StatusCode() != http.StatusNoContent && result.StatusCode() != http.StatusNotFound {
-		summary, detail := apiStatusError("deleting trust domain", result.StatusCode(), result.Body)
-		resp.Diagnostics.AddError(summary, detail)
+	if !doSWARequest("deleting trust domain", result.StatusCode(), result.Body, &resp.Diagnostics, http.StatusNoContent, http.StatusNotFound) {
 		return
 	}
 

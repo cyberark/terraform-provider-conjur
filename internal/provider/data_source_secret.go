@@ -17,11 +17,16 @@ var (
 )
 
 func NewSecretDataSource() datasource.DataSource {
-	return &SecretDataSource{}
+	return &SecretDataSource{
+		typeName:   "conjur_secret",
+		capability: CapabilityCoreV2,
+	}
 }
 
 type SecretDataSource struct {
-	client api.ClientV2
+	typeName   string
+	capability Capability
+	client     api.ClientV2
 }
 
 type SecretDataSourceModel struct {
@@ -58,15 +63,11 @@ func (d *SecretDataSource) Schema(_ context.Context, _ datasource.SchemaRequest,
 
 // Configure adds the provider configured client to this datasource.
 func (d *SecretDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	if req.ProviderData == nil {
-		return
-	}
-	client, ok := req.ProviderData.(*providerClients)
+	clients, ok := configureDataSourceClient(req, resp, d.capability, d.typeName)
 	if !ok {
-		AddUnexpectedConfigureTypeError(&resp.Diagnostics, "*providerClients", req.ProviderData)
 		return
 	}
-	d.client = client.conjurClient
+	d.client = clients.conjurClient
 }
 
 func (d *SecretDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {

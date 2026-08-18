@@ -437,6 +437,49 @@ func TestResolveAuthnJWT(t *testing.T) {
 	}
 }
 
+func TestCanonicalizeApplianceURL(t *testing.T) {
+	tests := []struct {
+		name string
+		url  string
+		want string
+	}{
+		{
+			name: "adds /api to bare cloud appliance URL",
+			url:  "https://tenant.secretsmgr.cyberark.cloud",
+			want: "https://tenant.secretsmgr.cyberark.cloud/api",
+		},
+		{
+			name: "keeps existing /api suffix on cloud appliance URL",
+			url:  "https://tenant.secretsmgr.cyberark.cloud/api",
+			want: "https://tenant.secretsmgr.cyberark.cloud/api",
+		},
+		{
+			name: "normalizes trailing-slash /api/ suffix on cloud appliance URL",
+			url:  "https://tenant.secretsmgr.cyberark.cloud/api/",
+			want: "https://tenant.secretsmgr.cyberark.cloud/api",
+		},
+		{
+			name: "leaves on-prem appliance URL untouched",
+			url:  "https://conjur.example.com",
+			want: "https://conjur.example.com",
+		},
+		{
+			name: "leaves unexpected path on cloud appliance URL untouched",
+			url:  "https://tenant.secretsmgr.cyberark.cloud/api/v2",
+			want: "https://tenant.secretsmgr.cyberark.cloud/api/v2",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := canonicalizeApplianceURL(tc.url)
+			if got != tc.want {
+				t.Errorf("canonicalizeApplianceURL(%q) = %q, want %q", tc.url, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestMayUseStoredCredentials(t *testing.T) {
 	// Env vars that influence the decision. Each test starts with all of them
 	// cleared and sets only the ones it cares about.

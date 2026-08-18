@@ -11,7 +11,6 @@ import (
 	swamocks "github.com/cyberark/terraform-provider-conjur/internal/swa/client/mocks"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	tfresource "github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -164,17 +163,13 @@ func TestTrustDomainResource_Create(t *testing.T) {
 				td := makeTrustDomainResponse()
 				td.Name = "dev.example.org"
 				workloadTTL := int32(3600)
-				sigAlg := swaclient.JWTConfigurationInputSignatureAlgorithm("RS512")
-				keyType := swaclient.JWTConfigurationInputSigningKeyType("RSA_4096")
-				signingKeyTTL := int32(86400)
-				tokenTTL := int32(300)
 				m.On("PostTrustDomainWithResponse", ctx, &swaclient.PostTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PostTrustDomainJSONRequestBody{
 					Name: "dev.example.org",
 					Jwt: &swaclient.JWTConfigurationInput{
-						SignatureAlgorithm: &sigAlg,
-						SigningKeyType:     &keyType,
-						SigningKeyTtl:      &signingKeyTTL,
-						TokenTtl:           &tokenTTL,
+						SignatureAlgorithm: new(swaclient.JWTConfigurationInputSignatureAlgorithm("RS512")),
+						SigningKeyType:     new(swaclient.JWTConfigurationInputSigningKeyType("RSA_4096")),
+						SigningKeyTtl:      new(int32(86400)),
+						TokenTtl:           new(int32(300)),
 					},
 					X509: &swaclient.X509ConfigurationInput{WorkloadTtl: &workloadTTL},
 				}).Return(&swaclient.PostTrustDomainResponse{
@@ -378,6 +373,23 @@ func TestTrustDomainResource_Read(t *testing.T) {
 			},
 			expectedError: true,
 			errorContains: "Error reading trust domain",
+		},
+		{
+			name: "nil response body",
+			data: TrustDomainResourceModel{
+				ID:   types.StringValue("prod.example.org"),
+				Name: types.StringValue("prod.example.org"),
+				JWT:  nullJWTObject,
+				X509: nullX509Object,
+			},
+			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
+				m.On("GetTrustDomainWithResponse", ctx, "prod.example.org", &swaclient.GetTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
+					Return(&swaclient.GetTrustDomainResponse{
+						HTTPResponse: makeHTTPResponse(http.StatusOK),
+					}, nil)
+			},
+			expectedError: true,
+			errorContains: "No response body",
 		},
 	}
 
@@ -588,6 +600,39 @@ func TestTrustDomainResource_Update(t *testing.T) {
 			expectedError: true,
 			errorContains: "Error updating trust domain",
 		},
+		{
+			name: "nil response body",
+			plan: TrustDomainResourceModel{
+				ID:   types.StringValue("prod.example.org"),
+				Name: types.StringValue("prod.example.org"),
+				JWT:  mustJWTObject(ctx, "RS512", "RSA_4096", 86400, 300),
+				X509: nullX509Object,
+			},
+			state: TrustDomainResourceModel{
+				ID:   types.StringValue("prod.example.org"),
+				Name: types.StringValue("prod.example.org"),
+				JWT:  nullJWTObject,
+				X509: nullX509Object,
+			},
+			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
+				sigAlg := swaclient.UpdateJWTConfigurationInputSignatureAlgorithm("RS512")
+				keyType := swaclient.UpdateJWTConfigurationInputSigningKeyType("RSA_4096")
+				signingKeyTTL := int32(86400)
+				tokenTTL := int32(300)
+				m.On("PatchTrustDomainWithResponse", ctx, "prod.example.org", &swaclient.PatchTrustDomainParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchTrustDomainJSONRequestBody{
+					Jwt: &swaclient.UpdateJWTConfigurationInput{
+						SignatureAlgorithm: &sigAlg,
+						SigningKeyType:     &keyType,
+						SigningKeyTtl:      &signingKeyTTL,
+						TokenTtl:           &tokenTTL,
+					},
+				}).Return(&swaclient.PatchTrustDomainResponse{
+					HTTPResponse: makeHTTPResponse(http.StatusOK),
+				}, nil)
+			},
+			expectedError: true,
+			errorContains: "No response body",
+		},
 	}
 
 	for _, tt := range tests {
@@ -730,75 +775,6 @@ func TestTrustDomainResource_Delete(t *testing.T) {
 				assert.False(t, resp.Diagnostics.HasError())
 			}
 		})
-	}
-}
-
-func TestTrustDomainResource_ValidateConfig(t *testing.T) {
-	tests := []struct {
-		name          string
-		data          TrustDomainResourceModel
-		expectedError bool
-		errorContains string
-	}{
-		{
-			name: "valid with jwt",
-			data: TrustDomainResourceModel{
-				Name: types.StringValue("prod.example.org"),
-				JWT:  mustJWTObject(context.Background(), "RS512", "RSA_4096", 86400, 300),
-				X509: nullX509Object,
-			},
-			expectedError: false,
-		},
-		{
-			name: "valid with x509",
-			data: TrustDomainResourceModel{
-				Name: types.StringValue("prod.example.org"),
-				JWT:  nullJWTObject,
-				X509: mustX509Object(context.Background(), 3600),
-			},
-			expectedError: false,
-		},
-		{
-			name: "valid without jwt or x509",
-			data: TrustDomainResourceModel{
-				Name: types.StringValue("prod.example.org"),
-				JWT:  nullJWTObject,
-				X509: nullX509Object,
-			},
-			expectedError: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
-			r := &TrustDomainResource{}
-			s := getTrustDomainSchema()
-			plan := newPlanWithSchema(s)
-			plan.Set(ctx, &tt.data)
-
-			req := resource.ValidateConfigRequest{
-				Config: buildTrustDomainConfigFromPlan(plan, s),
-			}
-			resp := &resource.ValidateConfigResponse{}
-			r.ValidateConfig(ctx, req, resp)
-
-			if tt.expectedError {
-				assert.True(t, resp.Diagnostics.HasError())
-				if tt.errorContains != "" {
-					assertDiagContains(t, resp.Diagnostics, tt.errorContains)
-				}
-			} else {
-				assert.False(t, resp.Diagnostics.HasError())
-			}
-		})
-	}
-}
-
-func buildTrustDomainConfigFromPlan(plan tfsdk.Plan, s schema.Schema) tfsdk.Config {
-	return tfsdk.Config{
-		Raw:    plan.Raw,
-		Schema: s,
 	}
 }
 

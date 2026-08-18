@@ -80,7 +80,7 @@ resource "conjur_swa_server_group" "no_attestation" {
 
 - `attestation` (Attributes) Node attestation configuration. Optionally specify any of x509pop, k8s_psat, or gcp_service_account; omit entirely for a server group with no attestation. (see [below for nested schema](#nestedatt--attestation))
 - `description` (String) A description of the server group.
-- `node_attestation` (Attributes, Deprecated) Deprecated: this attribute was renamed to `attestation` before this provider's initial release and is not functional. Use `attestation` instead. (see [below for nested schema](#nestedatt--node_attestation))
+- `node_attestation` (Attributes, Deprecated) Deprecated: use `attestation` instead. (see [below for nested schema](#nestedatt--node_attestation))
 
 ### Read-Only
 

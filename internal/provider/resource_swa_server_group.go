@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -29,7 +30,8 @@ var (
 )
 
 type ServerGroupResource struct {
-	client swaclient.ClientWithResponsesInterface
+	typeName string
+	client   swaclient.ClientWithResponsesInterface
 }
 
 type ServerGroupResourceModel struct {
@@ -82,7 +84,7 @@ func k8sPsatClusterAttrTypes() map[string]attr.Type {
 }
 
 func NewServerGroupResource() resource.Resource {
-	return &ServerGroupResource{}
+	return &ServerGroupResource{typeName: "conjur_swa_server_group"}
 }
 
 // attestationNestedAttributes returns the nested attribute schema shared by both the
@@ -153,7 +155,15 @@ func attestationNestedAttributes() map[string]schema.Attribute {
 				"audiences": schema.ListAttribute{
 					MarkdownDescription: "Expected audience values for the GCP identity token (`aud` claim). Defaults to `urn:panw:swa` when omitted.",
 					Optional:            true,
+					Computed:            true,
 					ElementType:         types.StringType,
+					// The API applies this same default server-side when the field is
+					// omitted. Without Computed+Default here, the plan sees the config's
+					// null value as final, and the value the API actually returns on
+					// create/update looks like an inconsistent result to Terraform core.
+					Default: listdefault.StaticValue(
+						types.ListValueMust(types.StringType, []attr.Value{types.StringValue("urn:panw:swa")}),
+					),
 					Validators: []validator.List{
 						listvalidator.SizeAtLeast(1),
 					},
@@ -362,8 +372,6 @@ func (r *ServerGroupResource) Schema(ctx context.Context, req resource.SchemaReq
 	}
 }
 
-
-
 func (r *ServerGroupResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	var data ServerGroupResourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
@@ -383,7 +391,7 @@ func (r *ServerGroupResource) ValidateConfig(ctx context.Context, req resource.V
 }
 
 func (r *ServerGroupResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	client, ok := configureSWAClient(req, resp)
+	client, ok := configureSWAClient(req, resp, r.typeName)
 	if !ok {
 		return
 	}
@@ -425,14 +433,11 @@ func (r *ServerGroupResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	if result.StatusCode() != http.StatusCreated {
-		summary, detail := apiStatusError("creating server group", result.StatusCode(), result.Body)
-		resp.Diagnostics.AddError(summary, detail)
+	if !doSWARequest("creating server group", result.StatusCode(), result.Body, &resp.Diagnostics, http.StatusCreated) {
 		return
 	}
 
-	if result.ApplicationxSecretsmgrV2JSON201 == nil {
-		resp.Diagnostics.AddError("Error creating server group", "No response body")
+	if !requireSWAResponseBody("creating server group", result.ApplicationxSecretsmgrV2JSON201, &resp.Diagnostics) {
 		return
 	}
 	sgResp := result.ApplicationxSecretsmgrV2JSON201
@@ -472,17 +477,20 @@ func (r *ServerGroupResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	if result.StatusCode() != http.StatusOK {
-		summary, detail := apiStatusError("reading server group", result.StatusCode(), result.Body)
-		resp.Diagnostics.AddError(summary, detail)
+	if !doSWARequest("reading server group", result.StatusCode(), result.Body, &resp.Diagnostics, http.StatusOK) {
 		return
 	}
 
-	if result.ApplicationxSecretsmgrV2JSON200 != nil {
-		state.ID = types.StringValue(fmt.Sprintf("%s/%s", state.TrustDomainName.ValueString(), result.ApplicationxSecretsmgrV2JSON200.Name))
-		state.Name = types.StringValue(result.ApplicationxSecretsmgrV2JSON200.Name)
-		state.Description = optionalStringValue(result.ApplicationxSecretsmgrV2JSON200.Description)
-		resp.Diagnostics.Append(updateAttestationFromResponse(ctx, &state, result.ApplicationxSecretsmgrV2JSON200.Attestation)...)
+	if !requireSWAResponseBody("reading server group", result.ApplicationxSecretsmgrV2JSON200, &resp.Diagnostics) {
+		return
+	}
+
+	state.ID = types.StringValue(fmt.Sprintf("%s/%s", state.TrustDomainName.ValueString(), result.ApplicationxSecretsmgrV2JSON200.Name))
+	state.Name = types.StringValue(result.ApplicationxSecretsmgrV2JSON200.Name)
+	state.Description = optionalStringValue(result.ApplicationxSecretsmgrV2JSON200.Description)
+	resp.Diagnostics.Append(updateAttestationFromResponse(ctx, &state, result.ApplicationxSecretsmgrV2JSON200.Attestation)...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
@@ -522,18 +530,21 @@ func (r *ServerGroupResource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	if result.StatusCode() != http.StatusOK {
-		summary, detail := apiStatusError("updating server group", result.StatusCode(), result.Body)
-		resp.Diagnostics.AddError(summary, detail)
+	if !doSWARequest("updating server group", result.StatusCode(), result.Body, &resp.Diagnostics, http.StatusOK) {
 		return
 	}
 
-	if result.ApplicationxSecretsmgrV2JSON200 != nil {
-		plan.ID = types.StringValue(fmt.Sprintf("%s/%s", result.ApplicationxSecretsmgrV2JSON200.TrustDomainName, result.ApplicationxSecretsmgrV2JSON200.Name))
-		plan.Name = types.StringValue(result.ApplicationxSecretsmgrV2JSON200.Name)
-		plan.TrustDomainName = types.StringValue(result.ApplicationxSecretsmgrV2JSON200.TrustDomainName)
-		plan.Description = optionalStringValue(result.ApplicationxSecretsmgrV2JSON200.Description)
-		resp.Diagnostics.Append(updateAttestationFromResponse(ctx, &plan, result.ApplicationxSecretsmgrV2JSON200.Attestation)...)
+	if !requireSWAResponseBody("updating server group", result.ApplicationxSecretsmgrV2JSON200, &resp.Diagnostics) {
+		return
+	}
+
+	plan.ID = types.StringValue(fmt.Sprintf("%s/%s", result.ApplicationxSecretsmgrV2JSON200.TrustDomainName, result.ApplicationxSecretsmgrV2JSON200.Name))
+	plan.Name = types.StringValue(result.ApplicationxSecretsmgrV2JSON200.Name)
+	plan.TrustDomainName = types.StringValue(result.ApplicationxSecretsmgrV2JSON200.TrustDomainName)
+	plan.Description = optionalStringValue(result.ApplicationxSecretsmgrV2JSON200.Description)
+	resp.Diagnostics.Append(updateAttestationFromResponse(ctx, &plan, result.ApplicationxSecretsmgrV2JSON200.Attestation)...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	tflog.Trace(ctx, "updated server group resource")
@@ -560,9 +571,7 @@ func (r *ServerGroupResource) Delete(ctx context.Context, req resource.DeleteReq
 		return
 	}
 
-	if result.StatusCode() != http.StatusNoContent && result.StatusCode() != http.StatusNotFound {
-		summary, detail := apiStatusError("deleting server group", result.StatusCode(), result.Body)
-		resp.Diagnostics.AddError(summary, detail)
+	if !doSWARequest("deleting server group", result.StatusCode(), result.Body, &resp.Diagnostics, http.StatusNoContent, http.StatusNotFound) {
 		return
 	}
 
