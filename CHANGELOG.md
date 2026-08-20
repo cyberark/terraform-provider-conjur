@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Added
+- Support for certificate authentication (`authn_type = "cert"`) using X.509 client certificates (mTLS). New provider attributes: `authn_cert_file`, `authn_cert_key_file` (file paths) and `authn_cert`, `authn_cert_key` (inline PEM content).
+
+
 ## [0.9.4] - 2026-08-12
 ### Added
 - Documentation update.
@@ -15,6 +19,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - `conjur_swa_server_group` no longer fails with "Provider produced inconsistent
   result after apply" when a `gcp_service_account` attestation block omits
   `audiences`; the server-side default (`urn:panw:swa`) is now reflected correctly.
+
 
 ## [0.9.2] - 2026-08-06
 

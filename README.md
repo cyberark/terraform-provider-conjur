@@ -1170,6 +1170,194 @@ provider "conjur" {
   authn_jwt_token = "eybghh......."
 }
 ```
+### Provider Configuration using Certificate Authentication (authn-cert)
+
+Certificate authentication lets a workload authenticate to Secrets Manager using an X.509 client certificate. The workload and the server establish mutual TLS (mTLS), and the workload receives an access token for fetching secrets.
+
+In Secrets Manager SaaS, certificate authentication is only available through **Secrets Manager Edge**. In Conjur Self-Hosted, it works directly against the Conjur server when the `authn-cert` authenticator is enabled.
+
+Two authentication modes are supported:
+
+- **Request mode** (default): the workload ID (`host_id`) is included in the authentication request URL. The server validates the client certificate fields against the host's annotations.
+- **SPIFFE mode**: `host_id` is left empty; the workload identity is derived from the SPIFFE SAN URI embedded in the client certificate.
+
+#### Sample Policy for Conjur Self-Hosted (Enterprise)
+
+Create the cert authenticator policy and save it as `authn-cert.yml`:
+```yaml
+- !policy
+  id: conjur/authn-cert/my-service
+  body:
+  - !webservice
+
+  - !variable ca-cert
+
+  - !group apps
+  - !permit
+    role: !group apps
+    privilege: [ read, authenticate ]
+    resource: !webservice
+
+  - !group operators
+  - !permit
+    role: !group operators
+    privilege: [ read, update ]
+    resource: !webservice
+```
+
+Load the policy to root and set the CA certificate:
+```
+conjur policy load -b root -f authn-cert.yml
+conjur variable set -i conjur/authn-cert/my-service/ca-cert -v "$(cat ca.crt)"
+```
+
+Create a workload host policy and save it as `authn-cert-host.yml`:
+```yaml
+- !policy
+  id: cert-apps
+  body:
+  - !group
+
+  - !host
+    id: vm-01
+    annotations:
+      authn-cert/my-service/cn: vm-01   # must match the client certificate's CN
+
+  - !grant
+    role: !group
+    member: !host vm-01
+```
+
+Load the host policy and grant it access to the authenticator:
+```
+conjur policy load -b root -f authn-cert-host.yml
+```
+
+```yaml
+# authn-cert-permission.yml
+- !grant
+  role: !group conjur/authn-cert/my-service/apps
+  member: !group cert-apps
+```
+```
+conjur policy load -b root -f authn-cert-permission.yml
+```
+
+#### Sample Policy for Secrets Manager SaaS (via Edge)
+
+Create the cert authenticator policy and save it as `authn-cert-my-service.yml`:
+```yaml
+- !policy
+  id: my-service
+  body:
+  - !webservice
+
+  - !variable ca-cert
+
+  - !group apps
+  - !permit
+    role: !group apps
+    privilege: [ read, authenticate ]
+    resource: !webservice
+
+  - !group operators
+  - !permit
+    role: !group operators
+    privilege: [ read, update ]
+    resource: !webservice
+```
+
+Load the policy and configure the authenticator:
+```
+conjur policy load -f authn-cert-my-service.yml -b conjur/authn-cert
+conjur variable set -i conjur/authn-cert/my-service/ca-cert -v "$(cat ca.crt)"
+conjur authenticator enable --id authn-cert/my-service
+```
+
+Create a workload host policy and save it as `authn-cert-hosts.yml`:
+```yaml
+- !policy
+  id: vm-workloads
+  body:
+  - !group
+
+  - !host
+    id: vm-01
+    annotations:
+      authn-cert/my-service/cn: vm-01
+
+  - !grant
+    role: !group
+    member: !host vm-01
+```
+
+Load to data branch and grant access to the authenticator:
+```
+conjur policy load -f authn-cert-hosts.yml -b data
+```
+
+```yaml
+# authn-cert-permission.yml
+- !grant
+  role: !group apps
+  member: !group /data/vm-workloads
+```
+```
+conjur policy load -f authn-cert-permission.yml -b conjur/authn-cert/my-service
+```
+
+#### Sample Terraform main.tf for Certificate Authentication
+
+```hcl
+variable "conjur_ssl_cert" {}        # CA certificate of the Conjur/Edge server (--cacert)
+variable "conjur_appliance_url" {}
+variable "conjur_account" {}
+variable "conjur_host_id" {}
+variable "conjur_authn_service_id" {}
+variable "conjur_authn_cert" {}      # Client certificate PEM content (--cert)
+variable "conjur_authn_cert_key" {}  # Client private key PEM content  (--key)
+
+terraform {
+  required_providers {
+    conjur = {
+      source  = "cyberark/conjur"
+    }
+  }
+}
+
+provider "conjur" {
+  appliance_url  = var.conjur_appliance_url   # Edge URL for SaaS, Conjur URL for OSS
+  account        = var.conjur_account
+  authn_type     = "cert"
+  service_id     = var.conjur_authn_service_id
+  host_id        = var.conjur_host_id         # leave empty for SPIFFE mode
+  ssl_cert       = var.conjur_ssl_cert
+  authn_cert     = var.conjur_authn_cert
+  authn_cert_key = var.conjur_authn_cert_key
+}
+```
+
+Alternatively, use file paths instead of inline PEM content:
+```hcl
+provider "conjur" {
+  # ...
+  authn_type          = "cert"
+  service_id          = "my-service"
+  host_id             = "host/data/vm-workloads/vm-01"
+  ssl_cert_path       = "/path/to/ca.crt"
+  authn_cert_file     = "/path/to/client.crt"
+  authn_cert_key_file = "/path/to/client.key"
+}
+```
+
+The following environment variables are also supported (read automatically by `conjur-api-go`):
+
+| Variable | Description |
+|---|---|
+| `CONJUR_AUTHN_CERT_FILE` | Path to the client certificate file |
+| `CONJUR_AUTHN_CERT_KEY_FILE` | Path to the client private key file |
+| `CONJUR_AUTHN_CERT_HOST_ID` | Workload host ID (equivalent to `host_id`) |
+
 ### Fetch secrets
 
 #### Preface

@@ -26,6 +26,7 @@ var (
 	providerAzureConfig = testProviderAzureConfigData()
 	providerGCPConfig   = testProviderGCPConfigData()
 	providerJWTConfig   = testProviderJWTConfigData()
+	providerCertConfig  = testProviderCertConfigData()
 )
 
 var (
@@ -126,6 +127,205 @@ func testProviderJWTConfigData() string {
 			ssl_cert      = %[6]q
 			authn_jwt_token = %[7]q
         }`, "jwt", os.Getenv("TF_CONJUR_APPLIANCE_URL"), os.Getenv("TF_CONJUR_ACCOUNT"), os.Getenv("TF_JWT_SERVICE_ID"), os.Getenv("TF_JWT_HOST_ID"), os.Getenv("TF_CONJUR_CERT_FILE"), os.Getenv("JWT_TOKEN"))
+}
+
+func TestCreateCertClient_SetsConfigFields(t *testing.T) {
+	p := &providerImpl{}
+
+	baseConfig := func() *conjurapi.Config {
+		return &conjurapi.Config{
+			ApplianceURL: "https://us-edge.acme.dev",
+			Account:      "conjur",
+		}
+	}
+
+	tests := []struct {
+		name   string
+		data   *providerModel
+		assert func(t *testing.T, cfg *conjurapi.Config)
+	}{
+		{
+			name: "sets AuthnType to cert",
+			data: &providerModel{
+				ServiceID:         types.StringValue("acme-vm"),
+				ClientCertFile:    types.StringValue("/path/to/client.crt"),
+				ClientCertKeyFile: types.StringValue("/path/to/client.key"),
+			},
+			assert: func(t *testing.T, cfg *conjurapi.Config) {
+				if cfg.AuthnType != "cert" {
+					t.Errorf("AuthnType = %q, want %q", cfg.AuthnType, "cert")
+				}
+			},
+		},
+		{
+			name: "maps service_id to ServiceID",
+			data: &providerModel{
+				ServiceID:         types.StringValue("acme-vm"),
+				ClientCertFile:    types.StringValue("/path/to/client.crt"),
+				ClientCertKeyFile: types.StringValue("/path/to/client.key"),
+			},
+			assert: func(t *testing.T, cfg *conjurapi.Config) {
+				if cfg.ServiceID != "acme-vm" {
+					t.Errorf("ServiceID = %q, want %q", cfg.ServiceID, "acme-vm")
+				}
+			},
+		},
+		{
+			name: "maps host_id to CertHostID for request mode",
+			data: &providerModel{
+				ServiceID:         types.StringValue("acme-vm"),
+				HostID:            types.StringValue("data/vm-workloads/vm-01"),
+				ClientCertFile:    types.StringValue("/path/to/client.crt"),
+				ClientCertKeyFile: types.StringValue("/path/to/client.key"),
+			},
+			assert: func(t *testing.T, cfg *conjurapi.Config) {
+				if cfg.CertHostID != "data/vm-workloads/vm-01" {
+					t.Errorf("CertHostID = %q, want %q", cfg.CertHostID, "data/vm-workloads/vm-01")
+				}
+			},
+		},
+		{
+			name: "empty host_id enables SPIFFE mode",
+			data: &providerModel{
+				ServiceID:         types.StringValue("acme-vm"),
+				ClientCertFile:    types.StringValue("/path/to/client.crt"),
+				ClientCertKeyFile: types.StringValue("/path/to/client.key"),
+				// HostID intentionally empty — SPIFFE mode
+			},
+			assert: func(t *testing.T, cfg *conjurapi.Config) {
+				if cfg.CertHostID != "" {
+					t.Errorf("CertHostID = %q, want empty (SPIFFE mode)", cfg.CertHostID)
+				}
+			},
+		},
+		{
+			name: "maps authn_cert_file to ClientCertFile",
+			data: &providerModel{
+				ServiceID:         types.StringValue("acme-vm"),
+				ClientCertFile:    types.StringValue("/path/to/client.crt"),
+				ClientCertKeyFile: types.StringValue("/path/to/client.key"),
+			},
+			assert: func(t *testing.T, cfg *conjurapi.Config) {
+				if cfg.ClientCertFile != "/path/to/client.crt" {
+					t.Errorf("ClientCertFile = %q, want %q", cfg.ClientCertFile, "/path/to/client.crt")
+				}
+			},
+		},
+		{
+			name: "maps authn_cert_key_file to ClientCertKeyFile",
+			data: &providerModel{
+				ServiceID:         types.StringValue("acme-vm"),
+				ClientCertFile:    types.StringValue("/path/to/client.crt"),
+				ClientCertKeyFile: types.StringValue("/path/to/client.key"),
+			},
+			assert: func(t *testing.T, cfg *conjurapi.Config) {
+				if cfg.ClientCertKeyFile != "/path/to/client.key" {
+					t.Errorf("ClientCertKeyFile = %q, want %q", cfg.ClientCertKeyFile, "/path/to/client.key")
+				}
+			},
+		},
+		{
+			name: "maps authn_cert inline content to ClientCert",
+			data: &providerModel{
+				ServiceID:     types.StringValue("acme-vm"),
+				ClientCert:    types.StringValue("-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"),
+				ClientCertKey: types.StringValue("-----BEGIN EC PRIVATE KEY-----\nMHQ...\n-----END EC PRIVATE KEY-----"), // gitleaks:allow
+			},
+			assert: func(t *testing.T, cfg *conjurapi.Config) {
+				want := "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"
+				if cfg.ClientCert != want {
+					t.Errorf("ClientCert = %q, want %q", cfg.ClientCert, want)
+				}
+			},
+		},
+		{
+			name: "maps authn_cert_key inline content to ClientCertKey",
+			data: &providerModel{
+				ServiceID:     types.StringValue("acme-vm"),
+				ClientCert:    types.StringValue("-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"),
+				ClientCertKey: types.StringValue("-----BEGIN EC PRIVATE KEY-----\nMHQ...\n-----END EC PRIVATE KEY-----"), // gitleaks:allow
+			},
+			assert: func(t *testing.T, cfg *conjurapi.Config) {
+				want := "-----BEGIN EC PRIVATE KEY-----\nMHQ...\n-----END EC PRIVATE KEY-----" // gitleaks:allow
+				if cfg.ClientCertKey != want {
+					t.Errorf("ClientCertKey = %q, want %q", cfg.ClientCertKey, want)
+				}
+			},
+		},
+		{
+			name: "empty authn_cert does not clear ClientCert loaded from environment",
+			data: &providerModel{
+				ServiceID:         types.StringValue("acme-vm"),
+				ClientCertFile:    types.StringValue("/path/to/client.crt"),
+				ClientCertKeyFile: types.StringValue("/path/to/client.key"),
+				// ClientCert intentionally empty — must not overwrite env-loaded value
+			},
+			assert: func(t *testing.T, cfg *conjurapi.Config) {
+				// env-loaded value set on config before calling createCertClient
+				if cfg.ClientCert != "env-cert-content" {
+					t.Errorf("ClientCert = %q, empty model value must not clear env-loaded content", cfg.ClientCert)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := baseConfig()
+			if tt.name == "empty authn_cert does not clear ClientCert loaded from environment" {
+				cfg.ClientCert = "env-cert-content"
+			}
+			// createCertClient mutates cfg before calling NewClientFromCertificate.
+			// The client build will fail (no real cert files) but the config mutations
+			// we assert on happen before that — same pattern as TestCreateAPIKeyClient_*.
+			_, _ = p.createCertClient(cfg, tt.data)
+			tt.assert(t, cfg)
+		})
+	}
+}
+
+func testProviderCertConfigData() string {
+	return fmt.Sprintf(`
+        provider "conjur" {
+            authn_type     = %[1]q
+            appliance_url  = %[2]q
+            account        = %[3]q
+            service_id     = %[4]q
+            host_id        = %[5]q
+            ssl_cert       = %[6]q
+            authn_cert     = %[7]q
+            authn_cert_key = %[8]q
+        }`, "cert",
+		os.Getenv("TF_CERT_APPLIANCE_URL"),
+		os.Getenv("TF_CERT_ACCOUNT"),
+		os.Getenv("TF_CERT_SERVICE_ID"),
+		os.Getenv("TF_CERT_HOST_ID"),
+		os.Getenv("TF_CERT_SSL_CERT"),
+		os.Getenv("TF_AUTHN_CERT"),
+		os.Getenv("TF_AUTHN_CERT_KEY"),
+	)
+}
+
+func TestProvider_MissingAttributes_Cert(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: `
+					provider "conjur" {
+						appliance_url = "https://us-edge.acme.dev"
+						account       = "conjur"
+						authn_type    = "cert"
+					}
+
+					data "conjur_secret" "dummy" {
+						name = "some/secret"
+					}
+				`,
+				ExpectError: regexp.MustCompile(`Missing cert attribute: service_id`),
+			},
+		},
+	})
 }
 
 func TestProvider_InvalidAuthnType(t *testing.T) {
@@ -533,31 +733,39 @@ func newValidateConfigRequest(data providerModel) provider.ValidateConfigRequest
 	configVal := tftypes.NewValue(
 		tftypes.Object{
 			AttributeTypes: map[string]tftypes.Type{
-				"authn_type":      tftypes.String,
-				"appliance_url":   tftypes.String,
-				"account":         tftypes.String,
-				"login":           tftypes.String,
-				"api_key":         tftypes.String,
-				"service_id":      tftypes.String,
-				"client_id":       tftypes.String,
-				"host_id":         tftypes.String,
-				"ssl_cert":        tftypes.String,
-				"ssl_cert_path":   tftypes.String,
-				"authn_jwt_token": tftypes.String,
+				"authn_type":          tftypes.String,
+				"appliance_url":       tftypes.String,
+				"account":             tftypes.String,
+				"login":               tftypes.String,
+				"api_key":             tftypes.String,
+				"service_id":          tftypes.String,
+				"client_id":           tftypes.String,
+				"host_id":             tftypes.String,
+				"ssl_cert":            tftypes.String,
+				"ssl_cert_path":       tftypes.String,
+				"authn_jwt_token":     tftypes.String,
+				"authn_cert_file":     tftypes.String,
+				"authn_cert_key_file": tftypes.String,
+				"authn_cert":          tftypes.String,
+				"authn_cert_key":      tftypes.String,
 			},
 		},
 		map[string]tftypes.Value{
-			"authn_type":      str(data.AuthnType),
-			"appliance_url":   str(data.ApplianceUrl),
-			"account":         str(data.Account),
-			"login":           str(data.Login),
-			"api_key":         str(data.APIKey),
-			"service_id":      str(data.ServiceID),
-			"client_id":       str(data.ClientID),
-			"host_id":         str(data.HostID),
-			"ssl_cert":        str(data.SSLCert),
-			"ssl_cert_path":   str(data.SSLCertPath),
-			"authn_jwt_token": str(data.AuthnJWT),
+			"authn_type":          str(data.AuthnType),
+			"appliance_url":       str(data.ApplianceUrl),
+			"account":             str(data.Account),
+			"login":               str(data.Login),
+			"api_key":             str(data.APIKey),
+			"service_id":          str(data.ServiceID),
+			"client_id":           str(data.ClientID),
+			"host_id":             str(data.HostID),
+			"ssl_cert":            str(data.SSLCert),
+			"ssl_cert_path":       str(data.SSLCertPath),
+			"authn_jwt_token":     str(data.AuthnJWT),
+			"authn_cert_file":     str(data.ClientCertFile),
+			"authn_cert_key_file": str(data.ClientCertKeyFile),
+			"authn_cert":          str(data.ClientCert),
+			"authn_cert_key":      str(data.ClientCertKey),
 		},
 	)
 
@@ -567,6 +775,72 @@ func newValidateConfigRequest(data providerModel) provider.ValidateConfigRequest
 			Schema: getProviderTestSchema(),
 		},
 	}
+}
+
+func TestProvider_CertAuthnType_ValidateConfig(t *testing.T) {
+	p := &providerImpl{}
+	ctx := context.Background()
+
+	t.Run("passes when appliance_url and service_id are set", func(t *testing.T) {
+		resp := &provider.ValidateConfigResponse{}
+		p.ValidateConfig(ctx, newValidateConfigRequest(providerModel{
+			AuthnType:    types.StringValue("cert"),
+			ApplianceUrl: types.StringValue("https://example.com"),
+			ServiceID:    types.StringValue("acme-vm"),
+		}), resp)
+
+		if resp.Diagnostics.HasError() {
+			t.Errorf("ValidateConfig should not error with valid cert attributes; got: %v", resp.Diagnostics.Errors())
+		}
+	})
+
+	t.Run("passes without host_id (SPIFFE mode)", func(t *testing.T) {
+		resp := &provider.ValidateConfigResponse{}
+		p.ValidateConfig(ctx, newValidateConfigRequest(providerModel{
+			AuthnType:    types.StringValue("cert"),
+			ApplianceUrl: types.StringValue("https://example.com"),
+			ServiceID:    types.StringValue("acme-vm"),
+			// HostID intentionally empty — SPIFFE mode
+		}), resp)
+
+		if resp.Diagnostics.HasError() {
+			t.Errorf("ValidateConfig should allow empty host_id (SPIFFE mode); got: %v", resp.Diagnostics.Errors())
+		}
+	})
+
+	t.Run("errors when service_id missing", func(t *testing.T) {
+		resp := &provider.ValidateConfigResponse{}
+		p.ValidateConfig(ctx, newValidateConfigRequest(providerModel{
+			AuthnType:    types.StringValue("cert"),
+			ApplianceUrl: types.StringValue("https://example.com"),
+		}), resp)
+
+		if !resp.Diagnostics.HasError() {
+			t.Fatal("ValidateConfig should error when service_id is missing for cert auth")
+		}
+		found := false
+		for _, d := range resp.Diagnostics.Errors() {
+			if regexp.MustCompile(`service_id`).MatchString(d.Detail()) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected error mentioning service_id; got: %v", resp.Diagnostics.Errors())
+		}
+	})
+
+	t.Run("errors when appliance_url missing", func(t *testing.T) {
+		resp := &provider.ValidateConfigResponse{}
+		p.ValidateConfig(ctx, newValidateConfigRequest(providerModel{
+			AuthnType: types.StringValue("cert"),
+			ServiceID: types.StringValue("acme-vm"),
+		}), resp)
+
+		if !resp.Diagnostics.HasError() {
+			t.Fatal("ValidateConfig should error when appliance_url is missing for cert auth")
+		}
+	})
 }
 
 func TestValidateConfig_APIAuthnTypeWithoutCredentials(t *testing.T) {

@@ -204,6 +204,17 @@ pipeline {
       }
     }
 
+    stage('Run integration tests (Enterprise) for Cert') {
+      environment {
+        INFRAPOOL_REGISTRY_URL = "registry.tld"
+      }
+      steps {
+        script {
+          INFRAPOOL_EXECUTORV2_AGENT_0.agentSh './bin/test -t enterprise -tc cert'
+        }
+      }
+    }
+
     stage('Run Conjur Cloud tests') {
       when {
         expression { params.TEST_CLOUD }

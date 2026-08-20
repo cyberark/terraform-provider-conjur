@@ -20,3 +20,7 @@
   id: conjur/authn-azure
   owner: !group data/Authn_Admins
 
+- !policy
+  id: conjur/authn-cert
+  owner: !group data/Authn_Admins
+

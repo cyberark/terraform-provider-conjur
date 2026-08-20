@@ -85,6 +85,10 @@ function main() {
   if [[ -z "$SWA_ONLY" ]]; then
     run_terraform_tests "$test_dir" || overall_status=1
     validate_results || overall_status=1
+
+    if [[ "$TEST_CASE" == "cert" ]]; then
+      run_cert_negative_tests || overall_status=1
+    fi
   fi
 
   if [[ "$run_resource_tests" == "true" ]]; then
@@ -148,11 +152,38 @@ function setup_test_dir {
     "gcp")
       test_dir="tests/gcp"
       ;;
+    "cert")
+      test_dir="tests/cert"
+      ;;
     *)
       echo "Error: Invalid test case '$TEST_CASE'"
       exit 1
       ;;
   esac
+}
+
+function generate_test_certs() {
+  echo "> Generating test CA and client certificate for authn-cert"
+  mkdir -p conf/cert
+
+  # Generate a self-signed CA cert and key
+  openssl req -x509 -newkey rsa:2048 -days 365 -nodes \
+    -keyout conf/cert/ca.key \
+    -out    conf/cert/ca.crt \
+    -subj   "/CN=TestCA"
+
+  # Generate a client cert signed by the CA with CN=vm-01
+  openssl req -newkey rsa:2048 -nodes \
+    -keyout conf/cert/client.key \
+    -out    conf/cert/client.csr \
+    -subj   "/CN=vm-01"
+
+  openssl x509 -req -days 365 \
+    -in     conf/cert/client.csr \
+    -CA     conf/cert/ca.crt \
+    -CAkey  conf/cert/ca.key \
+    -CAcreateserial \
+    -out    conf/cert/client.crt
 }
 
 function rotate_host_api_key() {
@@ -315,6 +346,20 @@ function load_test_policies() {
       set_variable "data/Dev-Team-credential1" "$TEST_SECRET_VAL"
       enable_authenticator "authn-jwt/my-service"
       ;;
+    "cert")
+      if [[ "$TARGET" == "cloud" ]]; then
+        echo "ERROR: authn-cert (mTLS certificate authentication) is not supported in Conjur Cloud SaaS."
+        exit 1
+      fi
+      generate_test_certs
+      load_policy "conjur/authn-cert" "$policy_folder/authn-cert.yml"
+      load_policy "data" "$policy_folder/authn-cert-host.yml"
+      load_policy "data" "$policy_folder/authn-cert-secrets.yml"
+      load_policy "conjur/authn-cert/test-service" "$policy_folder/authn-cert-permission.yml"
+      set_variable "conjur/authn-cert/test-service/ca-cert" "$(cat conf/cert/ca.crt)"
+      set_variable "data/cert-apps/database/password" "$TEST_SECRET_VAL"
+      enable_authenticator "authn-cert/test-service"
+      ;;
   esac
 }
 
@@ -341,6 +386,46 @@ function run_terraform_tests() {
     --stop \
     -v \
     terraform
+}
+
+function run_cert_negative_tests() {
+  local overall=0
+
+  echo ""
+  echo ">> Running authn-cert negative tests"
+  docker_compose up -d terraform
+
+  # Test 1: missing client certificate — Conjur must reject mTLS without a client cert.
+  echo "> Test: retrieve-secret-missing-client-cert (expecting failure)"
+  if docker_compose exec -T terraform sh -c "
+    cd tests/cert/missing-client-cert &&
+    rm -rf .terraform* terraform.tfstate* 2>/dev/null;
+    terraform init -no-color &&
+    terraform apply -auto-approve -no-color
+  "; then
+    echo "> FAIL: expected authentication failure when client certificate is missing"
+    overall=1
+  else
+    echo "> PASS: authentication correctly rejected without client certificate"
+  fi
+
+  # Test 2: missing service_id — provider validation must reject this configuration.
+  echo "> Test: retrieve-secret-missing-service-id (expecting failure)"
+  if docker_compose exec -T terraform sh -c "
+    cd tests/cert/missing-service-id &&
+    rm -rf .terraform* terraform.tfstate* 2>/dev/null;
+    terraform init -no-color &&
+    terraform apply -auto-approve -no-color
+  "; then
+    echo "> FAIL: expected configuration failure when service_id is missing"
+    overall=1
+  else
+    echo "> PASS: configuration correctly rejected without service_id"
+  fi
+
+  docker compose rm --force --stop -v terraform
+
+  return $overall
 }
 
 function validate_results() {  
@@ -402,6 +487,14 @@ function set_TF_vars() {
       export TF_VAR_conjur_authn_login="host/data/gcp-apps/test-app"
       export TF_VAR_conjur_secret_variable="data/secrets/test-variable"
       ;;
+    "cert")
+      export TF_VAR_conjur_authn_type="cert"
+      export TF_VAR_conjur_authn_service_id="test-service"
+      export TF_VAR_conjur_host_id="host/data/cert-apps/vm-01"
+      export TF_VAR_conjur_secret_variable="data/cert-apps/database/password"
+      export TF_VAR_conjur_authn_cert="$(cat conf/cert/client.crt)"
+      export TF_VAR_conjur_authn_cert_key="$(cat conf/cert/client.key)"
+      ;;
     *)
       echo "Unknown authentication type: $TEST_CASE"
       ;;
@@ -414,7 +507,7 @@ function show_help() {
   echo ""
   echo "Options:"
   echo "  -t, --target         The target environment (oss, enterprise, cloud)."
-  echo "  -tc, --test-case     The test case to run (api-key, iam, azure, gcp, jwt)."
+  echo "  -tc, --test-case     The test case to run (api-key, iam, azure, gcp, jwt, cert)."
   echo "  -h, --help           Show this help message."
   echo ""
   echo "Examples:"
@@ -474,10 +567,10 @@ esac
 
 # Validate --test-case value
 case "$TEST_CASE" in
-  "api-key" | "iam" | "azure" | "gcp" | "jwt")
+  "api-key" | "iam" | "azure" | "gcp" | "jwt" | "cert")
     ;;
   *)
-    echo "Error: Invalid test case '$TEST_CASE'. Valid options are 'api-key', 'iam', 'azure', 'jwt', or 'gcp'."
+    echo "Error: Invalid test case '$TEST_CASE'. Valid options are 'api-key', 'iam', 'azure', 'jwt', 'gcp', or 'cert'."
     exit 1
     ;;
 esac

@@ -1,0 +1,5 @@
+# Loaded to: conjur/authn-cert/test-service
+# conjur policy load -f authn-cert-permission.yml -b conjur/authn-cert/test-service
+- !grant
+  role: !group apps
+  member: !group /data/cert-apps
