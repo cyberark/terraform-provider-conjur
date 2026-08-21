@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -13,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -52,6 +54,7 @@ type AttestationModel struct {
 	X509Pop           *X509PopModel           `tfsdk:"x509pop"`
 	K8sPsat           *K8sPsatModel           `tfsdk:"k8s_psat"`
 	GcpServiceAccount *GcpServiceAccountModel `tfsdk:"gcp_service_account"`
+	AwsIid            *AwsIidModel            `tfsdk:"aws_iid"`
 }
 
 type X509PopModel struct {
@@ -65,6 +68,20 @@ type K8sPsatModel struct {
 type GcpServiceAccountModel struct {
 	AllowedProjectIDs types.List `tfsdk:"allowed_project_ids"`
 	Audiences         types.List `tfsdk:"audiences"`
+}
+
+type AwsIidModel struct {
+	AssumeRole         types.String          `tfsdk:"assume_role"`
+	Partition          types.String          `tfsdk:"partition"`
+	VerifyOrganization *AwsIidVerifyOrgModel `tfsdk:"verify_organization"`
+}
+
+type AwsIidVerifyOrgModel struct {
+	ManagementAccountID     types.String `tfsdk:"management_account_id"`
+	ManagementAccountRegion types.String `tfsdk:"management_account_region"`
+	AssumeOrgRole           types.String `tfsdk:"assume_org_role"`
+	OrgAccountMapTTL        types.String `tfsdk:"org_account_map_ttl"`
+	AccountListFile         types.String `tfsdk:"account_list_file"`
 }
 
 type K8sPsatClusterModel struct {
@@ -170,6 +187,55 @@ func attestationNestedAttributes() map[string]schema.Attribute {
 				},
 			},
 		},
+		"aws_iid": schema.SingleNestedAttribute{
+			MarkdownDescription: "AWS Instance Identity Document (IID) attestation configuration.",
+			Optional:            true,
+			Attributes: map[string]schema.Attribute{
+				"assume_role": schema.StringAttribute{
+					MarkdownDescription: "IAM role ARN the server assumes to describe the attesting instance in the target AWS account. Omitted means ambient credentials (e.g. IRSA/Pod Identity) are used.",
+					Optional:            true,
+				},
+				"partition": schema.StringAttribute{
+					MarkdownDescription: "AWS partition the server operates in. One of `aws`, `aws-cn`, `aws-us-gov`. Defaults to `aws`.",
+					Optional:            true,
+					Computed:            true,
+					// The API applies this same default server-side when the field is
+					// omitted. Without Computed+Default here, the plan sees the config's
+					// null value as final, and the value the API actually returns on
+					// create/update looks like an inconsistent result to Terraform core.
+					Default: stringdefault.StaticString("aws"),
+					Validators: []validator.String{
+						stringvalidator.OneOf("aws", "aws-cn", "aws-us-gov"),
+					},
+				},
+				"verify_organization": schema.SingleNestedAttribute{
+					MarkdownDescription: "Verify the attesting instance belongs to an AWS Organization.",
+					Optional:            true,
+					Attributes: map[string]schema.Attribute{
+						"management_account_id": schema.StringAttribute{
+							MarkdownDescription: "12-digit AWS account ID of the organization's management (root) account.",
+							Optional:            true,
+						},
+						"management_account_region": schema.StringAttribute{
+							MarkdownDescription: "AWS region where the management account is hosted.",
+							Optional:            true,
+						},
+						"assume_org_role": schema.StringAttribute{
+							MarkdownDescription: "IAM role name in the management account with organizations:ListAccounts permissions.",
+							Optional:            true,
+						},
+						"org_account_map_ttl": schema.StringAttribute{
+							MarkdownDescription: "Cache TTL duration for the organization account list as a Go duration string (e.g. `15m`, `1h`, `90s`). Minimum duration is 1 minute (`1m`). Omitted means the attestor default is used.",
+							Optional:            true,
+						},
+						"account_list_file": schema.StringAttribute{
+							MarkdownDescription: "Path on the SWA server host/container to a file containing a JSON array of AWS account IDs. Mutually exclusive with `management_account_id` and `assume_org_role`.",
+							Optional:            true,
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -221,6 +287,26 @@ func updateAttestationFromResponse(ctx context.Context, model *ServerGroupResour
 		appendOptionalStringList(ctx, &allowed, &gcpModel.AllowedProjectIDs, &diags)
 		appendOptionalStringList(ctx, gcp.Audiences, &gcpModel.Audiences, &diags)
 		attestation.GcpServiceAccount = gcpModel
+	}
+
+	if awsIid := at.AwsIid; awsIid != nil {
+		awsIidModel := &AwsIidModel{
+			AssumeRole: optionalStringValue(awsIid.AssumeRole),
+			Partition:  types.StringNull(),
+		}
+		if awsIid.Partition != nil {
+			awsIidModel.Partition = types.StringValue(string(*awsIid.Partition))
+		}
+		if vo := awsIid.VerifyOrganization; vo != nil {
+			awsIidModel.VerifyOrganization = &AwsIidVerifyOrgModel{
+				ManagementAccountID:     optionalStringValue(vo.ManagementAccountId),
+				ManagementAccountRegion: optionalStringValue(vo.ManagementAccountRegion),
+				AssumeOrgRole:           optionalStringValue(vo.AssumeOrgRole),
+				OrgAccountMapTTL:        optionalStringValue(vo.OrgAccountMapTtl),
+				AccountListFile:         optionalStringValue(vo.AccountListFile),
+			}
+		}
+		attestation.AwsIid = awsIidModel
 	}
 
 	model.Attestation = attestation
@@ -289,6 +375,31 @@ func buildGcpServiceAccount(ctx context.Context, gcp *GcpServiceAccountModel) (*
 	return config, diags
 }
 
+// buildAwsIid resolves the aws_iid part from the model.
+func buildAwsIid(awsIid *AwsIidModel) *swaclient.AwsIidAttestationConfiguration {
+	if awsIid == nil {
+		return nil
+	}
+
+	config := &swaclient.AwsIidAttestationConfiguration{
+		AssumeRole: stringPointerFromValue(awsIid.AssumeRole),
+	}
+	if knownStringValue(awsIid.Partition) {
+		partition := swaclient.AwsIidAttestationConfigurationPartition(awsIid.Partition.ValueString())
+		config.Partition = &partition
+	}
+	if vo := awsIid.VerifyOrganization; vo != nil {
+		config.VerifyOrganization = &swaclient.AwsIidVerifyOrganizationConfiguration{
+			ManagementAccountId:     stringPointerFromValue(vo.ManagementAccountID),
+			ManagementAccountRegion: stringPointerFromValue(vo.ManagementAccountRegion),
+			AssumeOrgRole:           stringPointerFromValue(vo.AssumeOrgRole),
+			OrgAccountMapTtl:        stringPointerFromValue(vo.OrgAccountMapTTL),
+			AccountListFile:         stringPointerFromValue(vo.AccountListFile),
+		}
+	}
+	return config
+}
+
 // buildAttestationRequest resolves the attestation model into the API request field.
 func buildAttestationRequest(ctx context.Context, at *AttestationModel) (*swaclient.AttestationConfiguration, diag.Diagnostics) {
 	var diags diag.Diagnostics
@@ -313,6 +424,8 @@ func buildAttestationRequest(ctx context.Context, at *AttestationModel) (*swacli
 	gcp, gcpDiags := buildGcpServiceAccount(ctx, at.GcpServiceAccount)
 	diags.Append(gcpDiags...)
 	attestation.GcpServiceAccount = gcp
+
+	attestation.AwsIid = buildAwsIid(at.AwsIid)
 
 	return attestation, diags
 }
@@ -351,7 +464,7 @@ func (r *ServerGroupResource) Schema(ctx context.Context, req resource.SchemaReq
 				},
 			},
 			"attestation": schema.SingleNestedAttribute{
-				MarkdownDescription: "Node attestation configuration. Optionally specify any of x509pop, k8s_psat, or gcp_service_account; omit entirely for a server group with no attestation.",
+				MarkdownDescription: "Node attestation configuration. Optionally specify any of x509pop, k8s_psat, gcp_service_account, or aws_iid; omit entirely for a server group with no attestation.",
 				Optional:            true,
 				Attributes:          attestationNestedAttributes(),
 			},

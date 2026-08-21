@@ -1257,15 +1257,90 @@ components:
           minItems: 1
           description: List of allowed GCP project IDs.
 
-    AttestationConfiguration:
+    GeminiEnterpriseAttestationConfiguration:
       type: object
+      required: [allowed_org_ids]
+      properties:
+        allowed_org_ids:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          minItems: 1
+          description: List of GCP organisation IDs allowed to attest. Hard gate enforced before any policy evaluation.
+        audiences:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          minItems: 1
+          description: JWT aud values accepted by the attestor. Omitted means audience is not validated; if specified, at least one non-empty audience string is required.
+
+    AwsIidAttestationConfiguration:
+      type: object
+      properties:
+        assume_role:
+          type: string
+          pattern: '^arn:(aws|aws-cn|aws-us-gov):iam::\d{12}:role/.+$'
+          description: IAM role ARN the server assumes to describe the attesting instance in the target AWS account. Omitted means ambient credentials (e.g. IRSA/Pod Identity) are used.
+          example: 'arn:aws:iam::123456789012:role/SWAServerRole'
+        # If you change partition, assume_role must be updated to match — its ARN's partition
+        # segment (arn:<partition>:...) has to agree with this field, since AWS partitions are
+        # fully isolated (no cross-partition IAM/STS trust). Enforced by validateAwsIidPartition
+        # in swa-management-service/internal/service/server_group_service.go, since OpenAPI 3.0's
+        # JSON Schema subset can't express this cross-field constraint declaratively.
+        #
+        # Only aws/aws-cn/aws-us-gov are accepted (not aws-iso/aws-iso-b, which AWS also defines)
+        # because that's the exact set SPIRE's aws_iid server plugin validates against; see
+        # https://github.com/spiffe/spire/blob/5bc0cdd4e9687ba30c75f7c7bd549e5ac17745cf/pkg/server/plugin/nodeattestor/awsiid/iid.go#L62
+        partition:
+          type: string
+          enum: [aws, aws-cn, aws-us-gov]
+          default: aws
+          description: AWS partition the server operates in.
+        verify_organization:
+          $ref: '#/components/schemas/AwsIidVerifyOrganizationConfiguration'
+
+    AwsIidVerifyOrganizationConfiguration:
+      type: object
+      properties:
+        management_account_id:
+          type: string
+          pattern: '^\d{12}$'
+          description: 12-digit AWS account ID of the organization's management (root) account.
+          example: '123456789012'
+        management_account_region:
+          type: string
+          minLength: 1
+          description: AWS region where the management account is hosted.
+          example: 'us-east-1'
+        assume_org_role:
+          type: string
+          minLength: 1
+          description: IAM role name in the management account with organizations:ListAccounts permissions.
+          example: 'AWSOrganizationsReadOnlyAccess'
+        org_account_map_ttl:
+          type: string
+          pattern: '^([0-9]+(h|m|s))+$'
+          description: Cache TTL duration for the organization account list as a Go duration string (e.g. '15m', '1h', '90s'). Minimum duration is 1 minute ('1m'). Omitted means the attestor default is used.
+          example: '15m'
+        account_list_file:
+          type: string
+          minLength: 1
+          description: Path on the SWA server host/container to a file containing a JSON array of AWS account IDs. Mutually exclusive with management_account_id and assume_org_role.
+          example: '/etc/spire/org-accounts.json'
+
+    AttestationConfiguration:
       description: Node attestation settings organized by type. Include at least one supported attestation object.
       allOf:
         - $ref: '#/components/schemas/DeprecatedAttestationConfiguration'
-        - type: object
-          properties:
-            gcp_service_account:
-              $ref: '#/components/schemas/GcpServiceAccountAttestationConfiguration'
+      properties:
+        gcp_service_account:
+          $ref: '#/components/schemas/GcpServiceAccountAttestationConfiguration'
+        gemini_enterprise:
+          $ref: '#/components/schemas/GeminiEnterpriseAttestationConfiguration'
+        aws_iid:
+          $ref: '#/components/schemas/AwsIidAttestationConfiguration'
 
     X509PopConfigurationInput:
       type: object
@@ -1967,10 +2042,6 @@ components:
           type: string
           description: Opaque Base64-encoded authenticator identifier used during server authentication setup.
           example: "aG9zdC9kYXRhL2FwcDEK"
-        login_url:
-          type: string
-          description: "Deprecated: Use authn_id instead. Opaque Base64-encoded authenticator identifier used during server authentication setup."
-          deprecated: true
 
     ServerResponse:
       type: object
@@ -1994,11 +2065,11 @@ components:
           type: string
           description: Opaque Base64-encoded authenticator identifier used during server authentication setup.
           example: "aG9zdC9kYXRhL2FwcDEK"
-        login_url:
+        last_seen_at:
           type: string
-          description: '**NOTE**: Deprecated. Use `authn_id` instead. Opaque Base64-encoded authenticator identifier used during server authentication setup.'
-          example: "aG9zdC9kYXRhL2FwcDEK"
-          deprecated: true
+          format: date-time
+          description: Timestamp of the last time this server contacted the control plane. Null if it has never connected.
+          nullable: true
 
     ServerAuthentication:
       type: object
@@ -2025,12 +2096,50 @@ components:
         data:
           type: object
           description: Authentication data containing issuer, audience, and related JWT fields.
-          additionalProperties: true
-          example:
-            audience: "conjur-cloud"
-            jwks_uri: "https://k8s-oidc.example.com/.well-known/jwks"
-            issuer: "https://k8s-oidc.example.com"
-            sub: "K8S service account name"
+          properties:
+            sub:
+              type: string
+              description: Expected subject claim value used to identify the server workload.
+              example: "K8S service account name"
+            audience:
+              type: string
+              description: Expected audience claim (`aud`) value used to validate the JWT.
+              example: "conjur-cloud"
+            jwks_uri:
+              type: string
+              description: URL of the JWKS endpoint used to retrieve the JWT signing keys.
+              example: "https://k8s-oidc.example.com/.well-known/jwks"
+            public_keys:
+              type: object
+              description: Inline JWKS used when Secrets Manager cannot reach a remote JWKS URL. Present when the server was created with `public_keys` instead of `jwks_uri`.
+              additionalProperties: {}
+            issuer:
+              type: string
+              description: Expected issuer claim (`iss`) value used to validate the JWT.
+              example: "https://k8s-oidc.example.com"
+            ca_cert:
+              type: string
+              description: X.509 CA certificate or bundle (PEM format) used to establish TLS with the JWKS provider.
+            identity:
+              type: object
+              description: Additional JWT identity configuration.
+              properties:
+                claim_aliases:
+                  type: object
+                  description: Mapping of custom alias names to JWT claim names.
+                  additionalProperties:
+                    type: string
+                enforced_claims:
+                  type: array
+                  description: List of JWT claims that all associated workloads must include in their annotations.
+                  items:
+                    type: string
+                identity_path:
+                  type: string
+                  description: Policy path prefix used together with `token_app_property` to resolve a workload's identity.
+                token_app_property:
+                  type: string
+                  description: Name of the JWT claim whose value is matched against the workload ID.
         annotations:
           type: object
           additionalProperties:

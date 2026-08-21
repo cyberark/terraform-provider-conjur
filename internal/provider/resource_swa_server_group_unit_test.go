@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"reflect"
 	"regexp"
 	"testing"
 	"time"
@@ -177,6 +178,38 @@ func TestUpdateAttestationFromResponse(t *testing.T) {
 		var auds []string
 		require.False(t, model.Attestation.GcpServiceAccount.Audiences.ElementsAs(ctx, &auds, false).HasError())
 		assert.Equal(t, []string{"urn:panw:swa"}, auds)
+	})
+
+	t.Run("aws_iid from attestation field is reconciled into state", func(t *testing.T) {
+		model := &ServerGroupResourceModel{}
+		partition := swaclient.Aws
+		at := &swaclient.AttestationConfiguration{
+			AwsIid: &swaclient.AwsIidAttestationConfiguration{
+				AssumeRole: new("arn:aws:iam::123456789012:role/SWAServerRole"),
+				Partition:  &partition,
+				VerifyOrganization: &swaclient.AwsIidVerifyOrganizationConfiguration{
+					ManagementAccountId:     new("123456789012"),
+					ManagementAccountRegion: new("us-east-1"),
+					AssumeOrgRole:           new("AWSOrganizationsReadOnlyAccess"),
+					OrgAccountMapTtl:        new("15m"),
+				},
+			},
+		}
+
+		diags := updateAttestationFromResponse(ctx, model, at)
+		assert.False(t, diags.HasError())
+		require.NotNil(t, model.Attestation)
+		require.NotNil(t, model.Attestation.AwsIid)
+		assert.Equal(t, "arn:aws:iam::123456789012:role/SWAServerRole", model.Attestation.AwsIid.AssumeRole.ValueString())
+		assert.Equal(t, "aws", model.Attestation.AwsIid.Partition.ValueString())
+
+		require.NotNil(t, model.Attestation.AwsIid.VerifyOrganization)
+		vo := model.Attestation.AwsIid.VerifyOrganization
+		assert.Equal(t, "123456789012", vo.ManagementAccountID.ValueString())
+		assert.Equal(t, "us-east-1", vo.ManagementAccountRegion.ValueString())
+		assert.Equal(t, "AWSOrganizationsReadOnlyAccess", vo.AssumeOrgRole.ValueString())
+		assert.Equal(t, "15m", vo.OrgAccountMapTTL.ValueString())
+		assert.True(t, vo.AccountListFile.IsNull())
 	})
 }
 
@@ -355,6 +388,47 @@ func TestServerGroupResource_Create(t *testing.T) {
 						GcpServiceAccount: &swaclient.GcpServiceAccountAttestationConfiguration{
 							AllowedProjectIds: []string{"project-a", "project-b"},
 							Audiences:         &audiences,
+						},
+					},
+				}).Return(&swaclient.PostServerGroupResponse{
+					HTTPResponse:                    makeHTTPResponse(http.StatusCreated),
+					ApplicationxSecretsmgrV2JSON201: sg,
+				}, nil)
+			},
+			expectedError: false,
+		},
+		{
+			// When aws_iid is configured, the request must go out on the attestation API
+			// field, including the nested verify_organization block.
+			name: "successful creation with AWS IID attestation",
+			data: ServerGroupResourceModel{
+				Name:            types.StringValue("prod-servers"),
+				TrustDomainName: types.StringValue("prod.example.org"),
+				Description:     types.StringNull(),
+				Attestation: &AttestationModel{
+					AwsIid: &AwsIidModel{
+						AssumeRole: types.StringValue("arn:aws:iam::123456789012:role/SWAServerRole"),
+						Partition:  types.StringValue("aws"),
+						VerifyOrganization: &AwsIidVerifyOrgModel{
+							ManagementAccountID: types.StringValue("123456789012"),
+							AssumeOrgRole:       types.StringValue("AWSOrganizationsReadOnlyAccess"),
+						},
+					},
+				},
+			},
+			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
+				sg := makeServerGroupResponse("prod-servers", "prod.example.org")
+				partition := swaclient.Aws
+				m.On("PostServerGroupWithResponse", context.Background(), "prod.example.org", &swaclient.PostServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PostServerGroupJSONRequestBody{
+					Name: "prod-servers",
+					Attestation: &swaclient.AttestationConfiguration{
+						AwsIid: &swaclient.AwsIidAttestationConfiguration{
+							AssumeRole: new("arn:aws:iam::123456789012:role/SWAServerRole"),
+							Partition:  &partition,
+							VerifyOrganization: &swaclient.AwsIidVerifyOrganizationConfiguration{
+								ManagementAccountId: new("123456789012"),
+								AssumeOrgRole:       new("AWSOrganizationsReadOnlyAccess"),
+							},
 						},
 					},
 				}).Return(&swaclient.PostServerGroupResponse{
@@ -1492,6 +1566,340 @@ resource "conjur_swa_server_group" "test" {
 }
 `,
 				ExpectError: regexp.MustCompile(`(?s)node_attestation.*.?attestation`),
+			},
+		},
+	})
+}
+
+// --- aws_iid attestation: HCL combination coverage ---
+
+// awsIidTestConfig wraps an `aws_iid = { ... }` body (the attrs, one per line) in a
+// full server group resource so each combination case only has to spell out the
+// fields relevant to it.
+func awsIidTestConfig(name, trustDomain, awsIidBody string) string {
+	return fmt.Sprintf(`
+resource "conjur_swa_server_group" "test" {
+  name              = %q
+  trust_domain_name = %q
+  attestation = {
+    aws_iid = {
+%s
+    }
+  }
+}
+`, name, trustDomain, awsIidBody)
+}
+
+// TestServerGroupResource_AwsIid_HCLCombinations drives the aws_iid attestation
+// block through Terraform's plan/apply lifecycle (via the mocked SWA client) for
+// every meaningful combination of its fields: assume_role alone, each partition
+// value, verify_organization via its IAM-role fields, verify_organization via its
+// account_list_file fields, an empty aws_iid block (default partition only), an
+// empty verify_organization block, and every field set at once. This exercises the
+// same request-building/state-reconciliation path a real apply would take, without
+// needing a live Conjur backend.
+func TestServerGroupResource_AwsIid_HCLCombinations(t *testing.T) {
+	t.Parallel()
+
+	arn := "arn:aws:iam::123456789012:role/SWAServerRole"
+
+	tests := []struct {
+		name   string
+		hcl    string
+		want   *swaclient.AwsIidAttestationConfiguration
+		checks []tfresource.TestCheckFunc
+	}{
+		{
+			name: "assume_role only (partition defaults to aws)",
+			hcl:  fmt.Sprintf(`assume_role = %q`, arn),
+			want: &swaclient.AwsIidAttestationConfiguration{
+				AssumeRole: new(arn),
+				Partition:  new(swaclient.Aws),
+			},
+			checks: []tfresource.TestCheckFunc{
+				tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.assume_role", arn),
+				tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.partition", "aws"),
+			},
+		},
+		{
+			name: "explicit partition aws",
+			hcl:  `partition = "aws"`,
+			want: &swaclient.AwsIidAttestationConfiguration{Partition: new(swaclient.Aws)},
+			checks: []tfresource.TestCheckFunc{
+				tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.partition", "aws"),
+				tfresource.TestCheckNoResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.assume_role"),
+			},
+		},
+		{
+			name: "explicit partition aws-cn",
+			hcl:  `partition = "aws-cn"`,
+			want: &swaclient.AwsIidAttestationConfiguration{Partition: new(swaclient.AwsCn)},
+			checks: []tfresource.TestCheckFunc{
+				tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.partition", "aws-cn"),
+			},
+		},
+		{
+			name: "explicit partition aws-us-gov",
+			hcl:  `partition = "aws-us-gov"`,
+			want: &swaclient.AwsIidAttestationConfiguration{Partition: new(swaclient.AwsUsGov)},
+			checks: []tfresource.TestCheckFunc{
+				tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.partition", "aws-us-gov"),
+			},
+		},
+		{
+			name: "empty aws_iid block still gets default partition",
+			hcl:  ``,
+			want: &swaclient.AwsIidAttestationConfiguration{Partition: new(swaclient.Aws)},
+			checks: []tfresource.TestCheckFunc{
+				tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.partition", "aws"),
+				tfresource.TestCheckNoResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.assume_role"),
+			},
+		},
+		{
+			name: "verify_organization via IAM role fields",
+			hcl: `
+      verify_organization = {
+        management_account_id     = "123456789012"
+        management_account_region = "us-east-1"
+        assume_org_role            = "AWSOrganizationsReadOnlyAccess"
+        org_account_map_ttl        = "15m"
+      }`,
+			want: &swaclient.AwsIidAttestationConfiguration{
+				Partition: new(swaclient.Aws),
+				VerifyOrganization: &swaclient.AwsIidVerifyOrganizationConfiguration{
+					ManagementAccountId:     new("123456789012"),
+					ManagementAccountRegion: new("us-east-1"),
+					AssumeOrgRole:           new("AWSOrganizationsReadOnlyAccess"),
+					OrgAccountMapTtl:        new("15m"),
+				},
+			},
+			checks: []tfresource.TestCheckFunc{
+				tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.verify_organization.management_account_id", "123456789012"),
+				tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.verify_organization.management_account_region", "us-east-1"),
+				tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.verify_organization.assume_org_role", "AWSOrganizationsReadOnlyAccess"),
+				tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.verify_organization.org_account_map_ttl", "15m"),
+				tfresource.TestCheckNoResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.verify_organization.account_list_file"),
+			},
+		},
+		{
+			name: "verify_organization via account_list_file",
+			hcl: `
+      verify_organization = {
+        account_list_file = "/etc/spire/org-accounts.json"
+      }`,
+			want: &swaclient.AwsIidAttestationConfiguration{
+				Partition: new(swaclient.Aws),
+				VerifyOrganization: &swaclient.AwsIidVerifyOrganizationConfiguration{
+					AccountListFile: new("/etc/spire/org-accounts.json"),
+				},
+			},
+			checks: []tfresource.TestCheckFunc{
+				tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.verify_organization.account_list_file", "/etc/spire/org-accounts.json"),
+				tfresource.TestCheckNoResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.verify_organization.management_account_id"),
+			},
+		},
+		{
+			name: "empty verify_organization block",
+			hcl: `
+      verify_organization = {}`,
+			want: &swaclient.AwsIidAttestationConfiguration{
+				Partition:          new(swaclient.Aws),
+				VerifyOrganization: &swaclient.AwsIidVerifyOrganizationConfiguration{},
+			},
+			checks: []tfresource.TestCheckFunc{
+				tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.verify_organization.%", "5"),
+			},
+		},
+		{
+			name: "every field set at once",
+			hcl: fmt.Sprintf(`
+      assume_role = %q
+      partition   = "aws-cn"
+      verify_organization = {
+        management_account_id     = "123456789012"
+        management_account_region = "us-east-1"
+        assume_org_role            = "AWSOrganizationsReadOnlyAccess"
+        org_account_map_ttl        = "15m"
+        account_list_file          = "/etc/spire/org-accounts.json"
+      }`, arn),
+			want: &swaclient.AwsIidAttestationConfiguration{
+				AssumeRole: new(arn),
+				Partition:  new(swaclient.AwsCn),
+				VerifyOrganization: &swaclient.AwsIidVerifyOrganizationConfiguration{
+					ManagementAccountId:     new("123456789012"),
+					ManagementAccountRegion: new("us-east-1"),
+					AssumeOrgRole:           new("AWSOrganizationsReadOnlyAccess"),
+					OrgAccountMapTtl:        new("15m"),
+					AccountListFile:         new("/etc/spire/org-accounts.json"),
+				},
+			},
+			checks: []tfresource.TestCheckFunc{
+				tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.assume_role", arn),
+				tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.partition", "aws-cn"),
+				tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.verify_organization.management_account_id", "123456789012"),
+				tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.verify_organization.management_account_region", "us-east-1"),
+				tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.verify_organization.assume_org_role", "AWSOrganizationsReadOnlyAccess"),
+				tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.verify_organization.org_account_map_ttl", "15m"),
+				tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.verify_organization.account_list_file", "/etc/spire/org-accounts.json"),
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockClient := swamocks.NewMockClientWithResponsesInterface(t)
+
+			att := &swaclient.AttestationConfiguration{AwsIid: tc.want}
+
+			mockClient.EXPECT().
+				PostServerGroupWithResponse(mock.Anything, "test-td", mock.Anything,
+					mock.MatchedBy(func(body swaclient.PostServerGroupJSONRequestBody) bool {
+						return body.Attestation != nil && reflect.DeepEqual(body.Attestation.AwsIid, tc.want)
+					})).
+				Return(&swaclient.PostServerGroupResponse{
+					HTTPResponse: makeHTTPResponse(http.StatusCreated),
+					ApplicationxSecretsmgrV2JSON201: &swaclient.ServerGroupResponse{
+						Name: "test-sg", TrustDomainName: "test-td", Attestation: att,
+					},
+				}, nil).Times(1)
+
+			mockClient.EXPECT().
+				GetServerGroupWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything).
+				Return(&swaclient.GetServerGroupResponse{
+					HTTPResponse: makeHTTPResponse(http.StatusOK),
+					ApplicationxSecretsmgrV2JSON200: &swaclient.ServerGroupResponse{
+						Name: "test-sg", TrustDomainName: "test-td", Attestation: att,
+					},
+				}, nil).Maybe()
+
+			mockClient.EXPECT().
+				DeleteServerGroupWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything).
+				Return(&swaclient.DeleteServerGroupResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
+
+			tfresource.Test(t, tfresource.TestCase{
+				ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
+				Steps: []tfresource.TestStep{
+					{
+						Config: awsIidTestConfig("test-sg", "test-td", tc.hcl),
+						Check:  tfresource.ComposeTestCheckFunc(tc.checks...),
+					},
+				},
+			})
+		})
+	}
+}
+
+// TestServerGroupResource_AwsIid_ValidateConfig_RejectsInvalidPartition exercises the
+// partition attribute's OneOf validator: only aws/aws-cn/aws-us-gov are accepted.
+func TestServerGroupResource_AwsIid_ValidateConfig_RejectsInvalidPartition(t *testing.T) {
+	t.Parallel()
+
+	mockClient := swamocks.NewMockClientWithResponsesInterface(t)
+
+	tfresource.Test(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
+		Steps: []tfresource.TestStep{
+			{
+				Config:      awsIidTestConfig("test-sg", "test-td", `partition = "invalid-partition"`),
+				ExpectError: regexp.MustCompile(`(?s)value must be one of`),
+			},
+		},
+	})
+}
+
+// TestServerGroupResource_AwsIid_ReplacesX509Pop exercises switching a server group's
+// attestation method from x509pop to aws_iid: the request must clear x509pop and set
+// aws_iid on the same PATCH, and the old x509pop values must not persist in state.
+func TestServerGroupResource_AwsIid_ReplacesX509Pop(t *testing.T) {
+	t.Parallel()
+
+	mockClient := swamocks.NewMockClientWithResponsesInterface(t)
+
+	cert := "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"
+	arn := "arn:aws:iam::123456789012:role/SWAServerRole"
+
+	x509Att := &swaclient.AttestationConfiguration{
+		X509pop: &swaclient.X509PopConfigurationInput{CaCertificates: cert},
+	}
+	awsIidAtt := &swaclient.AttestationConfiguration{
+		AwsIid: &swaclient.AwsIidAttestationConfiguration{
+			AssumeRole: new(arn),
+			Partition:  new(swaclient.Aws),
+		},
+	}
+
+	mockClient.EXPECT().
+		PostServerGroupWithResponse(mock.Anything, "test-td", mock.Anything, mock.Anything).
+		Return(&swaclient.PostServerGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusCreated),
+			ApplicationxSecretsmgrV2JSON201: &swaclient.ServerGroupResponse{
+				Name: "test-sg", TrustDomainName: "test-td", Attestation: x509Att,
+			},
+		}, nil).Times(1)
+
+	// Two reads: post-apply step-1 refresh + pre-plan step-2 refresh.
+	mockClient.EXPECT().
+		GetServerGroupWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything).
+		Return(&swaclient.GetServerGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: &swaclient.ServerGroupResponse{
+				Name: "test-sg", TrustDomainName: "test-td", Attestation: x509Att,
+			},
+		}, nil).Times(2)
+
+	mockClient.EXPECT().
+		PatchServerGroupWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything,
+			mock.MatchedBy(func(body swaclient.PatchServerGroupJSONRequestBody) bool {
+				return body.Attestation != nil &&
+					body.Attestation.X509pop == nil &&
+					body.Attestation.AwsIid != nil
+			})).
+		Return(&swaclient.PatchServerGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: &swaclient.ServerGroupResponse{
+				Name: "test-sg", TrustDomainName: "test-td", Attestation: awsIidAtt,
+			},
+		}, nil).Times(1)
+
+	mockClient.EXPECT().
+		GetServerGroupWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything).
+		Return(&swaclient.GetServerGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: &swaclient.ServerGroupResponse{
+				Name: "test-sg", TrustDomainName: "test-td", Attestation: awsIidAtt,
+			},
+		}, nil).Maybe()
+
+	mockClient.EXPECT().
+		DeleteServerGroupWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything).
+		Return(&swaclient.DeleteServerGroupResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
+
+	tfresource.Test(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
+		Steps: []tfresource.TestStep{
+			{
+				Config: `
+resource "conjur_swa_server_group" "test" {
+  name              = "test-sg"
+  trust_domain_name = "test-td"
+  attestation = {
+    x509pop = {
+      ca_certificates = "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"
+    }
+  }
+}
+`,
+				Check: tfresource.TestCheckResourceAttrSet("conjur_swa_server_group.test", "attestation.x509pop.ca_certificates"),
+			},
+			{
+				Config: awsIidTestConfig("test-sg", "test-td", fmt.Sprintf(`assume_role = %q`, arn)),
+				Check: tfresource.ComposeTestCheckFunc(
+					tfresource.TestCheckNoResourceAttr("conjur_swa_server_group.test", "attestation.x509pop.ca_certificates"),
+					tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.assume_role", arn),
+					tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.partition", "aws"),
+				),
 			},
 		},
 	})

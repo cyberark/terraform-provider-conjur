@@ -45,6 +45,25 @@ resource "conjur_swa_server_group" "gcp" {
   }
 }
 
+# Server group using AWS Instance Identity Document (IID) attestation
+resource "conjur_swa_server_group" "aws_iid" {
+  trust_domain_name = "prod.example.org"
+  name              = "aws-servers"
+  description       = "AWS workload server group"
+
+  attestation = {
+    aws_iid = {
+      assume_role = "arn:aws:iam::123456789012:role/SWAServerRole"
+      partition   = "aws"
+
+      verify_organization = {
+        management_account_id = "123456789012"
+        assume_org_role       = "AWSOrganizationsReadOnlyAccess"
+      }
+    }
+  }
+}
+
 # Server group with no node attestation (attestation is optional)
 resource "conjur_swa_server_group" "no_attestation" {
   trust_domain_name = "prod.example.org"
