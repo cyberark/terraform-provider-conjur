@@ -6,10 +6,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [0.9.5] - 2026-08-24
 ### Added
 - Support for certificate authentication (`authn_type = "cert"`) using X.509 client certificates (mTLS). 
 - Support for AWS Instance Identity Document (IID) attestation in SWA Server Groups.
-
+### Fixed
+- Documentation links for resources now point to the correct URLs in the Terraform Registry.
 
 ## [0.9.4] - 2026-08-12
 ### Added

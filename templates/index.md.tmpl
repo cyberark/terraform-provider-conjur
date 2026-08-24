@@ -5,22 +5,22 @@
 This provider manages authentication with CyberArk Secrets Manager, allowing Terraform to access and manage various Secrets Manager resources.
 
 The provider can access the following Secrets Manager resources as data sources:
-- [conjur_secret](./data-sources/secret.md) (also available as [ephemeral resource](./ephemeral-resources/secret.md))
-- [conjur_certificate_issue](./data-sources/certificate_issue.md) (requires Secrets Manager Saas with Certificate Manager integration)
-- [conjur_certificate_sign](./data-sources/certificate_sign.md) (requires Secrets Manager Saas with Certificate Manager integration)
+- [conjur_secret](docs/data-sources/secret.md) (also available as [ephemeral resource](docs/ephemeral-resources/secret.md))
+- [conjur_certificate_issue](docs/data-sources/certificate_issue.md) (requires Secrets Manager Saas with Certificate Manager integration)
+- [conjur_certificate_sign](docs/data-sources/certificate_sign.md) (requires Secrets Manager Saas with Certificate Manager integration)
 
 The provider can also manage the following Secrets Manager resources:
-- [conjur_authenticator](./resources/authenticator.md)
-- [conjur_branch](./resources/branch.md)
-- [conjur_host](./resources/host.md) (SaaS only)
-- [conjur_group](./resources/group.md)
-- [conjur_secret](./resources/secret.md) (SaaS only)
-- [conjur_membership](./resources/membership.md)
-- [conjur_permission](./resources/permission.md)
-- [conjur_swa_trust_domain](./resources/swa_trust_domain.md) (SaaS only)
-- [conjur_swa_server_group](./resources/swa_server_group.md) (SaaS only)
-- [conjur_swa_server](./resources/swa_server.md) (SaaS only)
-- [conjur_swa_node_group](./resources/swa_node_group.md) (SaaS only)
+- [conjur_authenticator](docs/resources/authenticator.md)
+- [conjur_policy_branch](docs/resources/policy_branch.md)
+- [conjur_host](docs/resources/host.md) (SaaS only)
+- [conjur_group](docs/resources/group.md)
+- [conjur_secret](docs/resources/secret.md) (SaaS only)
+- [conjur_membership](docs/resources/membership.md)
+- [conjur_permission](docs/resources/permission.md)
+- [conjur_swa_trust_domain](docs/resources/swa_trust_domain.md) (SaaS only)
+- [conjur_swa_server_group](docs/resources/swa_server_group.md) (SaaS only)
+- [conjur_swa_server](docs/resources/swa_server.md) (SaaS only)
+- [conjur_swa_node_group](docs/resources/swa_node_group.md) (SaaS only)
 
 ## Example Usage
 
@@ -56,6 +56,11 @@ both automatically, so the provider block can be left empty:
 {{ tffile "examples/provider/provider_with_conjur_login.tf" }}
 This is convenient for local, interactive use. For CI/automation, prefer explicit provider attributes or
 environment variables so the run does not depend on a pre-authenticated CLI session on the runner.
+
+### Using cloud or certificate authentication
+Instead of a static `login`/`api_key` pair, the provider can authenticate as a workload using its cloud
+identity or an X.509 client certificate, by setting `authn_type` to one of `aws`, `azure`, `gcp`, `jwt`, or
+`cert`.
 
 {{ .SchemaMarkdown | trimspace }}
 
@@ -111,7 +116,7 @@ It is usually granted implicitly assuming the above required privileges have bee
 | conjur_certificate_issue  | execute on the certificate issuer    |
 | conjur_certificate_sign   | execute on the certificate issuer    |
 
-**Note:** The `conjur_secret` data source is also available as an [ephemeral resource](./ephemeral-resources/secret.md) (`ephemeral "conjur_secret"`). 
+**Note:** The `conjur_secret` data source is also available as an [ephemeral resource](docs/ephemeral-resources/secret.md) (`ephemeral "conjur_secret"`).
 Ephemeral resources are not stored in Terraform state and are useful when you need secret values during operations but don't want them persisted.
 
 It is recommended to review your use case carefully and adjust the privileges of the provider's host identity to adhere to least-privilege security
