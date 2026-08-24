@@ -31,6 +31,69 @@ func makeCreateServerResponse(name, authnID string) *swaclient.CreateServerRespo
 	}
 }
 
+// testAuthIdentityFields mirrors swaclient.ServerAuthentication's anonymous
+// Data.Identity struct, for building test fixtures without spelling that type
+// at every call site.
+type testAuthIdentityFields struct {
+	ClaimAliases     map[string]string
+	EnforcedClaims   []string
+	IdentityPath     string
+	TokenAppProperty string
+}
+
+// testAuthDataFields mirrors swaclient.ServerAuthentication's anonymous Data
+// struct, for building test fixtures without spelling that type at every call
+// site.
+type testAuthDataFields struct {
+	Sub, Audience, JwksUri, Issuer, CaCert string
+	PublicKeys                             map[string]interface{}
+	Identity                               *testAuthIdentityFields
+}
+
+func newTestServerAuth(authType string, f testAuthDataFields) *swaclient.ServerAuthentication {
+	auth := &swaclient.ServerAuthentication{Type: swaclient.ServerAuthenticationType(authType)}
+	if f.Sub != "" {
+		auth.Data.Sub = &f.Sub
+	}
+	if f.Audience != "" {
+		auth.Data.Audience = &f.Audience
+	}
+	if f.JwksUri != "" {
+		auth.Data.JwksUri = &f.JwksUri
+	}
+	if f.Issuer != "" {
+		auth.Data.Issuer = &f.Issuer
+	}
+	if f.CaCert != "" {
+		auth.Data.CaCert = &f.CaCert
+	}
+	if f.PublicKeys != nil {
+		auth.Data.PublicKeys = &f.PublicKeys
+	}
+	if f.Identity != nil {
+		identity := &struct {
+			ClaimAliases     *map[string]string `json:"claim_aliases,omitempty"`
+			EnforcedClaims   *[]string          `json:"enforced_claims,omitempty"`
+			IdentityPath     *string            `json:"identity_path,omitempty"`
+			TokenAppProperty *string            `json:"token_app_property,omitempty"`
+		}{}
+		if f.Identity.ClaimAliases != nil {
+			identity.ClaimAliases = &f.Identity.ClaimAliases
+		}
+		if f.Identity.EnforcedClaims != nil {
+			identity.EnforcedClaims = &f.Identity.EnforcedClaims
+		}
+		if f.Identity.IdentityPath != "" {
+			identity.IdentityPath = &f.Identity.IdentityPath
+		}
+		if f.Identity.TokenAppProperty != "" {
+			identity.TokenAppProperty = &f.Identity.TokenAppProperty
+		}
+		auth.Data.Identity = identity
+	}
+	return auth
+}
+
 func TestServerResource_Create(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -582,7 +645,7 @@ func TestServerResource_Update(t *testing.T) {
 						HTTPResponse: makeHTTPResponse(http.StatusOK),
 						ApplicationxSecretsmgrV2JSON200: &swaclient.ServerResponse{
 							Name:           "my-server",
-							Authentication: &swaclient.ServerAuthentication{Type: "jwt", Data: map[string]any{"sub": "my-workload", "jwks_uri": "https://issuer.example.org/.well-known/jwks-v2.json"}},
+							Authentication: newTestServerAuth("jwt", testAuthDataFields{Sub: "my-workload", JwksUri: "https://issuer.example.org/.well-known/jwks-v2.json"}),
 						},
 					}, nil)
 			},
@@ -876,14 +939,11 @@ func TestServerResource_Read(t *testing.T) {
 							Name:            "my-server",
 							ServerGroupName: new("prod-servers"),
 							AuthnId:         &authnID,
-							Authentication: &swaclient.ServerAuthentication{
-								Type: "JWT",
-								Data: map[string]interface{}{
-									"sub":      "my-workload",
-									"issuer":   "https://issuer.example.org",
-									"audience": "https://api.example.org",
-								},
-							},
+							Authentication: newTestServerAuth("JWT", testAuthDataFields{
+								Sub:      "my-workload",
+								Issuer:   "https://issuer.example.org",
+								Audience: "https://api.example.org",
+							}),
 						},
 					}, nil)
 			},
@@ -1053,24 +1113,29 @@ func TestServerAuthFromCreateResponse_FullMapping(t *testing.T) {
 	assert.NotNil(t, result)
 
 	assert.Equal(t, swaclient.ServerAuthenticationType("jwt"), result.Type)
-	assert.Equal(t, "workload-sub", result.Data["sub"])
-	assert.Equal(t, "conjur", result.Data["audience"])
-	assert.Equal(t, "https://issuer.example.org/.well-known/jwks.json", result.Data["jwks_uri"])
-	assert.Equal(t, "https://issuer.example.org", result.Data["issuer"])
-	assert.Equal(t, "-----BEGIN CERTIFICATE-----...", result.Data["ca_cert"])
+	require.NotNil(t, result.Data.Sub)
+	assert.Equal(t, "workload-sub", *result.Data.Sub)
+	require.NotNil(t, result.Data.Audience)
+	assert.Equal(t, "conjur", *result.Data.Audience)
+	require.NotNil(t, result.Data.JwksUri)
+	assert.Equal(t, "https://issuer.example.org/.well-known/jwks.json", *result.Data.JwksUri)
+	require.NotNil(t, result.Data.Issuer)
+	assert.Equal(t, "https://issuer.example.org", *result.Data.Issuer)
+	require.NotNil(t, result.Data.CaCert)
+	assert.Equal(t, "-----BEGIN CERTIFICATE-----...", *result.Data.CaCert)
 
-	publicKeys, ok := result.Data["public_keys"].(map[string]interface{})
-	assert.True(t, ok)
-	assert.Equal(t, "jwks", publicKeys["type"])
+	require.NotNil(t, result.Data.PublicKeys)
+	assert.Equal(t, "jwks", (*result.Data.PublicKeys)["type"])
 
-	identityRaw, ok := result.Data["identity"]
-	assert.True(t, ok)
-	identity, ok := identityRaw.(map[string]any)
-	assert.True(t, ok)
-	assert.Equal(t, map[string]string{"app": "app"}, identity["claim_aliases"])
-	assert.Equal(t, []string{"sub", "iss"}, identity["enforced_claims"])
-	assert.Equal(t, "/data/workload", identity["identity_path"])
-	assert.Equal(t, "sub", identity["token_app_property"])
+	require.NotNil(t, result.Data.Identity)
+	require.NotNil(t, result.Data.Identity.ClaimAliases)
+	assert.Equal(t, map[string]string{"app": "app"}, *result.Data.Identity.ClaimAliases)
+	require.NotNil(t, result.Data.Identity.EnforcedClaims)
+	assert.Equal(t, []string{"sub", "iss"}, *result.Data.Identity.EnforcedClaims)
+	require.NotNil(t, result.Data.Identity.IdentityPath)
+	assert.Equal(t, "/data/workload", *result.Data.Identity.IdentityPath)
+	require.NotNil(t, result.Data.Identity.TokenAppProperty)
+	assert.Equal(t, "sub", *result.Data.Identity.TokenAppProperty)
 }
 
 func TestServerAuthFromCreateResponse_MissingAuthDataReturnsNil(t *testing.T) {
@@ -1088,34 +1153,30 @@ func TestServerAuthFromCreateResponse_EmptyIdentityOmitted(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
 
-	_, hasIdentity := result.Data["identity"]
-	assert.False(t, hasIdentity)
+	assert.Nil(t, result.Data.Identity)
 }
 
 func TestSyncServerAuthFromResponse_FullMapping(t *testing.T) {
 	ctx := context.Background()
 	state := &ServerResourceModel{}
 
-	auth := &swaclient.ServerAuthentication{
-		Type: "jwt",
-		Data: map[string]any{
-			"sub":      "workload-sub",
-			"audience": "conjur",
-			"jwks_uri": "https://issuer.example.org/.well-known/jwks.json",
-			"issuer":   "https://issuer.example.org",
-			"ca_cert":  "-----BEGIN CERTIFICATE-----...",
-			"public_keys": map[string]any{
-				"type":  "jwks",
-				"value": map[string]any{"keys": []any{}},
-			},
-			"identity": map[string]any{
-				"claim_aliases":      map[string]any{"app": "app"},
-				"enforced_claims":    []any{"sub", "iss"},
-				"identity_path":      "/data/workload",
-				"token_app_property": "sub",
-			},
+	auth := newTestServerAuth("jwt", testAuthDataFields{
+		Sub:      "workload-sub",
+		Audience: "conjur",
+		JwksUri:  "https://issuer.example.org/.well-known/jwks.json",
+		Issuer:   "https://issuer.example.org",
+		CaCert:   "-----BEGIN CERTIFICATE-----...",
+		PublicKeys: map[string]interface{}{
+			"type":  "jwks",
+			"value": map[string]any{"keys": []any{}},
 		},
-	}
+		Identity: &testAuthIdentityFields{
+			ClaimAliases:     map[string]string{"app": "app"},
+			EnforcedClaims:   []string{"sub", "iss"},
+			IdentityPath:     "/data/workload",
+			TokenAppProperty: "sub",
+		},
+	})
 
 	err := syncServerAuthFromResponse(ctx, state, auth)
 	assert.NoError(t, err)
@@ -1161,12 +1222,7 @@ func TestSyncServerAuthFromResponse_MissingFieldsClearExistingValues(t *testing.
 		},
 	}
 
-	auth := &swaclient.ServerAuthentication{
-		Type: "jwt",
-		Data: map[string]any{
-			"sub": "workload-sub",
-		},
-	}
+	auth := newTestServerAuth("jwt", testAuthDataFields{Sub: "workload-sub"})
 
 	err := syncServerAuthFromResponse(ctx, state, auth)
 	assert.NoError(t, err)
@@ -1185,12 +1241,7 @@ func TestSyncServerAuthFromResponse_MissingSubjectPreservesPriorValue(t *testing
 		},
 	}
 
-	auth := &swaclient.ServerAuthentication{
-		Type: "jwt",
-		Data: map[string]any{
-			"audience": "conjur",
-		},
-	}
+	auth := newTestServerAuth("jwt", testAuthDataFields{Audience: "conjur"})
 
 	err := syncServerAuthFromResponse(ctx, state, auth)
 	assert.NoError(t, err)
@@ -1199,13 +1250,10 @@ func TestSyncServerAuthFromResponse_MissingSubjectPreservesPriorValue(t *testing
 
 func TestSyncServerAuthFromResponse_PublicKeysMarshalError(t *testing.T) {
 	state := &ServerResourceModel{}
-	auth := &swaclient.ServerAuthentication{
-		Type: "jwt",
-		Data: map[string]any{
-			"sub":         "workload-sub",
-			"public_keys": map[string]any{"bad": make(chan int)},
-		},
-	}
+	auth := newTestServerAuth("jwt", testAuthDataFields{
+		Sub:        "workload-sub",
+		PublicKeys: map[string]interface{}{"bad": make(chan int)},
+	})
 
 	err := syncServerAuthFromResponse(context.Background(), state, auth)
 	assert.Error(t, err)
@@ -1423,7 +1471,7 @@ func TestServerResource_CreateAndDelete(t *testing.T) {
 			HTTPResponse: makeHTTPResponse(http.StatusOK),
 			ApplicationxSecretsmgrV2JSON200: &swaclient.ServerResponse{
 				Name:           "test-server",
-				Authentication: &swaclient.ServerAuthentication{Type: "jwt", Data: map[string]any{"sub": "my-workload", "jwks_uri": "https://www.googleapis.com/oauth2/v3/certs"}},
+				Authentication: newTestServerAuth("jwt", testAuthDataFields{Sub: "my-workload", JwksUri: "https://www.googleapis.com/oauth2/v3/certs"}),
 			},
 		}, nil).Maybe()
 
@@ -1485,7 +1533,7 @@ func TestServerResource_AuthChange_RequiresReplace(t *testing.T) {
 			HTTPResponse: makeHTTPResponse(http.StatusOK),
 			ApplicationxSecretsmgrV2JSON200: &swaclient.ServerResponse{
 				Name:           "test-server",
-				Authentication: &swaclient.ServerAuthentication{Type: "jwt", Data: map[string]any{"sub": "my-workload", "jwks_uri": "https://www.googleapis.com/oauth2/v3/certs"}},
+				Authentication: newTestServerAuth("jwt", testAuthDataFields{Sub: "my-workload", JwksUri: "https://www.googleapis.com/oauth2/v3/certs"}),
 			},
 		}, nil).Maybe()
 
@@ -1571,7 +1619,7 @@ func TestServerResource_NameChange_RequiresReplace(t *testing.T) {
 			HTTPResponse: makeHTTPResponse(http.StatusOK),
 			ApplicationxSecretsmgrV2JSON200: &swaclient.ServerResponse{
 				Name:           "server-1",
-				Authentication: &swaclient.ServerAuthentication{Type: "jwt", Data: map[string]any{"sub": "my-workload", "jwks_uri": "https://www.googleapis.com/oauth2/v3/certs"}},
+				Authentication: newTestServerAuth("jwt", testAuthDataFields{Sub: "my-workload", JwksUri: "https://www.googleapis.com/oauth2/v3/certs"}),
 			},
 		}, nil).Maybe()
 
@@ -1581,7 +1629,7 @@ func TestServerResource_NameChange_RequiresReplace(t *testing.T) {
 			HTTPResponse: makeHTTPResponse(http.StatusOK),
 			ApplicationxSecretsmgrV2JSON200: &swaclient.ServerResponse{
 				Name:           "server-2",
-				Authentication: &swaclient.ServerAuthentication{Type: "jwt", Data: map[string]any{"sub": "my-workload", "jwks_uri": "https://www.googleapis.com/oauth2/v3/certs"}},
+				Authentication: newTestServerAuth("jwt", testAuthDataFields{Sub: "my-workload", JwksUri: "https://www.googleapis.com/oauth2/v3/certs"}),
 			},
 		}, nil).Maybe()
 

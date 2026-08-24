@@ -66,56 +66,6 @@ func NewServerResource() resource.Resource {
 	return &ServerResource{typeName: "conjur_swa_server"}
 }
 
-func stringValueFromAuthData(data map[string]any, key string) types.String {
-	v, ok := data[key]
-	if !ok {
-		return types.StringNull()
-	}
-	s, ok := v.(string)
-	if !ok {
-		return types.StringNull()
-	}
-	return types.StringValue(s)
-}
-
-func asStringSlice(v any) ([]string, bool) {
-	if values, ok := v.([]string); ok {
-		return values, true
-	}
-	rawValues, ok := v.([]any)
-	if !ok {
-		return nil, false
-	}
-	values := make([]string, 0, len(rawValues))
-	for _, raw := range rawValues {
-		s, ok := raw.(string)
-		if !ok {
-			return nil, false
-		}
-		values = append(values, s)
-	}
-	return values, true
-}
-
-func asStringMap(v any) (map[string]string, bool) {
-	if values, ok := v.(map[string]string); ok {
-		return values, true
-	}
-	rawValues, ok := v.(map[string]any)
-	if !ok {
-		return nil, false
-	}
-	values := make(map[string]string, len(rawValues))
-	for key, raw := range rawValues {
-		s, ok := raw.(string)
-		if !ok {
-			return nil, false
-		}
-		values[key] = s
-	}
-	return values, true
-}
-
 func knownStringValue(v types.String) bool {
 	return !v.IsNull() && !v.IsUnknown()
 }
@@ -201,36 +151,6 @@ func stringPointerFromValue(v types.String) *string {
 		return nil
 	}
 	return new(v.ValueString())
-}
-
-func setMapValueIfNotNil[T any](data map[string]any, key string, value *T) {
-	if value != nil {
-		data[key] = *value
-	}
-}
-
-func mapValueFromIdentityField(ctx context.Context, raw any, field string) (types.Map, error) {
-	values, ok := asStringMap(raw)
-	if !ok {
-		return types.MapNull(types.StringType), fmt.Errorf("invalid auth.identity.%s in response", field)
-	}
-	value, diags := types.MapValueFrom(ctx, types.StringType, values)
-	if diags.HasError() {
-		return types.MapNull(types.StringType), fmt.Errorf("failed to convert auth.identity.%s from response", field)
-	}
-	return value, nil
-}
-
-func listValueFromIdentityField(ctx context.Context, raw any, field string) (types.List, error) {
-	values, ok := asStringSlice(raw)
-	if !ok {
-		return types.ListNull(types.StringType), fmt.Errorf("invalid auth.identity.%s in response", field)
-	}
-	value, diags := types.ListValueFrom(ctx, types.StringType, values)
-	if diags.HasError() {
-		return types.ListNull(types.StringType), fmt.Errorf("failed to convert auth.identity.%s from response", field)
-	}
-	return value, nil
 }
 
 func buildCreateServerIdentity(ctx context.Context, model *ServerAuthenticationIdentityModel) (*struct {
@@ -411,30 +331,24 @@ func serverAuthFromCreateResponse(auth swaclient.CreateServerAuthentication) (*s
 		return nil, nil
 	}
 
-	data := map[string]any{
-		"sub": jwtData.Sub,
-	}
-	setMapValueIfNotNil(data, "audience", jwtData.Audience)
-	setMapValueIfNotNil(data, "jwks_uri", jwtData.JwksUri)
-	setMapValueIfNotNil(data, "issuer", jwtData.Issuer)
-	setMapValueIfNotNil(data, "ca_cert", jwtData.CaCert)
-	setMapValueIfNotNil(data, "public_keys", jwtData.PublicKeys)
-
-	if jwtData.Identity != nil {
-		identity := map[string]any{}
-		setMapValueIfNotNil(identity, "claim_aliases", jwtData.Identity.ClaimAliases)
-		setMapValueIfNotNil(identity, "enforced_claims", jwtData.Identity.EnforcedClaims)
-		setMapValueIfNotNil(identity, "identity_path", jwtData.Identity.IdentityPath)
-		setMapValueIfNotNil(identity, "token_app_property", jwtData.Identity.TokenAppProperty)
-		if len(identity) > 0 {
-			data["identity"] = identity
-		}
-	}
-
-	return &swaclient.ServerAuthentication{
+	result := &swaclient.ServerAuthentication{
 		Type: swaclient.ServerAuthenticationType(strings.ToLower(string(auth.Type))),
-		Data: data,
-	}, nil
+	}
+	sub := jwtData.Sub
+	result.Data.Sub = &sub
+	result.Data.Audience = jwtData.Audience
+	result.Data.JwksUri = jwtData.JwksUri
+	result.Data.Issuer = jwtData.Issuer
+	result.Data.CaCert = jwtData.CaCert
+	result.Data.PublicKeys = jwtData.PublicKeys
+
+	if jwtData.Identity != nil &&
+		(jwtData.Identity.ClaimAliases != nil || jwtData.Identity.EnforcedClaims != nil ||
+			jwtData.Identity.IdentityPath != nil || jwtData.Identity.TokenAppProperty != nil) {
+		result.Data.Identity = jwtData.Identity
+	}
+
+	return result, nil
 }
 
 func syncServerAuthFromResponse(ctx context.Context, state *ServerResourceModel, auth *swaclient.ServerAuthentication) error {
@@ -454,16 +368,16 @@ func syncServerAuthFromResponse(ctx context.Context, state *ServerResourceModel,
 	// create request). Without this, `auth.subject` drifts to null on every read
 	// and, because `auth` forces replacement, triggers a spurious destroy/create.
 	// Remove this fallback once the API returns `sub`.
-	if sub := stringValueFromAuthData(auth.Data, "sub"); knownStringValue(sub) {
+	if sub := optionalStringValue(auth.Data.Sub); knownStringValue(sub) {
 		state.Auth.Subject = sub
 	}
-	state.Auth.Audience = stringValueFromAuthData(auth.Data, "audience")
-	state.Auth.JWKSURI = stringValueFromAuthData(auth.Data, "jwks_uri")
-	state.Auth.Issuer = stringValueFromAuthData(auth.Data, "issuer")
-	state.Auth.CACert = stringValueFromAuthData(auth.Data, "ca_cert")
+	state.Auth.Audience = optionalStringValue(auth.Data.Audience)
+	state.Auth.JWKSURI = optionalStringValue(auth.Data.JwksUri)
+	state.Auth.Issuer = optionalStringValue(auth.Data.Issuer)
+	state.Auth.CACert = optionalStringValue(auth.Data.CaCert)
 
-	if publicKeys, ok := auth.Data["public_keys"]; ok {
-		publicKeysJSON, err := json.Marshal(publicKeys)
+	if auth.Data.PublicKeys != nil {
+		publicKeysJSON, err := json.Marshal(*auth.Data.PublicKeys)
 		if err != nil {
 			return fmt.Errorf("failed to marshal auth.public_keys from response: %w", err)
 		}
@@ -472,14 +386,7 @@ func syncServerAuthFromResponse(ctx context.Context, state *ServerResourceModel,
 		state.Auth.PublicKeys = types.StringNull()
 	}
 
-	identityRaw, ok := auth.Data["identity"]
-	if !ok {
-		state.Auth.Identity = nil
-		return nil
-	}
-
-	identityMap, ok := identityRaw.(map[string]any)
-	if !ok {
+	if auth.Data.Identity == nil {
 		state.Auth.Identity = nil
 		return nil
 	}
@@ -487,28 +394,25 @@ func syncServerAuthFromResponse(ctx context.Context, state *ServerResourceModel,
 	identity := &ServerAuthenticationIdentityModel{
 		ClaimAliases:     types.MapNull(types.StringType),
 		EnforcedClaims:   types.ListNull(types.StringType),
-		IdentityPath:     types.StringNull(),
-		TokenAppProperty: types.StringNull(),
+		IdentityPath:     optionalStringValue(auth.Data.Identity.IdentityPath),
+		TokenAppProperty: optionalStringValue(auth.Data.Identity.TokenAppProperty),
 	}
 
-	if claimAliasesRaw, ok := identityMap["claim_aliases"]; ok {
-		claimAliasesValue, err := mapValueFromIdentityField(ctx, claimAliasesRaw, "claim_aliases")
-		if err != nil {
-			return err
+	if auth.Data.Identity.ClaimAliases != nil {
+		value, diags := types.MapValueFrom(ctx, types.StringType, *auth.Data.Identity.ClaimAliases)
+		if diags.HasError() {
+			return fmt.Errorf("failed to convert auth.identity.claim_aliases from response")
 		}
-		identity.ClaimAliases = claimAliasesValue
+		identity.ClaimAliases = value
 	}
 
-	if enforcedClaimsRaw, ok := identityMap["enforced_claims"]; ok {
-		enforcedClaimsValue, err := listValueFromIdentityField(ctx, enforcedClaimsRaw, "enforced_claims")
-		if err != nil {
-			return err
+	if auth.Data.Identity.EnforcedClaims != nil {
+		value, diags := types.ListValueFrom(ctx, types.StringType, *auth.Data.Identity.EnforcedClaims)
+		if diags.HasError() {
+			return fmt.Errorf("failed to convert auth.identity.enforced_claims from response")
 		}
-		identity.EnforcedClaims = enforcedClaimsValue
+		identity.EnforcedClaims = value
 	}
-
-	identity.IdentityPath = stringValueFromAuthData(identityMap, "identity_path")
-	identity.TokenAppProperty = stringValueFromAuthData(identityMap, "token_app_property")
 
 	state.Auth.Identity = identity
 

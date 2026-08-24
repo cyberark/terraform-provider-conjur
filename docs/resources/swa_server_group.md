@@ -60,6 +60,25 @@ resource "conjur_swa_server_group" "gcp" {
   }
 }
 
+# Server group using AWS Instance Identity Document (IID) attestation
+resource "conjur_swa_server_group" "aws_iid" {
+  trust_domain_name = "prod.example.org"
+  name              = "aws-servers"
+  description       = "AWS workload server group"
+
+  attestation = {
+    aws_iid = {
+      assume_role = "arn:aws:iam::123456789012:role/SWAServerRole"
+      partition   = "aws"
+
+      verify_organization = {
+        management_account_id = "123456789012"
+        assume_org_role       = "AWSOrganizationsReadOnlyAccess"
+      }
+    }
+  }
+}
+
 # Server group with no node attestation (attestation is optional)
 resource "conjur_swa_server_group" "no_attestation" {
   trust_domain_name = "prod.example.org"
@@ -78,7 +97,7 @@ resource "conjur_swa_server_group" "no_attestation" {
 
 ### Optional
 
-- `attestation` (Attributes) Node attestation configuration. Optionally specify any of x509pop, k8s_psat, or gcp_service_account; omit entirely for a server group with no attestation. (see [below for nested schema](#nestedatt--attestation))
+- `attestation` (Attributes) Node attestation configuration. Optionally specify any of x509pop, k8s_psat, gcp_service_account, or aws_iid; omit entirely for a server group with no attestation. (see [below for nested schema](#nestedatt--attestation))
 - `description` (String) A description of the server group.
 - `node_attestation` (Attributes, Deprecated) Deprecated: use `attestation` instead. (see [below for nested schema](#nestedatt--node_attestation))
 
@@ -91,9 +110,31 @@ resource "conjur_swa_server_group" "no_attestation" {
 
 Optional:
 
+- `aws_iid` (Attributes) AWS Instance Identity Document (IID) attestation configuration. (see [below for nested schema](#nestedatt--attestation--aws_iid))
 - `gcp_service_account` (Attributes) GCP service account attestation configuration. (see [below for nested schema](#nestedatt--attestation--gcp_service_account))
 - `k8s_psat` (Attributes) Kubernetes Projected Service Account Token attestation configuration. (see [below for nested schema](#nestedatt--attestation--k8s_psat))
 - `x509pop` (Attributes) X.509 Proof of Possession attestation configuration. (see [below for nested schema](#nestedatt--attestation--x509pop))
+
+<a id="nestedatt--attestation--aws_iid"></a>
+### Nested Schema for `attestation.aws_iid`
+
+Optional:
+
+- `assume_role` (String) IAM role ARN the server assumes to describe the attesting instance in the target AWS account. Omitted means ambient credentials (e.g. IRSA/Pod Identity) are used.
+- `partition` (String) AWS partition the server operates in. One of `aws`, `aws-cn`, `aws-us-gov`. Defaults to `aws`.
+- `verify_organization` (Attributes) Verify the attesting instance belongs to an AWS Organization. (see [below for nested schema](#nestedatt--attestation--aws_iid--verify_organization))
+
+<a id="nestedatt--attestation--aws_iid--verify_organization"></a>
+### Nested Schema for `attestation.aws_iid.verify_organization`
+
+Optional:
+
+- `account_list_file` (String) Path on the SWA server host/container to a file containing a JSON array of AWS account IDs. Mutually exclusive with `management_account_id` and `assume_org_role`.
+- `assume_org_role` (String) IAM role name in the management account with organizations:ListAccounts permissions.
+- `management_account_id` (String) 12-digit AWS account ID of the organization's management (root) account.
+- `management_account_region` (String) AWS region where the management account is hosted.
+- `org_account_map_ttl` (String) Cache TTL duration for the organization account list as a Go duration string (e.g. `15m`, `1h`, `90s`). Minimum duration is 1 minute (`1m`). Omitted means the attestor default is used.
+
 
 <a id="nestedatt--attestation--gcp_service_account"></a>
 ### Nested Schema for `attestation.gcp_service_account`
@@ -140,9 +181,31 @@ Required:
 
 Optional:
 
+- `aws_iid` (Attributes) AWS Instance Identity Document (IID) attestation configuration. (see [below for nested schema](#nestedatt--node_attestation--aws_iid))
 - `gcp_service_account` (Attributes) GCP service account attestation configuration. (see [below for nested schema](#nestedatt--node_attestation--gcp_service_account))
 - `k8s_psat` (Attributes) Kubernetes Projected Service Account Token attestation configuration. (see [below for nested schema](#nestedatt--node_attestation--k8s_psat))
 - `x509pop` (Attributes) X.509 Proof of Possession attestation configuration. (see [below for nested schema](#nestedatt--node_attestation--x509pop))
+
+<a id="nestedatt--node_attestation--aws_iid"></a>
+### Nested Schema for `node_attestation.aws_iid`
+
+Optional:
+
+- `assume_role` (String) IAM role ARN the server assumes to describe the attesting instance in the target AWS account. Omitted means ambient credentials (e.g. IRSA/Pod Identity) are used.
+- `partition` (String) AWS partition the server operates in. One of `aws`, `aws-cn`, `aws-us-gov`. Defaults to `aws`.
+- `verify_organization` (Attributes) Verify the attesting instance belongs to an AWS Organization. (see [below for nested schema](#nestedatt--node_attestation--aws_iid--verify_organization))
+
+<a id="nestedatt--node_attestation--aws_iid--verify_organization"></a>
+### Nested Schema for `node_attestation.aws_iid.verify_organization`
+
+Optional:
+
+- `account_list_file` (String) Path on the SWA server host/container to a file containing a JSON array of AWS account IDs. Mutually exclusive with `management_account_id` and `assume_org_role`.
+- `assume_org_role` (String) IAM role name in the management account with organizations:ListAccounts permissions.
+- `management_account_id` (String) 12-digit AWS account ID of the organization's management (root) account.
+- `management_account_region` (String) AWS region where the management account is hosted.
+- `org_account_map_ttl` (String) Cache TTL duration for the organization account list as a Go duration string (e.g. `15m`, `1h`, `90s`). Minimum duration is 1 minute (`1m`). Omitted means the attestor default is used.
+
 
 <a id="nestedatt--node_attestation--gcp_service_account"></a>
 ### Nested Schema for `node_attestation.gcp_service_account`
