@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [0.9.6] - 2026-08-24
+### Fixed
+- Cached credentials lookup failure by normalizing appliance_url to include /api for Secrets Manager Cloud.
+
 ## [0.9.5] - 2026-08-24
 ### Added
 - Support for certificate authentication (`authn_type = "cert"`) using X.509 client certificates (mTLS). 
