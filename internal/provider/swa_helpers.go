@@ -103,8 +103,13 @@ func splitSWAID(id string, expectedParts int, format string) ([]string, error) {
 	return parts, nil
 }
 
+// optionalStringListValue normalizes a nullable, possibly-empty API list field into a
+// Terraform list value. The API represents "not configured" as either a nil pointer or
+// a non-nil pointer to an empty slice; since the corresponding schema attribute is
+// Optional (not Computed), the provider must collapse both to null so it never writes
+// a value that diverges from what an omitted-in-config attribute planned to.
 func optionalStringListValue(ctx context.Context, values *[]string) (types.List, diag.Diagnostics) {
-	if values == nil {
+	if values == nil || len(*values) == 0 {
 		return types.ListNull(types.StringType), nil
 	}
 	listValue, diags := types.ListValueFrom(ctx, types.StringType, *values)

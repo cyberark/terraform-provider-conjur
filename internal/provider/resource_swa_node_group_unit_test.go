@@ -848,6 +848,32 @@ func TestNodeGroupResource_WorkloadRegistrationPoliciesRoundTrip(t *testing.T) {
 	assert.Equal(t, policies, gotPolicies)
 }
 
+// TestSyncWorkloadConfigFromResponse_EmptyNonNilPoliciesNormalizeToNull covers
+// an API response shape distinct from both "field omitted" (nil pointer) and
+// "policies set" (non-empty slice): a non-nil pointer to an empty slice. Config
+// leaves workload_registration_policies unset, so Terraform plans it as null;
+// since the attribute is Optional but not Computed, the provider must not
+// write back a known empty list there, or apply fails with "provider produced
+// inconsistent result after apply".
+func TestSyncWorkloadConfigFromResponse_EmptyNonNilPoliciesNormalizeToNull(t *testing.T) {
+	ctx := context.Background()
+	tmpl := "spiffe://{{ .trustdomain }}/{{ .nodegroup }}"
+	emptyPolicies := []string{}
+
+	model := &NodeGroupResourceModel{}
+	diags := syncWorkloadConfigFromResponse(ctx, model, &swaclient.WorkloadConfiguration{
+		SpiffeIdTemplate:             &tmpl,
+		WorkloadRegistrationPolicies: &emptyPolicies,
+	})
+
+	require.False(t, diags.HasError())
+	require.False(t, model.WorkloadConfiguration.IsNull())
+
+	var wc WorkloadConfigurationModel
+	require.False(t, model.WorkloadConfiguration.As(ctx, &wc, basetypes.ObjectAsOptions{}).HasError())
+	assert.True(t, wc.WorkloadRegistrationPolicies.IsNull())
+}
+
 func getNodeGroupTestSchema() schema.Schema {
 	r := &NodeGroupResource{}
 	var schemaResp resource.SchemaResponse
