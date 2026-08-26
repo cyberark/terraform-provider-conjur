@@ -4,6 +4,13 @@ COPY ssl_cert/*  /usr/local/share/ca-certificates/
 
 RUN update-ca-certificates
 
+# Pre-install Terraform so terraform-plugin-testing finds it in $PATH at test
+# startup rather than downloading it into a per-run temp directory.  Without
+# a pre-installed binary, parallel test goroutines race to write and then exec
+# the same /tmp/plugintest-terraform*/terraform file, producing an intermittent
+# "text file busy" (ETXTBSY) failure.
+# See: https://github.com/hashicorp/terraform-plugin-testing/issues/429
+ARG TERRAFORM_VERSION=1.15.9
 RUN apk add --no-cache curl \
                gcc \
                git \
@@ -12,7 +19,13 @@ RUN apk add --no-cache curl \
                musl-dev \
                jq \
                libc-dev \
-               openssl && \
+               openssl \
+               unzip && \
+    ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') && \
+    curl -fsSL "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_${ARCH}.zip" -o /tmp/terraform.zip && \
+    unzip /tmp/terraform.zip -d /usr/local/bin && \
+    rm /tmp/terraform.zip && \
+    terraform version && \
     go install github.com/jstemmer/go-junit-report@latest && \
     go install github.com/afunix/gocov/gocov@latest && \
     go install github.com/AlekSi/gocov-xml@latest && \
