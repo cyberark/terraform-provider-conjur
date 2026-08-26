@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [0.9.7] - 2026-08-25
+### Fixed
+- `conjur_swa_node_group` no longer fails with "Provider produced inconsistent
+  result after apply" when the configuration omits a non-calculated field
+  and the API returns an empty (non-null) list for it.
+
 ## [0.9.6] - 2026-08-24
 ### Fixed
 - Cached credentials lookup failure by normalizing appliance_url to include /api for Secrets Manager Cloud.

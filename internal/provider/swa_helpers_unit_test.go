@@ -217,6 +217,39 @@ func TestApplyOptionalModel_KnownRunsApply(t *testing.T) {
 	assert.False(t, diags.HasError())
 }
 
+func TestOptionalStringListValue_NilReturnsNull(t *testing.T) {
+	listValue, diags := optionalStringListValue(context.Background(), nil)
+
+	assert.False(t, diags.HasError())
+	assert.True(t, listValue.IsNull())
+}
+
+// A non-nil pointer to an empty slice must also normalize to null: the
+// corresponding schema attributes (e.g. workload_registration_policies) are
+// Optional but not Computed, so the provider is not allowed to write back a
+// known-but-empty list when the config omitted the attribute (planned null) -
+// doing so trips Terraform's "provider produced inconsistent result" check.
+func TestOptionalStringListValue_EmptyNonNilSliceReturnsNull(t *testing.T) {
+	empty := []string{}
+
+	listValue, diags := optionalStringListValue(context.Background(), &empty)
+
+	assert.False(t, diags.HasError())
+	assert.True(t, listValue.IsNull())
+}
+
+func TestOptionalStringListValue_PopulatedSliceReturnsList(t *testing.T) {
+	values := []string{"a", "b"}
+
+	listValue, diags := optionalStringListValue(context.Background(), &values)
+
+	assert.False(t, diags.HasError())
+	assert.False(t, listValue.IsNull())
+	var got []string
+	require.False(t, listValue.ElementsAs(context.Background(), &got, false).HasError())
+	assert.Equal(t, values, got)
+}
+
 func TestApplyOptionalModel_DecodeErrorSkipsApplyAndReturnsFalse(t *testing.T) {
 	ctx := context.Background()
 	var diags diag.Diagnostics
