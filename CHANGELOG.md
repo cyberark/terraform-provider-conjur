@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [0.9.8] - 2026-08-25
+### Fixed
+- `service_account_allow_list` format in docs and examples.
+
 ## [0.9.7] - 2026-08-25
 ### Fixed
 - `conjur_swa_node_group` no longer fails with "Provider produced inconsistent

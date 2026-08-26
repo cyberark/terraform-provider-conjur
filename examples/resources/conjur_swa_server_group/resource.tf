@@ -21,7 +21,7 @@ resource "conjur_swa_server_group" "k8s" {
     k8s_psat = {
       clusters = {
         "prod-cluster" = {
-          service_account_allow_list = ["app/my-sa", "kube-system/metrics-sa"]
+          service_account_allow_list = ["app:my-sa", "kube-system:metrics-sa"]
           audience                   = ["spiffe://prod.example.org"]
           allowed_pod_label_keys     = ["app", "version"]
           allowed_node_label_keys    = ["zone"]

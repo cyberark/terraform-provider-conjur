@@ -133,7 +133,7 @@ func attestationNestedAttributes() map[string]schema.Attribute {
 					NestedObject: schema.NestedAttributeObject{
 						Attributes: map[string]schema.Attribute{
 							"service_account_allow_list": schema.ListAttribute{
-								MarkdownDescription: "List of allowed service accounts in namespace/name format.",
+								MarkdownDescription: "List of allowed service accounts in `namespace:name` format.",
 								Optional:            true,
 								ElementType:         types.StringType,
 							},
