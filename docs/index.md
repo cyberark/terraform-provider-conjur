@@ -84,7 +84,7 @@ both automatically, so the provider block can be left empty:
 terraform {
   required_providers {
     conjur = {
-      source = "cyberark/conjur"
+      source  = "cyberark/conjur"
     }
   }
 }
