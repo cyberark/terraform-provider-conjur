@@ -185,7 +185,7 @@ func TestUpdateAttestationFromResponse(t *testing.T) {
 		partition := swaclient.Aws
 		at := &swaclient.AttestationConfiguration{
 			AwsIid: &swaclient.AwsIidAttestationConfiguration{
-				AssumeRole: new("arn:aws:iam::123456789012:role/SWAServerRole"),
+				AssumeRole: new("SWAServerRole"),
 				Partition:  &partition,
 				VerifyOrganization: &swaclient.AwsIidVerifyOrganizationConfiguration{
 					ManagementAccountId:     new("123456789012"),
@@ -200,7 +200,7 @@ func TestUpdateAttestationFromResponse(t *testing.T) {
 		assert.False(t, diags.HasError())
 		require.NotNil(t, model.Attestation)
 		require.NotNil(t, model.Attestation.AwsIid)
-		assert.Equal(t, "arn:aws:iam::123456789012:role/SWAServerRole", model.Attestation.AwsIid.AssumeRole.ValueString())
+		assert.Equal(t, "SWAServerRole", model.Attestation.AwsIid.AssumeRole.ValueString())
 		assert.Equal(t, "aws", model.Attestation.AwsIid.Partition.ValueString())
 
 		require.NotNil(t, model.Attestation.AwsIid.VerifyOrganization)
@@ -407,7 +407,7 @@ func TestServerGroupResource_Create(t *testing.T) {
 				Description:     types.StringNull(),
 				Attestation: &AttestationModel{
 					AwsIid: &AwsIidModel{
-						AssumeRole: types.StringValue("arn:aws:iam::123456789012:role/SWAServerRole"),
+						AssumeRole: types.StringValue("SWAServerRole"),
 						Partition:  types.StringValue("aws"),
 						VerifyOrganization: &AwsIidVerifyOrgModel{
 							ManagementAccountID: types.StringValue("123456789012"),
@@ -423,7 +423,7 @@ func TestServerGroupResource_Create(t *testing.T) {
 					Name: "prod-servers",
 					Attestation: &swaclient.AttestationConfiguration{
 						AwsIid: &swaclient.AwsIidAttestationConfiguration{
-							AssumeRole: new("arn:aws:iam::123456789012:role/SWAServerRole"),
+							AssumeRole: new("SWAServerRole"),
 							Partition:  &partition,
 							VerifyOrganization: &swaclient.AwsIidVerifyOrganizationConfiguration{
 								ManagementAccountId: new("123456789012"),
@@ -1601,7 +1601,7 @@ resource "conjur_swa_server_group" "test" {
 func TestServerGroupResource_AwsIid_HCLCombinations(t *testing.T) {
 	t.Parallel()
 
-	arn := "arn:aws:iam::123456789012:role/SWAServerRole"
+	assumeRole := "service-role/SWAServerRole"
 
 	tests := []struct {
 		name   string
@@ -1611,13 +1611,13 @@ func TestServerGroupResource_AwsIid_HCLCombinations(t *testing.T) {
 	}{
 		{
 			name: "assume_role only (partition defaults to aws)",
-			hcl:  fmt.Sprintf(`assume_role = %q`, arn),
+			hcl:  fmt.Sprintf(`assume_role = %q`, assumeRole),
 			want: &swaclient.AwsIidAttestationConfiguration{
-				AssumeRole: new(arn),
+				AssumeRole: new(assumeRole),
 				Partition:  new(swaclient.Aws),
 			},
 			checks: []tfresource.TestCheckFunc{
-				tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.assume_role", arn),
+				tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.assume_role", assumeRole),
 				tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.partition", "aws"),
 			},
 		},
@@ -1721,9 +1721,9 @@ func TestServerGroupResource_AwsIid_HCLCombinations(t *testing.T) {
         assume_org_role            = "AWSOrganizationsReadOnlyAccess"
         org_account_map_ttl        = "15m"
         account_list_file          = "/etc/spire/org-accounts.json"
-      }`, arn),
+      }`, assumeRole),
 			want: &swaclient.AwsIidAttestationConfiguration{
-				AssumeRole: new(arn),
+				AssumeRole: new(assumeRole),
 				Partition:  new(swaclient.AwsCn),
 				VerifyOrganization: &swaclient.AwsIidVerifyOrganizationConfiguration{
 					ManagementAccountId:     new("123456789012"),
@@ -1734,7 +1734,7 @@ func TestServerGroupResource_AwsIid_HCLCombinations(t *testing.T) {
 				},
 			},
 			checks: []tfresource.TestCheckFunc{
-				tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.assume_role", arn),
+				tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.assume_role", assumeRole),
 				tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.partition", "aws-cn"),
 				tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.verify_organization.management_account_id", "123456789012"),
 				tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.verify_organization.management_account_region", "us-east-1"),
@@ -1818,14 +1818,14 @@ func TestServerGroupResource_AwsIid_ReplacesX509Pop(t *testing.T) {
 	mockClient := swamocks.NewMockClientWithResponsesInterface(t)
 
 	cert := "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"
-	arn := "arn:aws:iam::123456789012:role/SWAServerRole"
+	assumeRole := "service-role/SWAServerRole"
 
 	x509Att := &swaclient.AttestationConfiguration{
 		X509pop: &swaclient.X509PopConfigurationInput{CaCertificates: cert},
 	}
 	awsIidAtt := &swaclient.AttestationConfiguration{
 		AwsIid: &swaclient.AwsIidAttestationConfiguration{
-			AssumeRole: new(arn),
+			AssumeRole: new(assumeRole),
 			Partition:  new(swaclient.Aws),
 		},
 	}
@@ -1894,10 +1894,10 @@ resource "conjur_swa_server_group" "test" {
 				Check: tfresource.TestCheckResourceAttrSet("conjur_swa_server_group.test", "attestation.x509pop.ca_certificates"),
 			},
 			{
-				Config: awsIidTestConfig("test-sg", "test-td", fmt.Sprintf(`assume_role = %q`, arn)),
+				Config: awsIidTestConfig("test-sg", "test-td", fmt.Sprintf(`assume_role = %q`, assumeRole)),
 				Check: tfresource.ComposeTestCheckFunc(
 					tfresource.TestCheckNoResourceAttr("conjur_swa_server_group.test", "attestation.x509pop.ca_certificates"),
-					tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.assume_role", arn),
+					tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.assume_role", assumeRole),
 					tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.aws_iid.partition", "aws"),
 				),
 			},

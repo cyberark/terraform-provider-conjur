@@ -68,7 +68,7 @@ resource "conjur_swa_server_group" "aws_iid" {
 
   attestation = {
     aws_iid = {
-      assume_role = "arn:aws:iam::123456789012:role/SWAServerRole"
+      assume_role = "SWAServerRole"
       partition   = "aws"
 
       verify_organization = {
@@ -121,7 +121,7 @@ Optional:
 
 Optional:
 
-- `assume_role` (String) IAM role ARN the server assumes to describe the attesting instance in the target AWS account. Omitted means ambient credentials (e.g. IRSA/Pod Identity) are used.
+- `assume_role` (String) Bare IAM role name, optionally path-prefixed (e.g. `service-role/SWAServerRole`), to describe the attesting instance — not a full ARN. Used to build the full ARN per-attestation as `arn:{partition}:iam::{account-id}:role/{assume_role}`, taking the account ID from the attesting instance's Instance Identity Document. Omitted means ambient credentials (e.g. IRSA/Pod Identity) are used.
 - `partition` (String) AWS partition the server operates in. One of `aws`, `aws-cn`, `aws-us-gov`. Defaults to `aws`.
 - `verify_organization` (Attributes) Verify the attesting instance belongs to an AWS Organization. (see [below for nested schema](#nestedatt--attestation--aws_iid--verify_organization))
 

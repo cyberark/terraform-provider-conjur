@@ -192,7 +192,7 @@ func attestationNestedAttributes() map[string]schema.Attribute {
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
 				"assume_role": schema.StringAttribute{
-					MarkdownDescription: "IAM role ARN the server assumes to describe the attesting instance in the target AWS account. Omitted means ambient credentials (e.g. IRSA/Pod Identity) are used.",
+					MarkdownDescription: "Bare IAM role name, optionally path-prefixed (e.g. `service-role/SWAServerRole`), to describe the attesting instance — not a full ARN. Used to build the full ARN per-attestation as `arn:{partition}:iam::{account-id}:role/{assume_role}`, taking the account ID from the attesting instance's Instance Identity Document. Omitted means ambient credentials (e.g. IRSA/Pod Identity) are used.",
 					Optional:            true,
 				},
 				"partition": schema.StringAttribute{

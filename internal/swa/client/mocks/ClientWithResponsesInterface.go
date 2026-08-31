@@ -1333,6 +1333,89 @@ func (_c *MockClientWithResponsesInterface_GetServersWithResponse_Call) RunAndRe
 	return _c
 }
 
+// GetSpiffeBundleWithResponse provides a mock function for the type MockClientWithResponsesInterface
+func (_mock *MockClientWithResponsesInterface) GetSpiffeBundleWithResponse(ctx context.Context, trustDomainName client.TrustDomainName, reqEditors ...client.RequestEditorFn) (*client.GetSpiffeBundleResponse, error) {
+	var tmpRet mock.Arguments
+	if len(reqEditors) > 0 {
+		tmpRet = _mock.Called(ctx, trustDomainName, reqEditors)
+	} else {
+		tmpRet = _mock.Called(ctx, trustDomainName)
+	}
+	ret := tmpRet
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetSpiffeBundleWithResponse")
+	}
+
+	var r0 *client.GetSpiffeBundleResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, client.TrustDomainName, ...client.RequestEditorFn) (*client.GetSpiffeBundleResponse, error)); ok {
+		return returnFunc(ctx, trustDomainName, reqEditors...)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, client.TrustDomainName, ...client.RequestEditorFn) *client.GetSpiffeBundleResponse); ok {
+		r0 = returnFunc(ctx, trustDomainName, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*client.GetSpiffeBundleResponse)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, client.TrustDomainName, ...client.RequestEditorFn) error); ok {
+		r1 = returnFunc(ctx, trustDomainName, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClientWithResponsesInterface_GetSpiffeBundleWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSpiffeBundleWithResponse'
+type MockClientWithResponsesInterface_GetSpiffeBundleWithResponse_Call struct {
+	*mock.Call
+}
+
+// GetSpiffeBundleWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - trustDomainName client.TrustDomainName
+//   - reqEditors ...client.RequestEditorFn
+func (_e *MockClientWithResponsesInterface_Expecter) GetSpiffeBundleWithResponse(ctx any, trustDomainName any, reqEditors ...any) *MockClientWithResponsesInterface_GetSpiffeBundleWithResponse_Call {
+	return &MockClientWithResponsesInterface_GetSpiffeBundleWithResponse_Call{Call: _e.mock.On("GetSpiffeBundleWithResponse",
+		append([]any{ctx, trustDomainName}, reqEditors...)...)}
+}
+
+func (_c *MockClientWithResponsesInterface_GetSpiffeBundleWithResponse_Call) Run(run func(ctx context.Context, trustDomainName client.TrustDomainName, reqEditors ...client.RequestEditorFn)) *MockClientWithResponsesInterface_GetSpiffeBundleWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 client.TrustDomainName
+		if args[1] != nil {
+			arg1 = args[1].(client.TrustDomainName)
+		}
+		var arg2 []client.RequestEditorFn
+		var variadicArgs []client.RequestEditorFn
+		if len(args) > 2 {
+			variadicArgs = args[2].([]client.RequestEditorFn)
+		}
+		arg2 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2...,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClientWithResponsesInterface_GetSpiffeBundleWithResponse_Call) Return(getSpiffeBundleResponse *client.GetSpiffeBundleResponse, err error) *MockClientWithResponsesInterface_GetSpiffeBundleWithResponse_Call {
+	_c.Call.Return(getSpiffeBundleResponse, err)
+	return _c
+}
+
+func (_c *MockClientWithResponsesInterface_GetSpiffeBundleWithResponse_Call) RunAndReturn(run func(ctx context.Context, trustDomainName client.TrustDomainName, reqEditors ...client.RequestEditorFn) (*client.GetSpiffeBundleResponse, error)) *MockClientWithResponsesInterface_GetSpiffeBundleWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetTrustDomainWithResponse provides a mock function for the type MockClientWithResponsesInterface
 func (_mock *MockClientWithResponsesInterface) GetTrustDomainWithResponse(ctx context.Context, trustDomainName client.TrustDomainName, params *client.GetTrustDomainParams, reqEditors ...client.RequestEditorFn) (*client.GetTrustDomainResponse, error) {
 	var tmpRet mock.Arguments
@@ -2345,6 +2428,95 @@ func (_c *MockClientWithResponsesInterface_PatchTrustDomainWithResponse_Call) Re
 }
 
 func (_c *MockClientWithResponsesInterface_PatchTrustDomainWithResponse_Call) RunAndReturn(run func(ctx context.Context, trustDomainName client.TrustDomainName, params *client.PatchTrustDomainParams, body client.PatchTrustDomainJSONRequestBody, reqEditors ...client.RequestEditorFn) (*client.PatchTrustDomainResponse, error)) *MockClientWithResponsesInterface_PatchTrustDomainWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PostBuiltinCaProvisionWithResponse provides a mock function for the type MockClientWithResponsesInterface
+func (_mock *MockClientWithResponsesInterface) PostBuiltinCaProvisionWithResponse(ctx context.Context, trustDomainName client.TrustDomainName, params *client.PostBuiltinCaProvisionParams, reqEditors ...client.RequestEditorFn) (*client.PostBuiltinCaProvisionResponse, error) {
+	var tmpRet mock.Arguments
+	if len(reqEditors) > 0 {
+		tmpRet = _mock.Called(ctx, trustDomainName, params, reqEditors)
+	} else {
+		tmpRet = _mock.Called(ctx, trustDomainName, params)
+	}
+	ret := tmpRet
+
+	if len(ret) == 0 {
+		panic("no return value specified for PostBuiltinCaProvisionWithResponse")
+	}
+
+	var r0 *client.PostBuiltinCaProvisionResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, client.TrustDomainName, *client.PostBuiltinCaProvisionParams, ...client.RequestEditorFn) (*client.PostBuiltinCaProvisionResponse, error)); ok {
+		return returnFunc(ctx, trustDomainName, params, reqEditors...)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, client.TrustDomainName, *client.PostBuiltinCaProvisionParams, ...client.RequestEditorFn) *client.PostBuiltinCaProvisionResponse); ok {
+		r0 = returnFunc(ctx, trustDomainName, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*client.PostBuiltinCaProvisionResponse)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, client.TrustDomainName, *client.PostBuiltinCaProvisionParams, ...client.RequestEditorFn) error); ok {
+		r1 = returnFunc(ctx, trustDomainName, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClientWithResponsesInterface_PostBuiltinCaProvisionWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PostBuiltinCaProvisionWithResponse'
+type MockClientWithResponsesInterface_PostBuiltinCaProvisionWithResponse_Call struct {
+	*mock.Call
+}
+
+// PostBuiltinCaProvisionWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - trustDomainName client.TrustDomainName
+//   - params *client.PostBuiltinCaProvisionParams
+//   - reqEditors ...client.RequestEditorFn
+func (_e *MockClientWithResponsesInterface_Expecter) PostBuiltinCaProvisionWithResponse(ctx any, trustDomainName any, params any, reqEditors ...any) *MockClientWithResponsesInterface_PostBuiltinCaProvisionWithResponse_Call {
+	return &MockClientWithResponsesInterface_PostBuiltinCaProvisionWithResponse_Call{Call: _e.mock.On("PostBuiltinCaProvisionWithResponse",
+		append([]any{ctx, trustDomainName, params}, reqEditors...)...)}
+}
+
+func (_c *MockClientWithResponsesInterface_PostBuiltinCaProvisionWithResponse_Call) Run(run func(ctx context.Context, trustDomainName client.TrustDomainName, params *client.PostBuiltinCaProvisionParams, reqEditors ...client.RequestEditorFn)) *MockClientWithResponsesInterface_PostBuiltinCaProvisionWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 client.TrustDomainName
+		if args[1] != nil {
+			arg1 = args[1].(client.TrustDomainName)
+		}
+		var arg2 *client.PostBuiltinCaProvisionParams
+		if args[2] != nil {
+			arg2 = args[2].(*client.PostBuiltinCaProvisionParams)
+		}
+		var arg3 []client.RequestEditorFn
+		var variadicArgs []client.RequestEditorFn
+		if len(args) > 3 {
+			variadicArgs = args[3].([]client.RequestEditorFn)
+		}
+		arg3 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3...,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClientWithResponsesInterface_PostBuiltinCaProvisionWithResponse_Call) Return(postBuiltinCaProvisionResponse *client.PostBuiltinCaProvisionResponse, err error) *MockClientWithResponsesInterface_PostBuiltinCaProvisionWithResponse_Call {
+	_c.Call.Return(postBuiltinCaProvisionResponse, err)
+	return _c
+}
+
+func (_c *MockClientWithResponsesInterface_PostBuiltinCaProvisionWithResponse_Call) RunAndReturn(run func(ctx context.Context, trustDomainName client.TrustDomainName, params *client.PostBuiltinCaProvisionParams, reqEditors ...client.RequestEditorFn) (*client.PostBuiltinCaProvisionResponse, error)) *MockClientWithResponsesInterface_PostBuiltinCaProvisionWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }

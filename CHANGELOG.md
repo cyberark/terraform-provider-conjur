@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [0.9.9] - 2026-08-31
+### Changed
+- `attestation.aws_iid.assume_role` on `conjur_swa_server_group` now takes a bare
+  IAM role name (optionally path-prefixed) instead of a full ARN.
+
 ## [0.9.8] - 2026-08-25
 ### Fixed
 - `service_account_allow_list` format in docs and examples.
