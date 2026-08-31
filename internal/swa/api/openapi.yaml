@@ -176,8 +176,11 @@ paths:
     parameters:
       - $ref: '#/components/parameters/TrustDomainName'
     get:
-      summary: Get SWA CA bundles
-      description: Returns CA bundles for the path `trust-domain-name`.
+      summary: Get SWA CA trust bundle
+      description: |
+        Returns the combined SWA CA trust bundle (root CAs and built-in
+        self-signed CA certificates) for the given `trust-domain-name`. An
+        unknown or unprovisioned trust domain yields an empty bundle.
       operationId: get-ca-bundles
       tags:
         - Trust Domains
@@ -209,8 +212,67 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/swa/trust-domains/{trust-domain-name}/.well-known/spiffe/bundle.json:
+    parameters:
+      - $ref: '#/components/parameters/TrustDomainName'
+    get:
+      summary: Get SPIFFE trust bundle
+      description: |
+        Returns the SPIFFE Trust Bundle (JSON) for the path `trust-domain-name`,
+        containing the trust domain's X.509 CA authorities, a sequence number
+        and a refresh hint. An unknown or unprovisioned trust domain yields an
+        empty bundle at sequence 0, not a 404.
+      operationId: get-spiffe-bundle
+      tags:
+        - Trust Domains
+      # kics-scan ignore-line
+      security: []
+      responses:
+        '200':
+          description: SPIFFE trust bundle retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/swa/trust-domains/{trust-domain-name}/builtin-ca/provision:
+    parameters:
+      - $ref: '#/components/parameters/AcceptSwa'
+      - $ref: '#/components/parameters/TrustDomainName'
+    post:
+      summary: Provision the built-in root CA
+      description: |
+        Provisions the initial built-in root CA for the path `trust-domain-name`
+        and activates it immediately. If the trust domain has no CA configuration
+        yet, a default one is created as part of this call. Rotation of an
+        existing CA is not yet supported, so a second call returns 409 while a
+        root CA already exists.
+      operationId: post-builtin-ca-provision
+      tags:
+        - Trust Domains
+      responses:
+        '201':
+          $ref: '#/components/responses/BuiltinCAProvisioned'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/TrustDomainNotFound'
+        '409':
+          $ref: '#/components/responses/BuiltinCAConflict'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
         '500':
@@ -1048,6 +1110,24 @@ components:
         application/x.secretsmgr.v2+json:
           schema:
             $ref: '#/components/schemas/ServerGroupResponse'
+    BuiltinCAProvisioned:
+      description: Built-in root CA provisioned successfully.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/BuiltinCAResponse'
+    BuiltinCAConflict:
+      description: A root CA already exists for this trust domain.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/Error'
     ServerGroupSuccess:
       description: Server group details.
       headers:
@@ -1281,15 +1361,15 @@ components:
       properties:
         assume_role:
           type: string
-          pattern: '^arn:(aws|aws-cn|aws-us-gov):iam::\d{12}:role/.+$'
-          description: IAM role ARN the server assumes to describe the attesting instance in the target AWS account. Omitted means ambient credentials (e.g. IRSA/Pod Identity) are used.
-          example: 'arn:aws:iam::123456789012:role/SWAServerRole'
-        # If you change partition, assume_role must be updated to match — its ARN's partition
-        # segment (arn:<partition>:...) has to agree with this field, since AWS partitions are
-        # fully isolated (no cross-partition IAM/STS trust). Enforced by validateAwsIidPartition
-        # in swa-management-service/internal/service/server_group_service.go, since OpenAPI 3.0's
-        # JSON Schema subset can't express this cross-field constraint declaratively.
-        #
+          # Deliberately no minLength: the Go-level validator treats an explicit empty string
+          # the same as an omitted field (ambient credentials), so the schema must accept it too.
+          # 576 = AWS's own CreateRole limits added together: Path max 512 chars + RoleName max
+          # 64 chars (this field is "whatever follows role/ in the ARN", which AWS models as
+          # those two separate parameters concatenated). Not a precise grammar check — see the
+          # description below — just a sanity bound against pathological input.
+          maxLength: 576
+          description: Bare IAM role name, optionally path-prefixed (e.g. `service-role/SWAServerRole`), to describe the attesting instance — not a full ARN. Used to build the full ARN per-attestation as `arn:{{Partition}}:iam::{{AccountID}}:role/{{AssumeRole}}`, taking AccountID from the attesting instance's Instance Identity Document. Omitted means ambient credentials (e.g. IRSA/Pod Identity) are used.
+          example: 'SWAServerRole'
         # Only aws/aws-cn/aws-us-gov are accepted (not aws-iso/aws-iso-b, which AWS also defines)
         # because that's the exact set SPIRE's aws_iid server plugin validates against; see
         # https://github.com/spiffe/spire/blob/5bc0cdd4e9687ba30c75f7c7bd549e5ac17745cf/pkg/server/plugin/nodeattestor/awsiid/iid.go#L62
@@ -1671,6 +1751,54 @@ components:
           maxLength: 50
           description: Last update timestamp in date-time format.
           example: '2024-01-15T10:30:00Z'
+    BuiltinCAResponse:
+      type: object
+      required:
+        - id
+        - trust_domain_name
+        - generation
+        - state
+        - algorithm
+        - not_before
+        - not_after
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier of the provisioned root CA.
+          example: '018f3a2b-1c4d-7e8f-9a0b-1c2d3e4f5a6b'
+        trust_domain_name:
+          type: string
+          maxLength: 60
+          description: Trust domain the root CA belongs to.
+          example: 'prod.example.com'
+        generation:
+          type: integer
+          format: int32
+          description: Root CA generation. The initial CA is generation 1.
+          example: 1
+        state:
+          type: string
+          enum: [READY, ACTIVE, DEPRECATED_DRAINING, INACTIVE]
+          description: Lifecycle state. A freshly provisioned root CA is ACTIVE.
+          example: 'ACTIVE'
+        algorithm:
+          type: string
+          enum: [EC_P256, EC_P384, RSA_2048, RSA_4096]
+          description: Key algorithm of the root CA.
+          example: 'EC_P384'
+        not_before:
+          type: string
+          format: date-time
+          maxLength: 50
+          description: Certificate validity start, in date-time format.
+          example: '2024-01-15T10:30:00Z'
+        not_after:
+          type: string
+          format: date-time
+          maxLength: 50
+          description: Certificate validity end, in date-time format.
+          example: '2024-05-14T10:30:00Z'
 
     CreateServerRequest:
       type: object

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/oapi-codegen/runtime"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // Defines values for AwsIidAttestationConfigurationPartition.
@@ -32,6 +33,54 @@ func (e AwsIidAttestationConfigurationPartition) Valid() bool {
 	case AwsCn:
 		return true
 	case AwsUsGov:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BuiltinCAResponseAlgorithm.
+const (
+	BuiltinCAResponseAlgorithmECP256  BuiltinCAResponseAlgorithm = "EC_P256"
+	BuiltinCAResponseAlgorithmECP384  BuiltinCAResponseAlgorithm = "EC_P384"
+	BuiltinCAResponseAlgorithmRSA2048 BuiltinCAResponseAlgorithm = "RSA_2048"
+	BuiltinCAResponseAlgorithmRSA4096 BuiltinCAResponseAlgorithm = "RSA_4096"
+)
+
+// Valid indicates whether the value is a known member of the BuiltinCAResponseAlgorithm enum.
+func (e BuiltinCAResponseAlgorithm) Valid() bool {
+	switch e {
+	case BuiltinCAResponseAlgorithmECP256:
+		return true
+	case BuiltinCAResponseAlgorithmECP384:
+		return true
+	case BuiltinCAResponseAlgorithmRSA2048:
+		return true
+	case BuiltinCAResponseAlgorithmRSA4096:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BuiltinCAResponseState.
+const (
+	ACTIVE             BuiltinCAResponseState = "ACTIVE"
+	DEPRECATEDDRAINING BuiltinCAResponseState = "DEPRECATED_DRAINING"
+	INACTIVE           BuiltinCAResponseState = "INACTIVE"
+	READY              BuiltinCAResponseState = "READY"
+)
+
+// Valid indicates whether the value is a known member of the BuiltinCAResponseState enum.
+func (e BuiltinCAResponseState) Valid() bool {
+	switch e {
+	case ACTIVE:
+		return true
+	case DEPRECATEDDRAINING:
+		return true
+	case INACTIVE:
+		return true
+	case READY:
 		return true
 	default:
 		return false
@@ -373,9 +422,9 @@ type AttestationConfiguration struct {
 
 // AwsIidAttestationConfiguration defines model for AwsIidAttestationConfiguration.
 type AwsIidAttestationConfiguration struct {
-	// AssumeRole IAM role ARN the server assumes to describe the attesting instance in the target AWS account. Omitted means ambient credentials (e.g. IRSA/Pod Identity) are used.
+	// AssumeRole Bare IAM role name, optionally path-prefixed (e.g. `service-role/SWAServerRole`), to describe the attesting instance — not a full ARN. Used to build the full ARN per-attestation as `arn:{{Partition}}:iam::{{AccountID}}:role/{{AssumeRole}}`, taking AccountID from the attesting instance's Instance Identity Document. Omitted means ambient credentials (e.g. IRSA/Pod Identity) are used.
 	//
-	// Example: arn:aws:iam::123456789012:role/SWAServerRole
+	// Example: SWAServerRole
 	AssumeRole *string `json:"assume_role,omitempty"`
 
 	// Partition AWS partition the server operates in.
@@ -413,6 +462,54 @@ type AwsIidVerifyOrganizationConfiguration struct {
 	// Example: 15m
 	OrgAccountMapTtl *string `json:"org_account_map_ttl,omitempty"`
 }
+
+// BuiltinCAResponse defines model for BuiltinCAResponse.
+type BuiltinCAResponse struct {
+	// Algorithm Key algorithm of the root CA.
+	//
+	// Example: EC_P384
+	Algorithm BuiltinCAResponseAlgorithm `json:"algorithm"`
+
+	// Generation Root CA generation. The initial CA is generation 1.
+	//
+	// Example: 1
+	Generation int32 `json:"generation"`
+
+	// Id Unique identifier of the provisioned root CA.
+	//
+	// Example: 018f3a2b-1c4d-7e8f-9a0b-1c2d3e4f5a6b
+	Id openapi_types.UUID `json:"id"`
+
+	// NotAfter Certificate validity end, in date-time format.
+	//
+	// Example: 2024-05-14T10:30:00Z
+	NotAfter time.Time `json:"not_after"`
+
+	// NotBefore Certificate validity start, in date-time format.
+	//
+	// Example: 2024-01-15T10:30:00Z
+	NotBefore time.Time `json:"not_before"`
+
+	// State Lifecycle state. A freshly provisioned root CA is ACTIVE.
+	//
+	// Example: ACTIVE
+	State BuiltinCAResponseState `json:"state"`
+
+	// TrustDomainName Trust domain the root CA belongs to.
+	//
+	// Example: prod.example.com
+	TrustDomainName string `json:"trust_domain_name"`
+}
+
+// BuiltinCAResponseAlgorithm Key algorithm of the root CA.
+//
+// Example: EC_P384
+type BuiltinCAResponseAlgorithm string
+
+// BuiltinCAResponseState Lifecycle state. A freshly provisioned root CA is ACTIVE.
+//
+// Example: ACTIVE
+type BuiltinCAResponseState string
 
 // CABundleResponse defines model for CABundleResponse.
 type CABundleResponse struct {
@@ -1480,6 +1577,12 @@ type TrustDomainName = string
 // BadRequest Standard error response containing machine-readable code and human-readable message.
 type BadRequest = Error
 
+// BuiltinCAConflict Standard error response containing machine-readable code and human-readable message.
+type BuiltinCAConflict = Error
+
+// BuiltinCAProvisioned defines model for BuiltinCAProvisioned.
+type BuiltinCAProvisioned = BuiltinCAResponse
+
 // Forbidden Standard error response containing machine-readable code and human-readable message.
 type Forbidden = Error
 
@@ -1598,6 +1701,12 @@ type GetCaBundlesParams struct {
 
 // GetCaBundlesParamsFormat defines parameters for GetCaBundles.
 type GetCaBundlesParamsFormat string
+
+// PostBuiltinCaProvisionParams defines parameters for PostBuiltinCaProvision.
+type PostBuiltinCaProvisionParams struct {
+	// Accept Include this `Accept` header on SWA management API requests. Use `application/x.secretsmgr.v2+json`.
+	Accept AcceptSwa `json:"Accept"`
+}
 
 // GetServerGroupsParams defines parameters for GetServerGroups.
 type GetServerGroupsParams struct {
@@ -2005,9 +2114,11 @@ type ClientInterface interface {
 	// Corresponds with PATCH /api/swa/trust-domains/{trust-domain-name} (the `PatchTrustDomain` operationId).
 	PatchTrustDomain(ctx context.Context, trustDomainName TrustDomainName, params *PatchTrustDomainParams, body PatchTrustDomainJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetCaBundles Get SWA CA bundles
+	// GetCaBundles Get SWA CA trust bundle
 	//
-	// Returns CA bundles for the path `trust-domain-name`.
+	// Returns the combined SWA CA trust bundle (root CAs and built-in
+	// self-signed CA certificates) for the given `trust-domain-name`. An
+	// unknown or unprovisioned trust domain yields an empty bundle.
 	//
 	// Corresponds with GET /api/swa/trust-domains/{trust-domain-name}/.well-known/ca-bundles (the `GetCaBundles` operationId).
 	GetCaBundles(ctx context.Context, trustDomainName TrustDomainName, params *GetCaBundlesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -2025,6 +2136,27 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /api/swa/trust-domains/{trust-domain-name}/.well-known/openid-configuration (the `GetOpenidConfiguration` operationId).
 	GetOpenidConfiguration(ctx context.Context, trustDomainName TrustDomainName, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetSpiffeBundle Get SPIFFE trust bundle
+	//
+	// Returns the SPIFFE Trust Bundle (JSON) for the path `trust-domain-name`,
+	// containing the trust domain's X.509 CA authorities, a sequence number
+	// and a refresh hint. An unknown or unprovisioned trust domain yields an
+	// empty bundle at sequence 0, not a 404.
+	//
+	// Corresponds with GET /api/swa/trust-domains/{trust-domain-name}/.well-known/spiffe/bundle.json (the `GetSpiffeBundle` operationId).
+	GetSpiffeBundle(ctx context.Context, trustDomainName TrustDomainName, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostBuiltinCaProvision Provision the built-in root CA
+	//
+	// Provisions the initial built-in root CA for the path `trust-domain-name`
+	// and activates it immediately. If the trust domain has no CA configuration
+	// yet, a default one is created as part of this call. Rotation of an
+	// existing CA is not yet supported, so a second call returns 409 while a
+	// root CA already exists.
+	//
+	// Corresponds with POST /api/swa/trust-domains/{trust-domain-name}/builtin-ca/provision (the `PostBuiltinCaProvision` operationId).
+	PostBuiltinCaProvision(ctx context.Context, trustDomainName TrustDomainName, params *PostBuiltinCaProvisionParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetServerGroups List SWA server groups
 	//
@@ -2345,9 +2477,11 @@ func (c *Client) PatchTrustDomain(ctx context.Context, trustDomainName TrustDoma
 	return c.Client.Do(req)
 }
 
-// GetCaBundles Get SWA CA bundles
+// GetCaBundles Get SWA CA trust bundle
 //
-// Returns CA bundles for the path `trust-domain-name`.
+// Returns the combined SWA CA trust bundle (root CAs and built-in
+// self-signed CA certificates) for the given `trust-domain-name`. An
+// unknown or unprovisioned trust domain yields an empty bundle.
 //
 // Corresponds with GET /api/swa/trust-domains/{trust-domain-name}/.well-known/ca-bundles (the `GetCaBundles` operationId).
 func (c *Client) GetCaBundles(ctx context.Context, trustDomainName TrustDomainName, params *GetCaBundlesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2386,6 +2520,47 @@ func (c *Client) GetJwks(ctx context.Context, trustDomainName TrustDomainName, r
 // Corresponds with GET /api/swa/trust-domains/{trust-domain-name}/.well-known/openid-configuration (the `GetOpenidConfiguration` operationId).
 func (c *Client) GetOpenidConfiguration(ctx context.Context, trustDomainName TrustDomainName, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetOpenidConfigurationRequest(c.Server, trustDomainName)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetSpiffeBundle Get SPIFFE trust bundle
+//
+// Returns the SPIFFE Trust Bundle (JSON) for the path `trust-domain-name`,
+// containing the trust domain's X.509 CA authorities, a sequence number
+// and a refresh hint. An unknown or unprovisioned trust domain yields an
+// empty bundle at sequence 0, not a 404.
+//
+// Corresponds with GET /api/swa/trust-domains/{trust-domain-name}/.well-known/spiffe/bundle.json (the `GetSpiffeBundle` operationId).
+func (c *Client) GetSpiffeBundle(ctx context.Context, trustDomainName TrustDomainName, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSpiffeBundleRequest(c.Server, trustDomainName)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostBuiltinCaProvision Provision the built-in root CA
+//
+// Provisions the initial built-in root CA for the path `trust-domain-name`
+// and activates it immediately. If the trust domain has no CA configuration
+// yet, a default one is created as part of this call. Rotation of an
+// existing CA is not yet supported, so a second call returns 409 while a
+// root CA already exists.
+//
+// Corresponds with POST /api/swa/trust-domains/{trust-domain-name}/builtin-ca/provision (the `PostBuiltinCaProvision` operationId).
+func (c *Client) PostBuiltinCaProvision(ctx context.Context, trustDomainName TrustDomainName, params *PostBuiltinCaProvisionParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostBuiltinCaProvisionRequest(c.Server, trustDomainName, params)
 	if err != nil {
 		return nil, err
 	}
@@ -3215,6 +3390,87 @@ func NewGetOpenidConfigurationRequest(server string, trustDomainName TrustDomain
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetSpiffeBundleRequest constructs an http.Request for the GetSpiffeBundle method
+func NewGetSpiffeBundleRequest(server string, trustDomainName TrustDomainName) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "trust-domain-name", trustDomainName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/swa/trust-domains/%s/.well-known/spiffe/bundle.json", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPostBuiltinCaProvisionRequest constructs an http.Request for the PostBuiltinCaProvision method
+func NewPostBuiltinCaProvisionRequest(server string, trustDomainName TrustDomainName, params *PostBuiltinCaProvisionParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "trust-domain-name", trustDomainName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/swa/trust-domains/%s/builtin-ca/provision", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Accept", params.Accept, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Accept", headerParam0)
+
 	}
 
 	return req, nil
@@ -4371,9 +4627,11 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PATCH /api/swa/trust-domains/{trust-domain-name} (the `PatchTrustDomain` operationId).
 	PatchTrustDomainWithResponse(ctx context.Context, trustDomainName TrustDomainName, params *PatchTrustDomainParams, body PatchTrustDomainJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchTrustDomainResponse, error)
 
-	// GetCaBundlesWithResponse Get SWA CA bundles
+	// GetCaBundlesWithResponse Get SWA CA trust bundle
 	//
-	// Returns CA bundles for the path `trust-domain-name`.
+	// Returns the combined SWA CA trust bundle (root CAs and built-in
+	// self-signed CA certificates) for the given `trust-domain-name`. An
+	// unknown or unprovisioned trust domain yields an empty bundle.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -4397,6 +4655,31 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /api/swa/trust-domains/{trust-domain-name}/.well-known/openid-configuration (the `GetOpenidConfiguration` operationId).
 	GetOpenidConfigurationWithResponse(ctx context.Context, trustDomainName TrustDomainName, reqEditors ...RequestEditorFn) (*GetOpenidConfigurationResponse, error)
+
+	// GetSpiffeBundleWithResponse Get SPIFFE trust bundle
+	//
+	// Returns the SPIFFE Trust Bundle (JSON) for the path `trust-domain-name`,
+	// containing the trust domain's X.509 CA authorities, a sequence number
+	// and a refresh hint. An unknown or unprovisioned trust domain yields an
+	// empty bundle at sequence 0, not a 404.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/swa/trust-domains/{trust-domain-name}/.well-known/spiffe/bundle.json (the `GetSpiffeBundle` operationId).
+	GetSpiffeBundleWithResponse(ctx context.Context, trustDomainName TrustDomainName, reqEditors ...RequestEditorFn) (*GetSpiffeBundleResponse, error)
+
+	// PostBuiltinCaProvisionWithResponse Provision the built-in root CA
+	//
+	// Provisions the initial built-in root CA for the path `trust-domain-name`
+	// and activates it immediately. If the trust domain has no CA configuration
+	// yet, a default one is created as part of this call. Rotation of an
+	// existing CA is not yet supported, so a second call returns 409 while a
+	// root CA already exists.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/swa/trust-domains/{trust-domain-name}/builtin-ca/provision (the `PostBuiltinCaProvision` operationId).
+	PostBuiltinCaProvisionWithResponse(ctx context.Context, trustDomainName TrustDomainName, params *PostBuiltinCaProvisionParams, reqEditors ...RequestEditorFn) (*PostBuiltinCaProvisionResponse, error)
 
 	// GetServerGroupsWithResponse List SWA server groups
 	//
@@ -5255,11 +5538,6 @@ type GetCaBundlesResponse401Headers struct {
 	ContentType *string
 }
 
-// GetCaBundlesResponse404Headers the declared response headers of an HTTP 404 response for GetCaBundles
-type GetCaBundlesResponse404Headers struct {
-	ContentType *string
-}
-
 // GetCaBundlesResponse422Headers the declared response headers of an HTTP 422 response for GetCaBundles
 type GetCaBundlesResponse422Headers struct {
 	ContentType *string
@@ -5279,8 +5557,6 @@ type GetCaBundlesResponse struct {
 	ApplicationxSecretsmgrV2JSON400 *BadRequest
 	// ApplicationxSecretsmgrV2JSON401 the response for an HTTP 401 `application/x.secretsmgr.v2+json` response
 	ApplicationxSecretsmgrV2JSON401 *Unauthorized
-	// ApplicationxSecretsmgrV2JSON404 the response for an HTTP 404 `application/x.secretsmgr.v2+json` response
-	ApplicationxSecretsmgrV2JSON404 *TrustDomainNotFound
 	// ApplicationxSecretsmgrV2JSON422 the response for an HTTP 422 `application/x.secretsmgr.v2+json` response
 	ApplicationxSecretsmgrV2JSON422 *UnprocessableEntity
 	// ApplicationxSecretsmgrV2JSON500 the response for an HTTP 500 `application/x.secretsmgr.v2+json` response
@@ -5291,8 +5567,6 @@ type GetCaBundlesResponse struct {
 	Headers400 *GetCaBundlesResponse400Headers
 	// Headers401 the parsed response headers for an HTTP 401 response
 	Headers401 *GetCaBundlesResponse401Headers
-	// Headers404 the parsed response headers for an HTTP 404 response
-	Headers404 *GetCaBundlesResponse404Headers
 	// Headers422 the parsed response headers for an HTTP 422 response
 	Headers422 *GetCaBundlesResponse422Headers
 	// Headers500 the parsed response headers for an HTTP 500 response
@@ -5312,11 +5586,6 @@ func (r GetCaBundlesResponse) GetApplicationxSecretsmgrV2JSON400() *BadRequest {
 // GetApplicationxSecretsmgrV2JSON401 returns the response for an HTTP 401 `application/x.secretsmgr.v2+json` response
 func (r GetCaBundlesResponse) GetApplicationxSecretsmgrV2JSON401() *Unauthorized {
 	return r.ApplicationxSecretsmgrV2JSON401
-}
-
-// GetApplicationxSecretsmgrV2JSON404 returns the response for an HTTP 404 `application/x.secretsmgr.v2+json` response
-func (r GetCaBundlesResponse) GetApplicationxSecretsmgrV2JSON404() *TrustDomainNotFound {
-	return r.ApplicationxSecretsmgrV2JSON404
 }
 
 // GetApplicationxSecretsmgrV2JSON422 returns the response for an HTTP 422 `application/x.secretsmgr.v2+json` response
@@ -5500,6 +5769,221 @@ func (r GetOpenidConfigurationResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetOpenidConfigurationResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetSpiffeBundleResponse400Headers the declared response headers of an HTTP 400 response for GetSpiffeBundle
+type GetSpiffeBundleResponse400Headers struct {
+	ContentType *string
+}
+
+// GetSpiffeBundleResponse500Headers the declared response headers of an HTTP 500 response for GetSpiffeBundle
+type GetSpiffeBundleResponse500Headers struct {
+	ContentType *string
+}
+
+type GetSpiffeBundleResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *map[string]interface{}
+	// ApplicationxSecretsmgrV2JSON400 the response for an HTTP 400 `application/x.secretsmgr.v2+json` response
+	ApplicationxSecretsmgrV2JSON400 *BadRequest
+	// ApplicationxSecretsmgrV2JSON500 the response for an HTTP 500 `application/x.secretsmgr.v2+json` response
+	ApplicationxSecretsmgrV2JSON500 *InternalServerError
+	// Headers400 the parsed response headers for an HTTP 400 response
+	Headers400 *GetSpiffeBundleResponse400Headers
+	// Headers500 the parsed response headers for an HTTP 500 response
+	Headers500 *GetSpiffeBundleResponse500Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetSpiffeBundleResponse) GetJSON200() *map[string]interface{} {
+	return r.JSON200
+}
+
+// GetApplicationxSecretsmgrV2JSON400 returns the response for an HTTP 400 `application/x.secretsmgr.v2+json` response
+func (r GetSpiffeBundleResponse) GetApplicationxSecretsmgrV2JSON400() *BadRequest {
+	return r.ApplicationxSecretsmgrV2JSON400
+}
+
+// GetApplicationxSecretsmgrV2JSON500 returns the response for an HTTP 500 `application/x.secretsmgr.v2+json` response
+func (r GetSpiffeBundleResponse) GetApplicationxSecretsmgrV2JSON500() *InternalServerError {
+	return r.ApplicationxSecretsmgrV2JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetSpiffeBundleResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSpiffeBundleResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSpiffeBundleResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetSpiffeBundleResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// PostBuiltinCaProvisionResponse201Headers the declared response headers of an HTTP 201 response for PostBuiltinCaProvision
+type PostBuiltinCaProvisionResponse201Headers struct {
+	ContentType *string
+}
+
+// PostBuiltinCaProvisionResponse400Headers the declared response headers of an HTTP 400 response for PostBuiltinCaProvision
+type PostBuiltinCaProvisionResponse400Headers struct {
+	ContentType *string
+}
+
+// PostBuiltinCaProvisionResponse401Headers the declared response headers of an HTTP 401 response for PostBuiltinCaProvision
+type PostBuiltinCaProvisionResponse401Headers struct {
+	ContentType *string
+}
+
+// PostBuiltinCaProvisionResponse403Headers the declared response headers of an HTTP 403 response for PostBuiltinCaProvision
+type PostBuiltinCaProvisionResponse403Headers struct {
+	ContentType *string
+}
+
+// PostBuiltinCaProvisionResponse404Headers the declared response headers of an HTTP 404 response for PostBuiltinCaProvision
+type PostBuiltinCaProvisionResponse404Headers struct {
+	ContentType *string
+}
+
+// PostBuiltinCaProvisionResponse409Headers the declared response headers of an HTTP 409 response for PostBuiltinCaProvision
+type PostBuiltinCaProvisionResponse409Headers struct {
+	ContentType *string
+}
+
+// PostBuiltinCaProvisionResponse422Headers the declared response headers of an HTTP 422 response for PostBuiltinCaProvision
+type PostBuiltinCaProvisionResponse422Headers struct {
+	ContentType *string
+}
+
+// PostBuiltinCaProvisionResponse500Headers the declared response headers of an HTTP 500 response for PostBuiltinCaProvision
+type PostBuiltinCaProvisionResponse500Headers struct {
+	ContentType *string
+}
+
+type PostBuiltinCaProvisionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationxSecretsmgrV2JSON201 the response for an HTTP 201 `application/x.secretsmgr.v2+json` response
+	ApplicationxSecretsmgrV2JSON201 *BuiltinCAProvisioned
+	// ApplicationxSecretsmgrV2JSON400 the response for an HTTP 400 `application/x.secretsmgr.v2+json` response
+	ApplicationxSecretsmgrV2JSON400 *BadRequest
+	// ApplicationxSecretsmgrV2JSON401 the response for an HTTP 401 `application/x.secretsmgr.v2+json` response
+	ApplicationxSecretsmgrV2JSON401 *Unauthorized
+	// ApplicationxSecretsmgrV2JSON403 the response for an HTTP 403 `application/x.secretsmgr.v2+json` response
+	ApplicationxSecretsmgrV2JSON403 *Forbidden
+	// ApplicationxSecretsmgrV2JSON404 the response for an HTTP 404 `application/x.secretsmgr.v2+json` response
+	ApplicationxSecretsmgrV2JSON404 *TrustDomainNotFound
+	// ApplicationxSecretsmgrV2JSON409 the response for an HTTP 409 `application/x.secretsmgr.v2+json` response
+	ApplicationxSecretsmgrV2JSON409 *BuiltinCAConflict
+	// ApplicationxSecretsmgrV2JSON422 the response for an HTTP 422 `application/x.secretsmgr.v2+json` response
+	ApplicationxSecretsmgrV2JSON422 *UnprocessableEntity
+	// ApplicationxSecretsmgrV2JSON500 the response for an HTTP 500 `application/x.secretsmgr.v2+json` response
+	ApplicationxSecretsmgrV2JSON500 *InternalServerError
+	// Headers201 the parsed response headers for an HTTP 201 response
+	Headers201 *PostBuiltinCaProvisionResponse201Headers
+	// Headers400 the parsed response headers for an HTTP 400 response
+	Headers400 *PostBuiltinCaProvisionResponse400Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *PostBuiltinCaProvisionResponse401Headers
+	// Headers403 the parsed response headers for an HTTP 403 response
+	Headers403 *PostBuiltinCaProvisionResponse403Headers
+	// Headers404 the parsed response headers for an HTTP 404 response
+	Headers404 *PostBuiltinCaProvisionResponse404Headers
+	// Headers409 the parsed response headers for an HTTP 409 response
+	Headers409 *PostBuiltinCaProvisionResponse409Headers
+	// Headers422 the parsed response headers for an HTTP 422 response
+	Headers422 *PostBuiltinCaProvisionResponse422Headers
+	// Headers500 the parsed response headers for an HTTP 500 response
+	Headers500 *PostBuiltinCaProvisionResponse500Headers
+}
+
+// GetApplicationxSecretsmgrV2JSON201 returns the response for an HTTP 201 `application/x.secretsmgr.v2+json` response
+func (r PostBuiltinCaProvisionResponse) GetApplicationxSecretsmgrV2JSON201() *BuiltinCAProvisioned {
+	return r.ApplicationxSecretsmgrV2JSON201
+}
+
+// GetApplicationxSecretsmgrV2JSON400 returns the response for an HTTP 400 `application/x.secretsmgr.v2+json` response
+func (r PostBuiltinCaProvisionResponse) GetApplicationxSecretsmgrV2JSON400() *BadRequest {
+	return r.ApplicationxSecretsmgrV2JSON400
+}
+
+// GetApplicationxSecretsmgrV2JSON401 returns the response for an HTTP 401 `application/x.secretsmgr.v2+json` response
+func (r PostBuiltinCaProvisionResponse) GetApplicationxSecretsmgrV2JSON401() *Unauthorized {
+	return r.ApplicationxSecretsmgrV2JSON401
+}
+
+// GetApplicationxSecretsmgrV2JSON403 returns the response for an HTTP 403 `application/x.secretsmgr.v2+json` response
+func (r PostBuiltinCaProvisionResponse) GetApplicationxSecretsmgrV2JSON403() *Forbidden {
+	return r.ApplicationxSecretsmgrV2JSON403
+}
+
+// GetApplicationxSecretsmgrV2JSON404 returns the response for an HTTP 404 `application/x.secretsmgr.v2+json` response
+func (r PostBuiltinCaProvisionResponse) GetApplicationxSecretsmgrV2JSON404() *TrustDomainNotFound {
+	return r.ApplicationxSecretsmgrV2JSON404
+}
+
+// GetApplicationxSecretsmgrV2JSON409 returns the response for an HTTP 409 `application/x.secretsmgr.v2+json` response
+func (r PostBuiltinCaProvisionResponse) GetApplicationxSecretsmgrV2JSON409() *BuiltinCAConflict {
+	return r.ApplicationxSecretsmgrV2JSON409
+}
+
+// GetApplicationxSecretsmgrV2JSON422 returns the response for an HTTP 422 `application/x.secretsmgr.v2+json` response
+func (r PostBuiltinCaProvisionResponse) GetApplicationxSecretsmgrV2JSON422() *UnprocessableEntity {
+	return r.ApplicationxSecretsmgrV2JSON422
+}
+
+// GetApplicationxSecretsmgrV2JSON500 returns the response for an HTTP 500 `application/x.secretsmgr.v2+json` response
+func (r PostBuiltinCaProvisionResponse) GetApplicationxSecretsmgrV2JSON500() *InternalServerError {
+	return r.ApplicationxSecretsmgrV2JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r PostBuiltinCaProvisionResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PostBuiltinCaProvisionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostBuiltinCaProvisionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostBuiltinCaProvisionResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -7398,9 +7882,11 @@ func (c *ClientWithResponses) PatchTrustDomainWithResponse(ctx context.Context, 
 	return ParsePatchTrustDomainResponse(rsp)
 }
 
-// GetCaBundlesWithResponse Get SWA CA bundles
+// GetCaBundlesWithResponse Get SWA CA trust bundle
 //
-// Returns CA bundles for the path `trust-domain-name`.
+// Returns the combined SWA CA trust bundle (root CAs and built-in
+// self-signed CA certificates) for the given `trust-domain-name`. An
+// unknown or unprovisioned trust domain yields an empty bundle.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -7441,6 +7927,43 @@ func (c *ClientWithResponses) GetOpenidConfigurationWithResponse(ctx context.Con
 		return nil, err
 	}
 	return ParseGetOpenidConfigurationResponse(rsp)
+}
+
+// GetSpiffeBundleWithResponse Get SPIFFE trust bundle
+//
+// Returns the SPIFFE Trust Bundle (JSON) for the path `trust-domain-name`,
+// containing the trust domain's X.509 CA authorities, a sequence number
+// and a refresh hint. An unknown or unprovisioned trust domain yields an
+// empty bundle at sequence 0, not a 404.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/swa/trust-domains/{trust-domain-name}/.well-known/spiffe/bundle.json (the `GetSpiffeBundle` operationId).
+func (c *ClientWithResponses) GetSpiffeBundleWithResponse(ctx context.Context, trustDomainName TrustDomainName, reqEditors ...RequestEditorFn) (*GetSpiffeBundleResponse, error) {
+	rsp, err := c.GetSpiffeBundle(ctx, trustDomainName, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetSpiffeBundleResponse(rsp)
+}
+
+// PostBuiltinCaProvisionWithResponse Provision the built-in root CA
+//
+// Provisions the initial built-in root CA for the path `trust-domain-name`
+// and activates it immediately. If the trust domain has no CA configuration
+// yet, a default one is created as part of this call. Rotation of an
+// existing CA is not yet supported, so a second call returns 409 while a
+// root CA already exists.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/swa/trust-domains/{trust-domain-name}/builtin-ca/provision (the `PostBuiltinCaProvision` operationId).
+func (c *ClientWithResponses) PostBuiltinCaProvisionWithResponse(ctx context.Context, trustDomainName TrustDomainName, params *PostBuiltinCaProvisionParams, reqEditors ...RequestEditorFn) (*PostBuiltinCaProvisionResponse, error) {
+	rsp, err := c.PostBuiltinCaProvision(ctx, trustDomainName, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostBuiltinCaProvisionResponse(rsp)
 }
 
 // GetServerGroupsWithResponse List SWA server groups
@@ -8463,13 +8986,6 @@ func ParseGetCaBundlesResponse(rsp *http.Response) (*GetCaBundlesResponse, error
 		}
 		response.ApplicationxSecretsmgrV2JSON401 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest TrustDomainNotFound
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationxSecretsmgrV2JSON404 = &dest
-
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest UnprocessableEntity
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -8517,16 +9033,6 @@ func ParseGetCaBundlesResponse(rsp *http.Response) (*GetCaBundlesResponse, error
 			headers.ContentType = &value
 		}
 		response.Headers401 = &headers
-	case rsp.StatusCode == 404:
-		var headers GetCaBundlesResponse404Headers
-		if values := rsp.Header.Values("Content-Type"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Type", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.ContentType = &value
-		}
-		response.Headers404 = &headers
 	case rsp.StatusCode == 422:
 		var headers GetCaBundlesResponse422Headers
 		if values := rsp.Header.Values("Content-Type"); len(values) > 0 {
@@ -8653,6 +9159,227 @@ func ParseGetOpenidConfigurationResponse(rsp *http.Response) (*GetOpenidConfigur
 		}
 		response.ApplicationxSecretsmgrV2JSON500 = &dest
 
+	}
+
+	return response, nil
+}
+
+// ParseGetSpiffeBundleResponse parses an HTTP response from a GetSpiffeBundleWithResponse call
+func ParseGetSpiffeBundleResponse(rsp *http.Response) (*GetSpiffeBundleResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSpiffeBundleResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest map[string]interface{}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationxSecretsmgrV2JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationxSecretsmgrV2JSON500 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 400:
+		var headers GetSpiffeBundleResponse400Headers
+		if values := rsp.Header.Values("Content-Type"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Type", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentType = &value
+		}
+		response.Headers400 = &headers
+	case rsp.StatusCode == 500:
+		var headers GetSpiffeBundleResponse500Headers
+		if values := rsp.Header.Values("Content-Type"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Type", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentType = &value
+		}
+		response.Headers500 = &headers
+	}
+
+	return response, nil
+}
+
+// ParsePostBuiltinCaProvisionResponse parses an HTTP response from a PostBuiltinCaProvisionWithResponse call
+func ParsePostBuiltinCaProvisionResponse(rsp *http.Response) (*PostBuiltinCaProvisionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostBuiltinCaProvisionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest BuiltinCAProvisioned
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationxSecretsmgrV2JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationxSecretsmgrV2JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationxSecretsmgrV2JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationxSecretsmgrV2JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest TrustDomainNotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationxSecretsmgrV2JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest BuiltinCAConflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationxSecretsmgrV2JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest UnprocessableEntity
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationxSecretsmgrV2JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationxSecretsmgrV2JSON500 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 201:
+		var headers PostBuiltinCaProvisionResponse201Headers
+		if values := rsp.Header.Values("Content-Type"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Type", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentType = &value
+		}
+		response.Headers201 = &headers
+	case rsp.StatusCode == 400:
+		var headers PostBuiltinCaProvisionResponse400Headers
+		if values := rsp.Header.Values("Content-Type"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Type", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentType = &value
+		}
+		response.Headers400 = &headers
+	case rsp.StatusCode == 401:
+		var headers PostBuiltinCaProvisionResponse401Headers
+		if values := rsp.Header.Values("Content-Type"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Type", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentType = &value
+		}
+		response.Headers401 = &headers
+	case rsp.StatusCode == 403:
+		var headers PostBuiltinCaProvisionResponse403Headers
+		if values := rsp.Header.Values("Content-Type"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Type", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentType = &value
+		}
+		response.Headers403 = &headers
+	case rsp.StatusCode == 404:
+		var headers PostBuiltinCaProvisionResponse404Headers
+		if values := rsp.Header.Values("Content-Type"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Type", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentType = &value
+		}
+		response.Headers404 = &headers
+	case rsp.StatusCode == 409:
+		var headers PostBuiltinCaProvisionResponse409Headers
+		if values := rsp.Header.Values("Content-Type"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Type", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentType = &value
+		}
+		response.Headers409 = &headers
+	case rsp.StatusCode == 422:
+		var headers PostBuiltinCaProvisionResponse422Headers
+		if values := rsp.Header.Values("Content-Type"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Type", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentType = &value
+		}
+		response.Headers422 = &headers
+	case rsp.StatusCode == 500:
+		var headers PostBuiltinCaProvisionResponse500Headers
+		if values := rsp.Header.Values("Content-Type"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Type", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentType = &value
+		}
+		response.Headers500 = &headers
 	}
 
 	return response, nil

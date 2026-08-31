@@ -53,7 +53,7 @@ resource "conjur_swa_server_group" "aws_iid" {
 
   attestation = {
     aws_iid = {
-      assume_role = "arn:aws:iam::123456789012:role/SWAServerRole"
+      assume_role = "SWAServerRole"
       partition   = "aws"
 
       verify_organization = {
