@@ -298,14 +298,6 @@ func splitParentAndName(id string) (string, string) {
 	return id[:idx], id[idx+1:]
 }
 
-func isNotFoundErr(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "404") || strings.Contains(msg, "not found")
-}
-
 func ownerToObject(owner *conjurapi.Owner) types.Object {
 	if owner == nil {
 		return types.ObjectNull(map[string]attr.Type{

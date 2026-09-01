@@ -12,10 +12,12 @@ import (
 	swaclient "github.com/cyberark/terraform-provider-conjur/internal/swa/client"
 	swamocks "github.com/cyberark/terraform-provider-conjur/internal/swa/client/mocks"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	tfresource "github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -42,6 +44,100 @@ func mustStringList(t *testing.T, values ...string) types.List {
 	return list
 }
 
+// The mk* helpers build the types.Object values that AttestationModel and its variant fields now
+// hold, from the plain struct fixtures used throughout these tests. Each defaults an unset nested
+// object field to a typed null so ObjectValueFrom succeeds.
+func mkObjectFromValue[M any](attrTypes map[string]attr.Type, m M) types.Object {
+	obj, diags := types.ObjectValueFrom(context.Background(), attrTypes, m)
+	if diags.HasError() {
+		panic(fmt.Sprintf("mkObjectFromValue[%T]: %v", m, diags))
+	}
+	return obj
+}
+
+func mkX509Pop(m X509PopModel) types.Object { return mkObjectFromValue(x509PopAttrTypes(), m) }
+func mkK8sPsat(m K8sPsatModel) types.Object { return mkObjectFromValue(k8sPsatAttrTypes(), m) }
+func mkGcpServiceAccount(m GcpServiceAccountModel) types.Object {
+	return mkObjectFromValue(gcpServiceAccountAttrTypes(), m)
+}
+func mkK8sJwt(m K8sJwtModel) types.Object { return mkObjectFromValue(k8sJwtAttrTypes(), m) }
+func mkAwsIidVerifyOrg(m AwsIidVerifyOrgModel) types.Object {
+	return mkObjectFromValue(awsIidVerifyOrgAttrTypes(), m)
+}
+
+func mkAwsIid(m AwsIidModel) types.Object {
+	if len(m.VerifyOrganization.AttributeTypes(context.Background())) == 0 {
+		m.VerifyOrganization = types.ObjectNull(awsIidVerifyOrgAttrTypes())
+	}
+	return mkObjectFromValue(awsIidAttrTypes(), m)
+}
+
+func mkAttestation(m AttestationModel) types.Object {
+	ctx := context.Background()
+	if len(m.X509Pop.AttributeTypes(ctx)) == 0 {
+		m.X509Pop = types.ObjectNull(x509PopAttrTypes())
+	}
+	if len(m.K8sPsat.AttributeTypes(ctx)) == 0 {
+		m.K8sPsat = types.ObjectNull(k8sPsatAttrTypes())
+	}
+	if len(m.GcpServiceAccount.AttributeTypes(ctx)) == 0 {
+		m.GcpServiceAccount = types.ObjectNull(gcpServiceAccountAttrTypes())
+	}
+	if len(m.AwsIid.AttributeTypes(ctx)) == 0 {
+		m.AwsIid = types.ObjectNull(awsIidAttrTypes())
+	}
+	if len(m.K8sJwt.AttributeTypes(ctx)) == 0 {
+		m.K8sJwt = types.ObjectNull(k8sJwtAttrTypes())
+	}
+	return mkObjectFromValue(attestationAttrTypes(), m)
+}
+
+// normalizeServerGroupModel fills typed nulls for the top-level object fields that fixtures leave
+// as zero-value types.Object values, matching what the framework produces when it reads a real
+// plan/state. Without it, Set rejects the model because an untyped object can't be reconciled
+// against the schema's typed attestation object.
+func normalizeServerGroupModel(m *ServerGroupResourceModel) {
+	ctx := context.Background()
+	if len(m.Attestation.AttributeTypes(ctx)) == 0 {
+		m.Attestation = types.ObjectNull(attestationAttrTypes())
+	}
+	if len(m.NodeAttestation.AttributeTypes(ctx)) == 0 {
+		m.NodeAttestation = types.ObjectNull(attestationAttrTypes())
+	}
+}
+
+// The decode* helpers reverse the mk* helpers for assertions on reconciled state.
+func decodeObject[M any](t *testing.T, obj types.Object) M {
+	t.Helper()
+	var m M
+	var diags diag.Diagnostics
+	diags.Append(obj.As(context.Background(), &m, basetypes.ObjectAsOptions{})...)
+	require.False(t, diags.HasError())
+	return m
+}
+
+func decodeAttestation(t *testing.T, obj types.Object) AttestationModel {
+	return decodeObject[AttestationModel](t, obj)
+}
+func decodeK8sPsat(t *testing.T, obj types.Object) K8sPsatModel {
+	return decodeObject[K8sPsatModel](t, obj)
+}
+func decodeGcpServiceAccount(t *testing.T, obj types.Object) GcpServiceAccountModel {
+	return decodeObject[GcpServiceAccountModel](t, obj)
+}
+func decodeAwsIid(t *testing.T, obj types.Object) AwsIidModel {
+	return decodeObject[AwsIidModel](t, obj)
+}
+func decodeAwsIidVerifyOrg(t *testing.T, obj types.Object) AwsIidVerifyOrgModel {
+	return decodeObject[AwsIidVerifyOrgModel](t, obj)
+}
+func decodeK8sJwt(t *testing.T, obj types.Object) K8sJwtModel {
+	return decodeObject[K8sJwtModel](t, obj)
+}
+func decodeX509Pop(t *testing.T, obj types.Object) X509PopModel {
+	return decodeObject[X509PopModel](t, obj)
+}
+
 func makeServerGroupResponse(name, trustDomain string) *swaclient.ServerGroupResponse {
 	now := time.Now()
 	return &swaclient.ServerGroupResponse{
@@ -61,20 +157,20 @@ func TestUpdateAttestationFromResponse(t *testing.T) {
 
 	t.Run("nil response clears node attestation", func(t *testing.T) {
 		model := &ServerGroupResourceModel{
-			Attestation: &AttestationModel{
-				X509Pop: &X509PopModel{CaCertificates: types.StringValue("stale-cert")},
-			},
+			Attestation: mkAttestation(AttestationModel{
+				X509Pop: mkX509Pop(X509PopModel{CaCertificates: types.StringValue("stale-cert")}),
+			}),
 		}
 		diags := updateAttestationFromResponse(ctx, model, nil)
 		assert.False(t, diags.HasError())
-		assert.Nil(t, model.Attestation)
+		assert.True(t, model.Attestation.IsNull())
 	})
 
 	t.Run("x509pop removed server-side is removed from state", func(t *testing.T) {
 		model := &ServerGroupResourceModel{
-			Attestation: &AttestationModel{
-				X509Pop: &X509PopModel{CaCertificates: types.StringValue("stale-cert")},
-			},
+			Attestation: mkAttestation(AttestationModel{
+				X509Pop: mkX509Pop(X509PopModel{CaCertificates: types.StringValue("stale-cert")}),
+			}),
 		}
 		at := &swaclient.AttestationConfiguration{
 			K8sPsat: &swaclient.K8sPsatConfigurationInput{
@@ -86,10 +182,11 @@ func TestUpdateAttestationFromResponse(t *testing.T) {
 
 		diags := updateAttestationFromResponse(ctx, model, at)
 		assert.False(t, diags.HasError())
-		require.NotNil(t, model.Attestation)
-		assert.Nil(t, model.Attestation.X509Pop, "x509pop should be cleared once the server no longer reports it")
-		require.NotNil(t, model.Attestation.K8sPsat)
-		assert.Contains(t, model.Attestation.K8sPsat.Clusters.Elements(), "cluster-a")
+		require.False(t, model.Attestation.IsNull())
+		att := decodeAttestation(t, model.Attestation)
+		assert.True(t, att.X509Pop.IsNull(), "x509pop should be cleared once the server no longer reports it")
+		require.False(t, att.K8sPsat.IsNull())
+		assert.Contains(t, decodeK8sPsat(t, att.K8sPsat).Clusters.Elements(), "cluster-a")
 	})
 
 	t.Run("cluster removed server-side is removed from state", func(t *testing.T) {
@@ -104,14 +201,14 @@ func TestUpdateAttestationFromResponse(t *testing.T) {
 		clusterB := nullLists
 		clusterB.ServiceAccountAllowList = mustStringList(t, "ns2/sa2")
 		model := &ServerGroupResourceModel{
-			Attestation: &AttestationModel{
-				K8sPsat: &K8sPsatModel{
+			Attestation: mkAttestation(AttestationModel{
+				K8sPsat: mkK8sPsat(K8sPsatModel{
 					Clusters: mustClustersMap(t, ctx, map[string]K8sPsatClusterModel{
 						"cluster-a": clusterA,
 						"cluster-b": clusterB,
 					}),
-				},
-			},
+				}),
+			}),
 		}
 		at := &swaclient.AttestationConfiguration{
 			K8sPsat: &swaclient.K8sPsatConfigurationInput{
@@ -123,9 +220,11 @@ func TestUpdateAttestationFromResponse(t *testing.T) {
 
 		diags := updateAttestationFromResponse(ctx, model, at)
 		assert.False(t, diags.HasError())
-		require.NotNil(t, model.Attestation.K8sPsat)
-		assert.Contains(t, model.Attestation.K8sPsat.Clusters.Elements(), "cluster-a")
-		assert.NotContains(t, model.Attestation.K8sPsat.Clusters.Elements(), "cluster-b", "cluster-b was removed server-side and must not persist in state")
+		att := decodeAttestation(t, model.Attestation)
+		require.False(t, att.K8sPsat.IsNull())
+		clusters := decodeK8sPsat(t, att.K8sPsat).Clusters.Elements()
+		assert.Contains(t, clusters, "cluster-a")
+		assert.NotContains(t, clusters, "cluster-b", "cluster-b was removed server-side and must not persist in state")
 	})
 
 	t.Run("k8s_psat removed server-side is removed from state", func(t *testing.T) {
@@ -136,14 +235,14 @@ func TestUpdateAttestationFromResponse(t *testing.T) {
 			AllowedNodeLabelKeys:    types.ListNull(types.StringType),
 		}
 		model := &ServerGroupResourceModel{
-			Attestation: &AttestationModel{
-				X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
-				K8sPsat: &K8sPsatModel{
+			Attestation: mkAttestation(AttestationModel{
+				X509Pop: mkX509Pop(X509PopModel{CaCertificates: types.StringValue("cert")}),
+				K8sPsat: mkK8sPsat(K8sPsatModel{
 					Clusters: mustClustersMap(t, ctx, map[string]K8sPsatClusterModel{
 						"cluster-a": emptyCluster,
 					}),
-				},
-			},
+				}),
+			}),
 		}
 		at := &swaclient.AttestationConfiguration{
 			X509pop: &swaclient.X509PopConfigurationInput{CaCertificates: "cert"},
@@ -151,8 +250,9 @@ func TestUpdateAttestationFromResponse(t *testing.T) {
 
 		diags := updateAttestationFromResponse(ctx, model, at)
 		assert.False(t, diags.HasError())
-		require.NotNil(t, model.Attestation)
-		assert.Nil(t, model.Attestation.K8sPsat, "k8s_psat should be cleared once the server no longer reports it")
+		require.False(t, model.Attestation.IsNull())
+		att := decodeAttestation(t, model.Attestation)
+		assert.True(t, att.K8sPsat.IsNull(), "k8s_psat should be cleared once the server no longer reports it")
 	})
 
 	t.Run("gcp_service_account from attestation field is reconciled into state", func(t *testing.T) {
@@ -167,17 +267,19 @@ func TestUpdateAttestationFromResponse(t *testing.T) {
 
 		diags := updateAttestationFromResponse(ctx, model, at)
 		assert.False(t, diags.HasError())
-		require.NotNil(t, model.Attestation)
-		require.NotNil(t, model.Attestation.GcpServiceAccount)
-		assert.Nil(t, model.Attestation.X509Pop)
-		assert.Nil(t, model.Attestation.K8sPsat)
+		require.False(t, model.Attestation.IsNull())
+		att := decodeAttestation(t, model.Attestation)
+		require.False(t, att.GcpServiceAccount.IsNull())
+		assert.True(t, att.X509Pop.IsNull())
+		assert.True(t, att.K8sPsat.IsNull())
+		gcp := decodeGcpServiceAccount(t, att.GcpServiceAccount)
 
 		var projects []string
-		require.False(t, model.Attestation.GcpServiceAccount.AllowedProjectIDs.ElementsAs(ctx, &projects, false).HasError())
+		require.False(t, gcp.AllowedProjectIDs.ElementsAs(ctx, &projects, false).HasError())
 		assert.Equal(t, []string{"project-a", "project-b"}, projects)
 
 		var auds []string
-		require.False(t, model.Attestation.GcpServiceAccount.Audiences.ElementsAs(ctx, &auds, false).HasError())
+		require.False(t, gcp.Audiences.ElementsAs(ctx, &auds, false).HasError())
 		assert.Equal(t, []string{"urn:panw:swa"}, auds)
 	})
 
@@ -199,13 +301,15 @@ func TestUpdateAttestationFromResponse(t *testing.T) {
 
 		diags := updateAttestationFromResponse(ctx, model, at)
 		assert.False(t, diags.HasError())
-		require.NotNil(t, model.Attestation)
-		require.NotNil(t, model.Attestation.AwsIid)
-		assert.Equal(t, "SWAServerRole", model.Attestation.AwsIid.AssumeRole.ValueString())
-		assert.Equal(t, "aws", model.Attestation.AwsIid.Partition.ValueString())
+		require.False(t, model.Attestation.IsNull())
+		att := decodeAttestation(t, model.Attestation)
+		require.False(t, att.AwsIid.IsNull())
+		awsIid := decodeAwsIid(t, att.AwsIid)
+		assert.Equal(t, "SWAServerRole", awsIid.AssumeRole.ValueString())
+		assert.Equal(t, "aws", awsIid.Partition.ValueString())
 
-		require.NotNil(t, model.Attestation.AwsIid.VerifyOrganization)
-		vo := model.Attestation.AwsIid.VerifyOrganization
+		require.False(t, awsIid.VerifyOrganization.IsNull())
+		vo := decodeAwsIidVerifyOrg(t, awsIid.VerifyOrganization)
 		assert.Equal(t, "123456789012", vo.ManagementAccountID.ValueString())
 		assert.Equal(t, "us-east-1", vo.ManagementAccountRegion.ValueString())
 		assert.Equal(t, "AWSOrganizationsReadOnlyAccess", vo.AssumeOrgRole.ValueString())
@@ -230,11 +334,12 @@ func TestUpdateAttestationFromResponse(t *testing.T) {
 
 		diags := updateAttestationFromResponse(ctx, model, at)
 		assert.False(t, diags.HasError())
-		require.NotNil(t, model.Attestation)
-		require.NotNil(t, model.Attestation.K8sJwt)
+		require.False(t, model.Attestation.IsNull())
+		att := decodeAttestation(t, model.Attestation)
+		require.False(t, att.K8sJwt.IsNull())
 
 		var clusters map[string]K8sJwtClusterModel
-		require.False(t, model.Attestation.K8sJwt.Clusters.ElementsAs(ctx, &clusters, false).HasError())
+		require.False(t, decodeK8sJwt(t, att.K8sJwt).Clusters.ElementsAs(ctx, &clusters, false).HasError())
 		require.Contains(t, clusters, "cluster-a")
 		cluster := clusters["cluster-a"]
 		assert.Equal(t, "https://kubernetes.default.svc.cluster.local", cluster.Issuer.ValueString())
@@ -264,9 +369,9 @@ func TestUpdateAttestationFromResponse(t *testing.T) {
 		clustersMap, diags := types.MapValueFrom(ctx, types.ObjectType{AttrTypes: k8sJwtClusterAttrTypes()}, priorClusters)
 		require.False(t, diags.HasError())
 		model := &ServerGroupResourceModel{
-			Attestation: &AttestationModel{
-				K8sJwt: &K8sJwtModel{Clusters: clustersMap},
-			},
+			Attestation: mkAttestation(AttestationModel{
+				K8sJwt: mkK8sJwt(K8sJwtModel{Clusters: clustersMap}),
+			}),
 		}
 
 		at := &swaclient.AttestationConfiguration{
@@ -288,8 +393,9 @@ func TestUpdateAttestationFromResponse(t *testing.T) {
 		updateDiags := updateAttestationFromResponse(ctx, model, at)
 		assert.False(t, updateDiags.HasError())
 
+		att := decodeAttestation(t, model.Attestation)
 		var clusters map[string]K8sJwtClusterModel
-		require.False(t, model.Attestation.K8sJwt.Clusters.ElementsAs(ctx, &clusters, false).HasError())
+		require.False(t, decodeK8sJwt(t, att.K8sJwt).Clusters.ElementsAs(ctx, &clusters, false).HasError())
 		assert.Equal(t, priorPublicKeys, clusters["cluster-a"].PublicKeys.ValueString(), "prior JSON formatting should be preserved when semantically equal")
 	})
 }
@@ -484,11 +590,11 @@ func TestServerGroupResource_Create(t *testing.T) {
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
 				Description:     types.StringNull(),
-				Attestation: &AttestationModel{
-					X509Pop: &X509PopModel{
+				Attestation: mkAttestation(AttestationModel{
+					X509Pop: mkX509Pop(X509PopModel{
 						CaCertificates: types.StringValue("-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"),
-					},
-				},
+					}),
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				sg := makeServerGroupResponse("prod-servers", "prod.example.org")
@@ -512,11 +618,11 @@ func TestServerGroupResource_Create(t *testing.T) {
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
 				Description:     types.StringValue("Production servers"),
-				Attestation: &AttestationModel{
-					X509Pop: &X509PopModel{
+				Attestation: mkAttestation(AttestationModel{
+					X509Pop: mkX509Pop(X509PopModel{
 						CaCertificates: types.StringValue("-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"),
-					},
-				},
+					}),
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				sg := makeServerGroupResponse("prod-servers", "prod.example.org")
@@ -546,12 +652,12 @@ func TestServerGroupResource_Create(t *testing.T) {
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
 				Description:     types.StringNull(),
-				Attestation: &AttestationModel{
-					GcpServiceAccount: &GcpServiceAccountModel{
+				Attestation: mkAttestation(AttestationModel{
+					GcpServiceAccount: mkGcpServiceAccount(GcpServiceAccountModel{
 						AllowedProjectIDs: mustStringList(t, "project-a", "project-b"),
 						Audiences:         mustStringList(t, "urn:panw:swa"),
-					},
-				},
+					}),
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				sg := makeServerGroupResponse("prod-servers", "prod.example.org")
@@ -579,16 +685,16 @@ func TestServerGroupResource_Create(t *testing.T) {
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
 				Description:     types.StringNull(),
-				Attestation: &AttestationModel{
-					AwsIid: &AwsIidModel{
+				Attestation: mkAttestation(AttestationModel{
+					AwsIid: mkAwsIid(AwsIidModel{
 						AssumeRole: types.StringValue("SWAServerRole"),
 						Partition:  types.StringValue("aws"),
-						VerifyOrganization: &AwsIidVerifyOrgModel{
+						VerifyOrganization: mkAwsIidVerifyOrg(AwsIidVerifyOrgModel{
 							ManagementAccountID: types.StringValue("123456789012"),
 							AssumeOrgRole:       types.StringValue("AWSOrganizationsReadOnlyAccess"),
-						},
-					},
-				},
+						}),
+					}),
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				sg := makeServerGroupResponse("prod-servers", "prod.example.org")
@@ -638,7 +744,7 @@ func TestServerGroupResource_Create(t *testing.T) {
 			data: ServerGroupResourceModel{
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
-				Attestation:     &AttestationModel{},
+				Attestation:     mkAttestation(AttestationModel{}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				sg := makeServerGroupResponse("prod-servers", "prod.example.org")
@@ -657,11 +763,11 @@ func TestServerGroupResource_Create(t *testing.T) {
 			data: ServerGroupResourceModel{
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
-				Attestation: &AttestationModel{
-					X509Pop: &X509PopModel{
+				Attestation: mkAttestation(AttestationModel{
+					X509Pop: mkX509Pop(X509PopModel{
 						CaCertificates: types.StringValue("cert"),
-					},
-				},
+					}),
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				m.On("PostServerGroupWithResponse", context.Background(), "prod.example.org", &swaclient.PostServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PostServerGroupJSONRequestBody{
@@ -679,11 +785,11 @@ func TestServerGroupResource_Create(t *testing.T) {
 			data: ServerGroupResourceModel{
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
-				Attestation: &AttestationModel{
-					X509Pop: &X509PopModel{
+				Attestation: mkAttestation(AttestationModel{
+					X509Pop: mkX509Pop(X509PopModel{
 						CaCertificates: types.StringValue("cert"),
-					},
-				},
+					}),
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				m.On("PostServerGroupWithResponse", context.Background(), "prod.example.org", &swaclient.PostServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PostServerGroupJSONRequestBody{
@@ -716,6 +822,7 @@ func TestServerGroupResource_Create(t *testing.T) {
 			}
 
 			ctx := context.Background()
+			normalizeServerGroupModel(&tt.data)
 			if diags := req.Plan.Set(ctx, &tt.data); diags.HasError() {
 				t.Fatalf("failed to set plan: %v", diags)
 			}
@@ -749,11 +856,11 @@ func TestServerGroupResource_Read(t *testing.T) {
 				ID:              types.StringValue("prod.example.org/prod-servers"),
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
-				Attestation: &AttestationModel{
-					X509Pop: &X509PopModel{
+				Attestation: mkAttestation(AttestationModel{
+					X509Pop: mkX509Pop(X509PopModel{
 						CaCertificates: types.StringValue("stale-cert"),
-					},
-				},
+					}),
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				sg := makeServerGroupResponse("prod-servers", "prod.example.org")
@@ -775,11 +882,11 @@ func TestServerGroupResource_Read(t *testing.T) {
 				ID:              types.StringValue("prod.example.org/missing-servers"),
 				Name:            types.StringValue("missing-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
-				Attestation: &AttestationModel{
-					X509Pop: &X509PopModel{
+				Attestation: mkAttestation(AttestationModel{
+					X509Pop: mkX509Pop(X509PopModel{
 						CaCertificates: types.StringValue("cert"),
-					},
-				},
+					}),
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				m.On("GetServerGroupWithResponse", context.Background(), "prod.example.org", "missing-servers", &swaclient.GetServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
@@ -796,9 +903,9 @@ func TestServerGroupResource_Read(t *testing.T) {
 				ID:              types.StringValue("prod.example.org/prod-servers"),
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
-				Attestation: &AttestationModel{
-					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
-				},
+				Attestation: mkAttestation(AttestationModel{
+					X509Pop: mkX509Pop(X509PopModel{CaCertificates: types.StringValue("cert")}),
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				m.On("GetServerGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.GetServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
@@ -816,11 +923,11 @@ func TestServerGroupResource_Read(t *testing.T) {
 				ID:              types.StringValue("prod.example.org/prod-servers"),
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
-				Attestation: &AttestationModel{
-					X509Pop: &X509PopModel{
+				Attestation: mkAttestation(AttestationModel{
+					X509Pop: mkX509Pop(X509PopModel{
 						CaCertificates: types.StringValue("cert"),
-					},
-				},
+					}),
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				m.On("GetServerGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.GetServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
@@ -835,9 +942,9 @@ func TestServerGroupResource_Read(t *testing.T) {
 				ID:              types.StringValue("prod.example.org/prod-servers"),
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
-				Attestation: &AttestationModel{
-					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
-				},
+				Attestation: mkAttestation(AttestationModel{
+					X509Pop: mkX509Pop(X509PopModel{CaCertificates: types.StringValue("cert")}),
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				m.On("GetServerGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.GetServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
@@ -865,6 +972,7 @@ func TestServerGroupResource_Read(t *testing.T) {
 			}
 
 			ctx := context.Background()
+			normalizeServerGroupModel(&tt.data)
 			if diags := req.State.Set(ctx, &tt.data); diags.HasError() {
 				t.Fatalf("failed to set state: %v", diags)
 			}
@@ -883,9 +991,10 @@ func TestServerGroupResource_Read(t *testing.T) {
 					var result ServerGroupResourceModel
 					diag := resp.State.Get(ctx, &result)
 					require.False(t, diag.HasError())
-					require.NotNil(t, result.Attestation)
-					require.NotNil(t, result.Attestation.X509Pop)
-					assert.Equal(t, tt.expectedCert, result.Attestation.X509Pop.CaCertificates.ValueString())
+					require.False(t, result.Attestation.IsNull())
+					att := decodeAttestation(t, result.Attestation)
+					require.False(t, att.X509Pop.IsNull())
+					assert.Equal(t, tt.expectedCert, decodeX509Pop(t, att.X509Pop).CaCertificates.ValueString())
 				}
 			}
 		})
@@ -906,9 +1015,9 @@ func TestServerGroupResource_Delete(t *testing.T) {
 				ID:              types.StringValue("prod.example.org/prod-servers"),
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
-				Attestation: &AttestationModel{
-					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
-				},
+				Attestation: mkAttestation(AttestationModel{
+					X509Pop: mkX509Pop(X509PopModel{CaCertificates: types.StringValue("cert")}),
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				m.On("DeleteServerGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.DeleteServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
@@ -924,9 +1033,9 @@ func TestServerGroupResource_Delete(t *testing.T) {
 				ID:              types.StringValue("prod.example.org/prod-servers"),
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
-				Attestation: &AttestationModel{
-					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
-				},
+				Attestation: mkAttestation(AttestationModel{
+					X509Pop: mkX509Pop(X509PopModel{CaCertificates: types.StringValue("cert")}),
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				m.On("DeleteServerGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.DeleteServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
@@ -942,9 +1051,9 @@ func TestServerGroupResource_Delete(t *testing.T) {
 				ID:              types.StringValue("prod.example.org/prod-servers"),
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
-				Attestation: &AttestationModel{
-					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
-				},
+				Attestation: mkAttestation(AttestationModel{
+					X509Pop: mkX509Pop(X509PopModel{CaCertificates: types.StringValue("cert")}),
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				m.On("DeleteServerGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.DeleteServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
@@ -959,9 +1068,9 @@ func TestServerGroupResource_Delete(t *testing.T) {
 				ID:              types.StringValue("prod.example.org/prod-servers"),
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
-				Attestation: &AttestationModel{
-					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
-				},
+				Attestation: mkAttestation(AttestationModel{
+					X509Pop: mkX509Pop(X509PopModel{CaCertificates: types.StringValue("cert")}),
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				m.On("DeleteServerGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.DeleteServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
@@ -990,6 +1099,7 @@ func TestServerGroupResource_Delete(t *testing.T) {
 			}
 
 			ctx := context.Background()
+			normalizeServerGroupModel(&tt.data)
 			if diags := req.State.Set(ctx, &tt.data); diags.HasError() {
 				t.Fatalf("failed to set state: %v", diags)
 			}
@@ -1023,18 +1133,18 @@ func TestServerGroupResource_Update(t *testing.T) {
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
 				Description:     types.StringValue("updated description"),
-				Attestation: &AttestationModel{
-					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
-				},
+				Attestation: mkAttestation(AttestationModel{
+					X509Pop: mkX509Pop(X509PopModel{CaCertificates: types.StringValue("cert")}),
+				}),
 			},
 			state: ServerGroupResourceModel{
 				ID:              types.StringValue("prod.example.org/prod-servers"),
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
 				Description:     types.StringNull(),
-				Attestation: &AttestationModel{
-					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
-				},
+				Attestation: mkAttestation(AttestationModel{
+					X509Pop: mkX509Pop(X509PopModel{CaCertificates: types.StringValue("cert")}),
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				sg := makeServerGroupResponse("prod-servers", "prod.example.org")
@@ -1059,18 +1169,18 @@ func TestServerGroupResource_Update(t *testing.T) {
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
 				Description:     types.StringNull(),
-				Attestation: &AttestationModel{
-					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
-				},
+				Attestation: mkAttestation(AttestationModel{
+					X509Pop: mkX509Pop(X509PopModel{CaCertificates: types.StringValue("cert")}),
+				}),
 			},
 			state: ServerGroupResourceModel{
 				ID:              types.StringValue("prod.example.org/prod-servers"),
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
 				Description:     types.StringNull(),
-				Attestation: &AttestationModel{
-					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
-				},
+				Attestation: mkAttestation(AttestationModel{
+					X509Pop: mkX509Pop(X509PopModel{CaCertificates: types.StringValue("cert")}),
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				m.On("PatchServerGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.PatchServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchServerGroupJSONRequestBody{
@@ -1097,9 +1207,9 @@ func TestServerGroupResource_Update(t *testing.T) {
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
 				Description:     types.StringNull(),
-				Attestation: &AttestationModel{
-					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
-				},
+				Attestation: mkAttestation(AttestationModel{
+					X509Pop: mkX509Pop(X509PopModel{CaCertificates: types.StringValue("cert")}),
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				sg := makeServerGroupResponse("prod-servers", "prod.example.org")
@@ -1118,18 +1228,18 @@ func TestServerGroupResource_Update(t *testing.T) {
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
 				Description:     types.StringNull(),
-				Attestation: &AttestationModel{
-					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
-				},
+				Attestation: mkAttestation(AttestationModel{
+					X509Pop: mkX509Pop(X509PopModel{CaCertificates: types.StringValue("cert")}),
+				}),
 			},
 			state: ServerGroupResourceModel{
 				ID:              types.StringValue("prod.example.org/prod-servers"),
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
 				Description:     types.StringNull(),
-				Attestation: &AttestationModel{
-					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
-				},
+				Attestation: mkAttestation(AttestationModel{
+					X509Pop: mkX509Pop(X509PopModel{CaCertificates: types.StringValue("cert")}),
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				m.On("PatchServerGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.PatchServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchServerGroupJSONRequestBody{
@@ -1151,18 +1261,18 @@ func TestServerGroupResource_Update(t *testing.T) {
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
 				Description:     types.StringNull(),
-				Attestation: &AttestationModel{
-					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
-				},
+				Attestation: mkAttestation(AttestationModel{
+					X509Pop: mkX509Pop(X509PopModel{CaCertificates: types.StringValue("cert")}),
+				}),
 			},
 			state: ServerGroupResourceModel{
 				ID:              types.StringValue("prod.example.org/prod-servers"),
 				Name:            types.StringValue("prod-servers"),
 				TrustDomainName: types.StringValue("prod.example.org"),
 				Description:     types.StringNull(),
-				Attestation: &AttestationModel{
-					X509Pop: &X509PopModel{CaCertificates: types.StringValue("cert")},
-				},
+				Attestation: mkAttestation(AttestationModel{
+					X509Pop: mkX509Pop(X509PopModel{CaCertificates: types.StringValue("cert")}),
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				m.On("PatchServerGroupWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.PatchServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PatchServerGroupJSONRequestBody{
@@ -1194,6 +1304,8 @@ func TestServerGroupResource_Update(t *testing.T) {
 			}
 
 			ctx := context.Background()
+			normalizeServerGroupModel(&tt.plan)
+			normalizeServerGroupModel(&tt.state)
 			if diags := req.Plan.Set(ctx, &tt.plan); diags.HasError() {
 				t.Fatalf("failed to set plan: %v", diags)
 			}
@@ -1732,7 +1844,7 @@ func TestServerGroupResource_ValidateConfig_UnknownGCPServiceAccount(t *testing.
 	data := ServerGroupResourceModel{
 		Name:            types.StringValue("test-sg"),
 		TrustDomainName: types.StringValue("test-td"),
-		Attestation:     &AttestationModel{},
+		Attestation:     mkAttestation(AttestationModel{}),
 	}
 
 	gcpAttrTypes := map[string]attr.Type{
@@ -1742,6 +1854,7 @@ func TestServerGroupResource_ValidateConfig_UnknownGCPServiceAccount(t *testing.
 
 	s := getServerGroupTestSchema()
 	plan := newPlanWithSchema(s)
+	normalizeServerGroupModel(&data)
 	require.False(t, plan.Set(context.Background(), &data).HasError())
 	require.False(t, plan.SetAttribute(
 		context.Background(),

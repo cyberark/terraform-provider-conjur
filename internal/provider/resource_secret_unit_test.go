@@ -561,6 +561,16 @@ func TestSecretResource_ValidateConfig(t *testing.T) {
 			errorContains: "value_wo_version",
 		},
 		{
+			name: "value_wo_version with unknown value_wo should be valid (e.g. variable with no default during terraform validate)",
+			data: SecretResourceModel{
+				Name:           types.StringValue("test-secret"),
+				Branch:         types.StringValue("/data/test"),
+				ValueWO:        types.StringUnknown(),
+				ValueWOVersion: types.Int32Value(1),
+			},
+			expectError: false,
+		},
+		{
 			name: "value_wo_version with value but not value_wo should produce error",
 			data: SecretResourceModel{
 				Name:           types.StringValue("test-secret"),

@@ -201,7 +201,7 @@ func (r *SecretResource) ValidateConfig(ctx context.Context, req resource.Valida
 
 	// Validate that value_wo_version requires value_wo
 	if !data.ValueWOVersion.IsNull() && !data.ValueWOVersion.IsUnknown() {
-		if data.ValueWO.IsNull() || data.ValueWO.IsUnknown() {
+		if data.ValueWO.IsNull() {
 			resp.Diagnostics.AddError(
 				"Invalid Attribute Combination",
 				"The 'value_wo_version' attribute requires 'value_wo' to be set. 'value_wo_version' is used together with 'value_wo' to trigger an update.",

@@ -40,25 +40,28 @@ type ServerGroupResource struct {
 }
 
 type ServerGroupResourceModel struct {
-	ID              types.String      `tfsdk:"id"`
-	Name            types.String      `tfsdk:"name"`
-	Description     types.String      `tfsdk:"description"`
-	TrustDomainName types.String      `tfsdk:"trust_domain_name"`
-	Attestation     *AttestationModel `tfsdk:"attestation"`
+	ID              types.String `tfsdk:"id"`
+	Name            types.String `tfsdk:"name"`
+	Description     types.String `tfsdk:"description"`
+	TrustDomainName types.String `tfsdk:"trust_domain_name"`
+	Attestation     types.Object `tfsdk:"attestation"`
 	// NodeAttestation is the old provider's name for Attestation. It was renamed to
 	// `attestation` before this provider's initial release, so this field exists solely
 	// so ValidateConfig can detect stale configs written against the old provider and
 	// return an actionable error instead of Terraform core's generic
 	// "unsupported argument" message.
-	NodeAttestation *AttestationModel `tfsdk:"node_attestation"`
+	NodeAttestation types.Object `tfsdk:"node_attestation"`
 }
 
+// AttestationModel's variant fields are types.Object (not struct pointers) for the same
+// Unknown-tolerance reason as ServerGroupResourceModel.Attestation above: each variant is
+// Optional and any one of them may be unknown independently at plan/validate time.
 type AttestationModel struct {
-	X509Pop           *X509PopModel           `tfsdk:"x509pop"`
-	K8sPsat           *K8sPsatModel           `tfsdk:"k8s_psat"`
-	GcpServiceAccount *GcpServiceAccountModel `tfsdk:"gcp_service_account"`
-	AwsIid            *AwsIidModel            `tfsdk:"aws_iid"`
-	K8sJwt            *K8sJwtModel            `tfsdk:"k8s_jwt"`
+	X509Pop           types.Object `tfsdk:"x509pop"`
+	K8sPsat           types.Object `tfsdk:"k8s_psat"`
+	GcpServiceAccount types.Object `tfsdk:"gcp_service_account"`
+	AwsIid            types.Object `tfsdk:"aws_iid"`
+	K8sJwt            types.Object `tfsdk:"k8s_jwt"`
 }
 
 type X509PopModel struct {
@@ -75,9 +78,9 @@ type GcpServiceAccountModel struct {
 }
 
 type AwsIidModel struct {
-	AssumeRole         types.String          `tfsdk:"assume_role"`
-	Partition          types.String          `tfsdk:"partition"`
-	VerifyOrganization *AwsIidVerifyOrgModel `tfsdk:"verify_organization"`
+	AssumeRole         types.String `tfsdk:"assume_role"`
+	Partition          types.String `tfsdk:"partition"`
+	VerifyOrganization types.Object `tfsdk:"verify_organization"`
 }
 
 type AwsIidVerifyOrgModel struct {
@@ -127,6 +130,55 @@ func k8sJwtClusterAttrTypes() map[string]attr.Type {
 		"service_account_allow_list": types.ListType{ElemType: types.StringType},
 		"jwks_uri":                   types.StringType,
 		"public_keys":                types.StringType,
+	}
+}
+
+// The following attr-type maps mirror the schema of the `attestation` nested attribute and its
+// variants so the models can round-trip through types.Object.
+func x509PopAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{"ca_certificates": types.StringType}
+}
+
+func k8sPsatAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{"clusters": types.MapType{ElemType: types.ObjectType{AttrTypes: k8sPsatClusterAttrTypes()}}}
+}
+
+func gcpServiceAccountAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"allowed_project_ids": types.ListType{ElemType: types.StringType},
+		"audiences":           types.ListType{ElemType: types.StringType},
+	}
+}
+
+func awsIidVerifyOrgAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"management_account_id":     types.StringType,
+		"management_account_region": types.StringType,
+		"assume_org_role":           types.StringType,
+		"org_account_map_ttl":       types.StringType,
+		"account_list_file":         types.StringType,
+	}
+}
+
+func awsIidAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"assume_role":         types.StringType,
+		"partition":           types.StringType,
+		"verify_organization": types.ObjectType{AttrTypes: awsIidVerifyOrgAttrTypes()},
+	}
+}
+
+func k8sJwtAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{"clusters": types.MapType{ElemType: types.ObjectType{AttrTypes: k8sJwtClusterAttrTypes()}}}
+}
+
+func attestationAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"x509pop":             types.ObjectType{AttrTypes: x509PopAttrTypes()},
+		"k8s_psat":            types.ObjectType{AttrTypes: k8sPsatAttrTypes()},
+		"gcp_service_account": types.ObjectType{AttrTypes: gcpServiceAccountAttrTypes()},
+		"aws_iid":             types.ObjectType{AttrTypes: awsIidAttrTypes()},
+		"k8s_jwt":             types.ObjectType{AttrTypes: k8sJwtAttrTypes()},
 	}
 }
 
@@ -352,17 +404,25 @@ func updateAttestationFromResponse(ctx context.Context, model *ServerGroupResour
 	var diags diag.Diagnostics
 
 	if at == nil {
-		model.Attestation = nil
+		model.Attestation = types.ObjectNull(attestationAttrTypes())
 		return diags
 	}
 	x509pop, k8sPsat, gcp := at.X509pop, at.K8sPsat, at.GcpServiceAccount
 
-	attestation := &AttestationModel{}
+	attestation := AttestationModel{
+		X509Pop:           types.ObjectNull(x509PopAttrTypes()),
+		K8sPsat:           types.ObjectNull(k8sPsatAttrTypes()),
+		GcpServiceAccount: types.ObjectNull(gcpServiceAccountAttrTypes()),
+		AwsIid:            types.ObjectNull(awsIidAttrTypes()),
+		K8sJwt:            types.ObjectNull(k8sJwtAttrTypes()),
+	}
 
 	if x509pop != nil {
-		attestation.X509Pop = &X509PopModel{
+		obj, objDiags := types.ObjectValueFrom(ctx, x509PopAttrTypes(), X509PopModel{
 			CaCertificates: types.StringValue(x509pop.CaCertificates),
-		}
+		})
+		diags.Append(objDiags...)
+		attestation.X509Pop = obj
 	}
 
 	if k8sPsat != nil && k8sPsat.Clusters != nil {
@@ -382,45 +442,50 @@ func updateAttestationFromResponse(ctx context.Context, model *ServerGroupResour
 			clusterObjs,
 		)
 		diags.Append(mapDiags...)
-		attestation.K8sPsat = &K8sPsatModel{Clusters: clustersMap}
+		obj, objDiags := types.ObjectValueFrom(ctx, k8sPsatAttrTypes(), K8sPsatModel{Clusters: clustersMap})
+		diags.Append(objDiags...)
+		attestation.K8sPsat = obj
 	}
 
 	if gcp != nil {
-		gcpModel := &GcpServiceAccountModel{}
+		gcpModel := GcpServiceAccountModel{}
 		allowed := append([]string(nil), gcp.AllowedProjectIds...)
 		appendOptionalStringList(ctx, &allowed, &gcpModel.AllowedProjectIDs, &diags)
 		appendOptionalStringList(ctx, gcp.Audiences, &gcpModel.Audiences, &diags)
-		attestation.GcpServiceAccount = gcpModel
+		obj, objDiags := types.ObjectValueFrom(ctx, gcpServiceAccountAttrTypes(), gcpModel)
+		diags.Append(objDiags...)
+		attestation.GcpServiceAccount = obj
 	}
 
 	if awsIid := at.AwsIid; awsIid != nil {
-		awsIidModel := &AwsIidModel{
-			AssumeRole: optionalStringValue(awsIid.AssumeRole),
-			Partition:  types.StringNull(),
+		awsIidModel := AwsIidModel{
+			AssumeRole:         optionalStringValue(awsIid.AssumeRole),
+			Partition:          types.StringNull(),
+			VerifyOrganization: types.ObjectNull(awsIidVerifyOrgAttrTypes()),
 		}
 		if awsIid.Partition != nil {
 			awsIidModel.Partition = types.StringValue(string(*awsIid.Partition))
 		}
 		if vo := awsIid.VerifyOrganization; vo != nil {
-			awsIidModel.VerifyOrganization = &AwsIidVerifyOrgModel{
+			voObj, voDiags := types.ObjectValueFrom(ctx, awsIidVerifyOrgAttrTypes(), AwsIidVerifyOrgModel{
 				ManagementAccountID:     optionalStringValue(vo.ManagementAccountId),
 				ManagementAccountRegion: optionalStringValue(vo.ManagementAccountRegion),
 				AssumeOrgRole:           optionalStringValue(vo.AssumeOrgRole),
 				OrgAccountMapTTL:        optionalStringValue(vo.OrgAccountMapTtl),
 				AccountListFile:         optionalStringValue(vo.AccountListFile),
-			}
+			})
+			diags.Append(voDiags...)
+			awsIidModel.VerifyOrganization = voObj
 		}
-		attestation.AwsIid = awsIidModel
+		obj, objDiags := types.ObjectValueFrom(ctx, awsIidAttrTypes(), awsIidModel)
+		diags.Append(objDiags...)
+		attestation.AwsIid = obj
 	}
 
 	if k8sJwt := at.K8sJwt; k8sJwt != nil {
 		// Look up prior per-cluster public_keys JSON so preferPriorJSONString below can
 		// keep the user's original formatting instead of a reformatted-but-equivalent value.
-		priorClusters := map[string]K8sJwtClusterModel{}
-		if model.Attestation != nil && model.Attestation.K8sJwt != nil &&
-			!model.Attestation.K8sJwt.Clusters.IsNull() && !model.Attestation.K8sJwt.Clusters.IsUnknown() {
-			diags.Append(model.Attestation.K8sJwt.Clusters.ElementsAs(ctx, &priorClusters, false)...)
-		}
+		priorClusters := priorK8sJwtClusters(ctx, model.Attestation, &diags)
 
 		clusterObjs := make(map[string]attr.Value, len(k8sJwt.Clusters))
 		for clusterName, clusterConfig := range k8sJwt.Clusters {
@@ -457,11 +522,31 @@ func updateAttestationFromResponse(ctx context.Context, model *ServerGroupResour
 			clusterObjs,
 		)
 		diags.Append(mapDiags...)
-		attestation.K8sJwt = &K8sJwtModel{Clusters: clustersMap}
+		obj, objDiags := types.ObjectValueFrom(ctx, k8sJwtAttrTypes(), K8sJwtModel{Clusters: clustersMap})
+		diags.Append(objDiags...)
+		attestation.K8sJwt = obj
 	}
 
-	model.Attestation = attestation
+	attObj, objDiags := types.ObjectValueFrom(ctx, attestationAttrTypes(), attestation)
+	diags.Append(objDiags...)
+	model.Attestation = attObj
 	return diags
+}
+
+// priorK8sJwtClusters decodes the prior state's attestation.k8s_jwt clusters (if any) so
+// updateAttestationFromResponse can preserve the user's original public_keys JSON formatting.
+func priorK8sJwtClusters(ctx context.Context, attestation types.Object, diags *diag.Diagnostics) map[string]K8sJwtClusterModel {
+	priorClusters := map[string]K8sJwtClusterModel{}
+	priorAtt := modelFromObject[AttestationModel](ctx, attestation, diags)
+	if priorAtt == nil {
+		return priorClusters
+	}
+	priorK8sJwt := modelFromObject[K8sJwtModel](ctx, priorAtt.K8sJwt, diags)
+	if priorK8sJwt == nil || priorK8sJwt.Clusters.IsNull() || priorK8sJwt.Clusters.IsUnknown() {
+		return priorClusters
+	}
+	diags.Append(priorK8sJwt.Clusters.ElementsAs(ctx, &priorClusters, false)...)
+	return priorClusters
 }
 
 // buildK8sPsatClusters converts the Terraform model to the API client cluster map.
@@ -554,7 +639,7 @@ func buildGcpServiceAccount(ctx context.Context, gcp *GcpServiceAccountModel) (*
 }
 
 // buildAwsIid resolves the aws_iid part from the model.
-func buildAwsIid(awsIid *AwsIidModel) *swaclient.AwsIidAttestationConfiguration {
+func buildAwsIid(ctx context.Context, awsIid *AwsIidModel, diags *diag.Diagnostics) *swaclient.AwsIidAttestationConfiguration {
 	if awsIid == nil {
 		return nil
 	}
@@ -566,7 +651,7 @@ func buildAwsIid(awsIid *AwsIidModel) *swaclient.AwsIidAttestationConfiguration 
 		partition := swaclient.AwsIidAttestationConfigurationPartition(awsIid.Partition.ValueString())
 		config.Partition = &partition
 	}
-	if vo := awsIid.VerifyOrganization; vo != nil {
+	if vo := modelFromObject[AwsIidVerifyOrgModel](ctx, awsIid.VerifyOrganization, diags); vo != nil {
 		config.VerifyOrganization = &swaclient.AwsIidVerifyOrganizationConfiguration{
 			ManagementAccountId:     stringPointerFromValue(vo.ManagementAccountID),
 			ManagementAccountRegion: stringPointerFromValue(vo.ManagementAccountRegion),
@@ -587,25 +672,25 @@ func buildAttestationRequest(ctx context.Context, at *AttestationModel) (*swacli
 
 	attestation := &swaclient.AttestationConfiguration{}
 
-	if at.X509Pop != nil {
+	if x509pop := modelFromObject[X509PopModel](ctx, at.X509Pop, &diags); x509pop != nil {
 		attestation.X509pop = &swaclient.X509PopConfigurationInput{
-			CaCertificates: at.X509Pop.CaCertificates.ValueString(),
+			CaCertificates: x509pop.CaCertificates.ValueString(),
 		}
 	}
 
-	clusters, clusterDiags := buildK8sPsatClusters(ctx, at.K8sPsat)
+	clusters, clusterDiags := buildK8sPsatClusters(ctx, modelFromObject[K8sPsatModel](ctx, at.K8sPsat, &diags))
 	diags.Append(clusterDiags...)
 	if clusters != nil {
 		attestation.K8sPsat = &swaclient.K8sPsatConfigurationInput{Clusters: &clusters}
 	}
 
-	gcp, gcpDiags := buildGcpServiceAccount(ctx, at.GcpServiceAccount)
+	gcp, gcpDiags := buildGcpServiceAccount(ctx, modelFromObject[GcpServiceAccountModel](ctx, at.GcpServiceAccount, &diags))
 	diags.Append(gcpDiags...)
 	attestation.GcpServiceAccount = gcp
 
-	attestation.AwsIid = buildAwsIid(at.AwsIid)
+	attestation.AwsIid = buildAwsIid(ctx, modelFromObject[AwsIidModel](ctx, at.AwsIid, &diags), &diags)
 
-	k8sJwtClusters, k8sJwtDiags := buildK8sJwtClusters(ctx, at.K8sJwt)
+	k8sJwtClusters, k8sJwtDiags := buildK8sJwtClusters(ctx, modelFromObject[K8sJwtModel](ctx, at.K8sJwt, &diags))
 	diags.Append(k8sJwtDiags...)
 	if k8sJwtClusters != nil {
 		attestation.K8sJwt = &swaclient.K8sJwtAttestationConfiguration{Clusters: k8sJwtClusters}
@@ -677,12 +762,17 @@ func (r *ServerGroupResource) Schema(ctx context.Context, req resource.SchemaReq
 }
 
 func (r *ServerGroupResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	var nodeAttestation types.Object
-	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("node_attestation"), &nodeAttestation)...)
+	// The whole model decodes in one Get because Attestation is types.Object: a sibling
+	// attestation variant (e.g. gcp_service_account) that is unknown at validate-time (a
+	// conditional over a not-yet-resolved value) is tolerated natively here, whereas reflecting
+	// an Unknown value into a plain struct pointer would be a hard error.
+	var data ServerGroupResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if !nodeAttestation.IsNull() {
+
+	if !data.NodeAttestation.IsNull() {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("node_attestation"),
 			"Unsupported Attribute: node_attestation",
@@ -692,25 +782,14 @@ func (r *ServerGroupResource) ValidateConfig(ctx context.Context, req resource.V
 		)
 	}
 
-	validateK8sJwtConfig(ctx, req, resp)
-}
-
-// validateK8sJwtConfig fetches attestation.k8s_jwt directly by path rather than by
-// decoding the whole attestation object into *AttestationModel: a sibling attestation
-// variant (e.g. gcp_service_account) can be Unknown here when its config expression
-// depends on a not-yet-resolved value (a conditional over an unresolved
-// variable/resource attribute, for example), and reflecting an Unknown value into
-// anything but a `types` package type is a hard error. Fetching just this one
-// sub-attribute keeps that irrelevant, possibly-Unknown sibling out of the decode
-// entirely.
-func validateK8sJwtConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	var k8sJwtObj types.Object
-	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("attestation").AtName("k8s_jwt"), &k8sJwtObj)...)
+	if data.Attestation.IsNull() || data.Attestation.IsUnknown() {
+		return
+	}
+	attestation := modelFromObject[AttestationModel](ctx, data.Attestation, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	k8sJwt := modelFromObject[K8sJwtModel](ctx, k8sJwtObj, &resp.Diagnostics)
+	k8sJwt := modelFromObject[K8sJwtModel](ctx, attestation.K8sJwt, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -779,7 +858,12 @@ func (r *ServerGroupResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	attestation, attDiags := buildAttestationRequest(ctx, plan.Attestation)
+	attestationModel := modelFromObject[AttestationModel](ctx, plan.Attestation, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	attestation, attDiags := buildAttestationRequest(ctx, attestationModel)
 	resp.Diagnostics.Append(attDiags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -883,7 +967,12 @@ func (r *ServerGroupResource) Update(ctx context.Context, req resource.UpdateReq
 		updateReq.Description = new(plan.Description.ValueString())
 	}
 
-	attestation, attDiags := buildAttestationRequest(ctx, plan.Attestation)
+	attestationModel := modelFromObject[AttestationModel](ctx, plan.Attestation, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	attestation, attDiags := buildAttestationRequest(ctx, attestationModel)
 	resp.Diagnostics.Append(attDiags...)
 	if resp.Diagnostics.HasError() {
 		return

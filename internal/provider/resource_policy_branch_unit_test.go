@@ -3,9 +3,11 @@ package provider
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/cyberark/conjur-api-go/conjurapi"
+	"github.com/cyberark/conjur-api-go/conjurapi/response"
 	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api/mocks"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -149,7 +151,7 @@ func TestPolicyBranchResource_Read(t *testing.T) {
 				Annotations: types.MapNull(types.StringType),
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
-				mockV2.On("ReadBranch", "data/test/nonexistent").Return(nil, fmt.Errorf("404 not found"))
+				mockV2.On("ReadBranch", "data/test/nonexistent").Return(nil, &response.ConjurError{Code: http.StatusNotFound})
 			},
 		},
 		{
