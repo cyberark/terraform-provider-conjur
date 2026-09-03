@@ -76,8 +76,9 @@ func TestHostResource_Create(t *testing.T) {
 					{
 						Type:      types.StringValue("jwt"),
 						ServiceID: types.StringValue("jwt-service"),
-						Data: &HostAuthnDescriptorData{
-							Claims: map[string]string{"sub": "test", "aud": "myapp"},
+						Data: map[string]string{
+							"sub": "test",
+							"aud": "myapp",
 						},
 					},
 				},
@@ -457,3 +458,126 @@ func getHostTestSchema() schema.Schema {
 	r.Schema(context.Background(), resource.SchemaRequest{}, &schemaResp)
 	return schemaResp.Schema
 }
+
+func TestHostResource_ValidateConfig(t *testing.T) {
+	tests := []struct {
+		name          string
+		data          HostResourceModel
+		expectedError bool
+		errorContains string
+	}{
+		{
+			name: "valid config with data",
+			data: HostResourceModel{
+				Name:         types.StringValue("test-host"),
+				Branch:       types.StringValue("data"),
+				RestrictedTo: types.ListNull(types.StringType),
+				AuthnDescriptors: []HostAuthnDescriptor{
+					{
+						Type: types.StringValue("jwt"),
+						Data: map[string]string{"sub": "user1"},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		{
+			name: "valid config with no data",
+			data: HostResourceModel{
+				Name:         types.StringValue("test-host"),
+				Branch:       types.StringValue("data"),
+				RestrictedTo: types.ListNull(types.StringType),
+				AuthnDescriptors: []HostAuthnDescriptor{
+					{
+						Type: types.StringValue("api_key"),
+					},
+				},
+			},
+			expectedError: false,
+		},
+		{
+			name: "empty authn_descriptors is rejected",
+			data: HostResourceModel{
+				Name:             types.StringValue("test-host"),
+				Branch:           types.StringValue("data"),
+				RestrictedTo:     types.ListNull(types.StringType),
+				AuthnDescriptors: []HostAuthnDescriptor{},
+			},
+			expectedError: true,
+			errorContains: "At least one authentication descriptor is required",
+		},
+		{
+			name: "valid config with multi-valued claim",
+			data: HostResourceModel{
+				Name:         types.StringValue("test-host"),
+				Branch:       types.StringValue("data"),
+				RestrictedTo: types.ListNull(types.StringType),
+				AuthnDescriptors: []HostAuthnDescriptor{
+					{
+						Type:    types.StringValue("jwt"),
+						Data: map[string]string{"aud": `["aud1", "aud2"]`},
+					},
+				},
+			},
+			expectedError: false,
+		},
+		{
+			name: "missing descriptor type is rejected",
+			data: HostResourceModel{
+				Name:         types.StringValue("test-host"),
+				Branch:       types.StringValue("data"),
+				RestrictedTo: types.ListNull(types.StringType),
+				AuthnDescriptors: []HostAuthnDescriptor{
+					{
+						Type: types.StringValue(""),
+					},
+				},
+			},
+			expectedError: true,
+			errorContains: "is missing a type",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &HostResource{}
+			s := getHostTestSchema()
+
+			// tfsdk.Config has no Set method (a practitioner's config is
+			// read-only from the provider's perspective), so build the Raw
+			// tftypes.Value via a Plan — which does support Set — and reuse
+			// it for the Config, matching the pattern used by the SWA
+			// resource unit tests (see buildServerConfigFromPlan).
+			plan := newPlanWithSchema(s)
+			ctx := context.Background()
+			plan.Set(ctx, &tt.data)
+
+			req := resource.ValidateConfigRequest{
+				Config: tfsdk.Config{
+					Raw:    plan.Raw,
+					Schema: s,
+				},
+			}
+			resp := &resource.ValidateConfigResponse{}
+
+			r.ValidateConfig(ctx, req, resp)
+
+			if tt.expectedError {
+				assert.True(t, resp.Diagnostics.HasError())
+				if tt.errorContains != "" {
+					found := false
+					for _, diag := range resp.Diagnostics.Errors() {
+						if contains(diag.Summary(), tt.errorContains) || contains(diag.Detail(), tt.errorContains) {
+							found = true
+							break
+						}
+					}
+					assert.True(t, found, "Expected error to contain: %s", tt.errorContains)
+				}
+			} else {
+				assert.False(t, resp.Diagnostics.HasError())
+			}
+		})
+	}
+}
+
