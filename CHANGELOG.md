@@ -5,14 +5,14 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-### Changed
-- **Breaking:** `conjur_host`'s `authn_descriptors[].data` is now a flat map
-  of keys to expected values (e.g. JWT claim names to expected claim
-  values, or other authenticator-specific data). 
-  Multiple values for a single key (e.g. a JWT `aud` claim) are expressed as 
-  a JSON array string, e.g. `aud = jsonencode(["app1", "app2"])`.
 
+## [0.9.10] - 2026-09-04
 ### Fixed
+- `conjur_host`'s `authn_descriptors[].data` is now a flat map
+  of keys to expected values (e.g. JWT claim names to expected claim
+  values, or other authenticator-specific data).
+  Multiple values for a single key (e.g. a JWT `aud` claim) are expressed as
+  a JSON array string, e.g. `aud = jsonencode(["app1", "app2"])`.
 - `conjur_host`, `conjur_group`, and `conjur_permission` no longer misidentify
   the Secrets Manager account when a branch or name contains a colon (e.g. a
   host named after a `spiffe://...` ID).
