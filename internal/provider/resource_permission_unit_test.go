@@ -206,10 +206,11 @@ func TestPermissionResource_Read(t *testing.T) {
 				}),
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
-				mockV2.On("CheckPermissionForRole", "variable:data/test/db-password", "group:data/test/developers", "read").Return(true, nil)
-				mockV2.On("CheckPermissionForRole", "variable:data/test/db-password", "group:data/test/developers", "update").Return(false, nil)
-				mockV2.On("CheckPermissionForRole", "variable:data/test/db-password", "group:data/test/developers", "execute").Return(false, nil)
-				mockV2.On("CheckPermissionForRole", "variable:data/test/db-password", "group:data/test/developers", "create").Return(false, nil)
+				mockV2.On("GetConfig").Return(conjurapi.Config{Account: "conjur"})
+				mockV2.On("CheckPermissionForRole", "conjur:variable:data/test/db-password", "conjur:group:data/test/developers", "read").Return(true, nil)
+				mockV2.On("CheckPermissionForRole", "conjur:variable:data/test/db-password", "conjur:group:data/test/developers", "update").Return(false, nil)
+				mockV2.On("CheckPermissionForRole", "conjur:variable:data/test/db-password", "conjur:group:data/test/developers", "execute").Return(false, nil)
+				mockV2.On("CheckPermissionForRole", "conjur:variable:data/test/db-password", "conjur:group:data/test/developers", "create").Return(false, nil)
 			},
 			expectedError: false,
 			expectedPrivs: []string{"read"},
@@ -233,10 +234,11 @@ func TestPermissionResource_Read(t *testing.T) {
 				}),
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
-				mockV2.On("CheckPermissionForRole", "variable:data/prod/api-key", "group:data/prod/admins", "read").Return(true, nil)
-				mockV2.On("CheckPermissionForRole", "variable:data/prod/api-key", "group:data/prod/admins", "update").Return(true, nil)
-				mockV2.On("CheckPermissionForRole", "variable:data/prod/api-key", "group:data/prod/admins", "execute").Return(false, nil)
-				mockV2.On("CheckPermissionForRole", "variable:data/prod/api-key", "group:data/prod/admins", "create").Return(false, nil)
+				mockV2.On("GetConfig").Return(conjurapi.Config{Account: "conjur"})
+				mockV2.On("CheckPermissionForRole", "conjur:variable:data/prod/api-key", "conjur:group:data/prod/admins", "read").Return(true, nil)
+				mockV2.On("CheckPermissionForRole", "conjur:variable:data/prod/api-key", "conjur:group:data/prod/admins", "update").Return(true, nil)
+				mockV2.On("CheckPermissionForRole", "conjur:variable:data/prod/api-key", "conjur:group:data/prod/admins", "execute").Return(false, nil)
+				mockV2.On("CheckPermissionForRole", "conjur:variable:data/prod/api-key", "conjur:group:data/prod/admins", "create").Return(false, nil)
 			},
 			expectedError: false,
 			expectedPrivs: []string{"read", "update"},
@@ -259,7 +261,8 @@ func TestPermissionResource_Read(t *testing.T) {
 				}),
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
-				mockV2.On("CheckPermissionForRole", "variable:data/test/secret", "group:data/test/users", "read").Return(false, fmt.Errorf("connection error"))
+				mockV2.On("GetConfig").Return(conjurapi.Config{Account: "conjur"})
+				mockV2.On("CheckPermissionForRole", "conjur:variable:data/test/secret", "conjur:group:data/test/users", "read").Return(false, fmt.Errorf("connection error"))
 			},
 			expectedError: true,
 			errorContains: "Unable to check permission via API",
@@ -280,13 +283,46 @@ func TestPermissionResource_Read(t *testing.T) {
 				Privileges: types.ListValueMust(types.StringType, []attr.Value{}),
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
-				mockV2.On("CheckPermissionForRole", "variable:data/test/restricted", "group:data/test/guests", "read").Return(false, nil)
-				mockV2.On("CheckPermissionForRole", "variable:data/test/restricted", "group:data/test/guests", "update").Return(false, nil)
-				mockV2.On("CheckPermissionForRole", "variable:data/test/restricted", "group:data/test/guests", "execute").Return(false, nil)
-				mockV2.On("CheckPermissionForRole", "variable:data/test/restricted", "group:data/test/guests", "create").Return(false, nil)
+				mockV2.On("GetConfig").Return(conjurapi.Config{Account: "conjur"})
+				mockV2.On("CheckPermissionForRole", "conjur:variable:data/test/restricted", "conjur:group:data/test/guests", "read").Return(false, nil)
+				mockV2.On("CheckPermissionForRole", "conjur:variable:data/test/restricted", "conjur:group:data/test/guests", "update").Return(false, nil)
+				mockV2.On("CheckPermissionForRole", "conjur:variable:data/test/restricted", "conjur:group:data/test/guests", "execute").Return(false, nil)
+				mockV2.On("CheckPermissionForRole", "conjur:variable:data/test/restricted", "conjur:group:data/test/guests", "create").Return(false, nil)
 			},
 			expectedError: false,
 			expectedPrivs: []string{},
+		},
+		{
+			// Regression test: a SPIFFE-ID-named role's name contains its own
+			// "spiffe://" colon. Without an explicit account, CheckPermissionForRole's
+			// ID parser (a naive strings.SplitN(id, ":", 3)) would misread that colon
+			// as the account/kind boundary instead of defaulting the account, and the
+			// check would go against the wrong role entirely.
+			name: "role named after a SPIFFE ID",
+			data: PermissionResourceModel{
+				Role: RoleModel{
+					Name:   types.StringValue("spiffe://prod.example.com/k8s-nodegroup/ns/myapp/sa/myapp"),
+					Kind:   types.StringValue("host"),
+					Branch: types.StringValue("data/swa/trust-domains/prod.example.com/workloads"),
+				},
+				Resource: ResourceModel{
+					Name:   types.StringValue("db-password"),
+					Kind:   types.StringValue("variable"),
+					Branch: types.StringValue("data/test"),
+				},
+				Privileges: types.ListValueMust(types.StringType, []attr.Value{
+					types.StringValue("read"),
+				}),
+			},
+			setupMock: func(mockV2 *mocks.MockClientV2) {
+				mockV2.On("GetConfig").Return(conjurapi.Config{Account: "conjur"})
+				mockV2.On("CheckPermissionForRole", "conjur:variable:data/test/db-password", "conjur:host:data/swa/trust-domains/prod.example.com/workloads/spiffe://prod.example.com/k8s-nodegroup/ns/myapp/sa/myapp", "read").Return(true, nil)
+				mockV2.On("CheckPermissionForRole", "conjur:variable:data/test/db-password", "conjur:host:data/swa/trust-domains/prod.example.com/workloads/spiffe://prod.example.com/k8s-nodegroup/ns/myapp/sa/myapp", "update").Return(false, nil)
+				mockV2.On("CheckPermissionForRole", "conjur:variable:data/test/db-password", "conjur:host:data/swa/trust-domains/prod.example.com/workloads/spiffe://prod.example.com/k8s-nodegroup/ns/myapp/sa/myapp", "execute").Return(false, nil)
+				mockV2.On("CheckPermissionForRole", "conjur:variable:data/test/db-password", "conjur:host:data/swa/trust-domains/prod.example.com/workloads/spiffe://prod.example.com/k8s-nodegroup/ns/myapp/sa/myapp", "create").Return(false, nil)
+			},
+			expectedError: false,
+			expectedPrivs: []string{"read"},
 		},
 	}
 

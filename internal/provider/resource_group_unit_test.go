@@ -173,7 +173,8 @@ func TestGroupResource_Read(t *testing.T) {
 				Branch: types.StringValue("data/test"),
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
-				mockV2.On("RoleExists", "group:data/test/developers").Return(true, nil)
+				mockV2.On("GetConfig").Return(conjurapi.Config{Account: "conjur"})
+				mockV2.On("RoleExists", "conjur:group:data/test/developers").Return(true, nil)
 			},
 			expectedError: false,
 			shouldRemove:  false,
@@ -185,7 +186,8 @@ func TestGroupResource_Read(t *testing.T) {
 				Branch: types.StringValue("data/test"),
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
-				mockV2.On("RoleExists", "group:data/test/missing-group").Return(false, nil)
+				mockV2.On("GetConfig").Return(conjurapi.Config{Account: "conjur"})
+				mockV2.On("RoleExists", "conjur:group:data/test/missing-group").Return(false, nil)
 			},
 			expectedError: false,
 			shouldRemove:  true,
@@ -197,7 +199,8 @@ func TestGroupResource_Read(t *testing.T) {
 				Branch: types.StringValue("data/test"),
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
-				mockV2.On("RoleExists", "group:data/test/error-group").
+				mockV2.On("GetConfig").Return(conjurapi.Config{Account: "conjur"})
+				mockV2.On("RoleExists", "conjur:group:data/test/error-group").
 					Return(false, fmt.Errorf("connection error"))
 			},
 			expectedError: true,
@@ -210,7 +213,8 @@ func TestGroupResource_Read(t *testing.T) {
 				Branch: types.StringValue("data/production/teams"),
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
-				mockV2.On("RoleExists", "group:data/production/teams/admins").Return(true, nil)
+				mockV2.On("GetConfig").Return(conjurapi.Config{Account: "conjur"})
+				mockV2.On("RoleExists", "conjur:group:data/production/teams/admins").Return(true, nil)
 			},
 			expectedError: false,
 			shouldRemove:  false,
@@ -226,7 +230,8 @@ func TestGroupResource_Read(t *testing.T) {
 				},
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
-				mockV2.On("RoleExists", "group:data/groups/security").Return(true, nil)
+				mockV2.On("GetConfig").Return(conjurapi.Config{Account: "conjur"})
+				mockV2.On("RoleExists", "conjur:group:data/groups/security").Return(true, nil)
 			},
 			expectedError: false,
 			shouldRemove:  false,

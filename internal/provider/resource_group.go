@@ -182,8 +182,7 @@ func (r *GroupResource) Read(ctx context.Context, req resource.ReadRequest, resp
 		return
 	}
 
-	// Just validate the group exists in Conjur since we can't fully hydrate the state via API currently
-	groupID := fmt.Sprintf("group:%s/%s", data.Branch.ValueString(), data.Name.ValueString())
+	groupID := fullyQualifiedID(r.client, "group", fmt.Sprintf("%s/%s", data.Branch.ValueString(), data.Name.ValueString()))
 	exists, err := r.client.RoleExists(groupID)
 	if err != nil {
 		resp.Diagnostics.AddError(

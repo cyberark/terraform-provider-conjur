@@ -139,9 +139,8 @@ func (r *membershipResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	account := r.client.GetConfig().Account
-	fqMember := fmt.Sprintf("%s:%s:%s", account, data.MemberKind.ValueString(), data.MemberID.ValueString())
-	fqGroup := fmt.Sprintf("%s:group:%s", account, data.GroupID.ValueString())
+	fqMember := fullyQualifiedID(r.client, data.MemberKind.ValueString(), data.MemberID.ValueString())
+	fqGroup := fullyQualifiedID(r.client, "group", data.GroupID.ValueString())
 
 	memberships, err := r.client.RoleMemberships(fqMember)
 	if err != nil {

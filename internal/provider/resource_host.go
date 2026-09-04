@@ -238,7 +238,7 @@ func (r *HostResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	hostID := fmt.Sprintf("host:%s/%s", data.Branch.ValueString(), data.Name.ValueString())
+	hostID := fullyQualifiedID(r.client, "host", fmt.Sprintf("%s/%s", data.Branch.ValueString(), data.Name.ValueString()))
 	exists, err := r.client.RoleExists(hostID)
 	if err != nil {
 		resp.Diagnostics.AddError(
