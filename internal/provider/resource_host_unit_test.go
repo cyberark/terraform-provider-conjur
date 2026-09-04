@@ -198,7 +198,8 @@ func TestHostResource_Read(t *testing.T) {
 				},
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
-				mockV2.On("RoleExists", "host:data/test-host").Return(true, nil)
+				mockV2.On("GetConfig").Return(conjurapi.Config{Account: "conjur"})
+				mockV2.On("RoleExists", "conjur:host:data/test-host").Return(true, nil)
 			},
 			expectedError: false,
 			shouldRemove:  false,
@@ -216,7 +217,8 @@ func TestHostResource_Read(t *testing.T) {
 				},
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
-				mockV2.On("RoleExists", "host:data/missing-host").Return(false, nil)
+				mockV2.On("GetConfig").Return(conjurapi.Config{Account: "conjur"})
+				mockV2.On("RoleExists", "conjur:host:data/missing-host").Return(false, nil)
 			},
 			expectedError: false,
 			shouldRemove:  true,
@@ -234,7 +236,8 @@ func TestHostResource_Read(t *testing.T) {
 				},
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
-				mockV2.On("RoleExists", "host:data/error-host").
+				mockV2.On("GetConfig").Return(conjurapi.Config{Account: "conjur"})
+				mockV2.On("RoleExists", "conjur:host:data/error-host").
 					Return(false, fmt.Errorf("connection error"))
 			},
 			expectedError: true,
@@ -253,7 +256,32 @@ func TestHostResource_Read(t *testing.T) {
 				},
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
-				mockV2.On("RoleExists", "host:data/production/servers/server-01").Return(true, nil)
+				mockV2.On("GetConfig").Return(conjurapi.Config{Account: "conjur"})
+				mockV2.On("RoleExists", "conjur:host:data/production/servers/server-01").Return(true, nil)
+			},
+			expectedError: false,
+			shouldRemove:  false,
+		},
+		{
+			// Regression test: a SPIFFE-ID-named host's name contains its own
+			// "spiffe://" colon. Without an explicit account, RoleExists's ID
+			// parser (a naive strings.SplitN(id, ":", 3)) would misread that
+			// colon as the account/kind boundary instead of defaulting the
+			// account, and the lookup would go to the wrong role entirely.
+			name: "host named after a SPIFFE ID",
+			data: HostResourceModel{
+				Name:         types.StringValue("spiffe://prod.example.com/k8s-nodegroup/ns/myapp/sa/myapp"),
+				Branch:       types.StringValue("data/swa/trust-domains/prod.example.com/workloads"),
+				RestrictedTo: types.ListNull(types.StringType),
+				AuthnDescriptors: []HostAuthnDescriptor{
+					{
+						Type: types.StringValue("api_key"),
+					},
+				},
+			},
+			setupMock: func(mockV2 *mocks.MockClientV2) {
+				mockV2.On("GetConfig").Return(conjurapi.Config{Account: "conjur"})
+				mockV2.On("RoleExists", "conjur:host:data/swa/trust-domains/prod.example.com/workloads/spiffe://prod.example.com/k8s-nodegroup/ns/myapp/sa/myapp").Return(true, nil)
 			},
 			expectedError: false,
 			shouldRemove:  false,

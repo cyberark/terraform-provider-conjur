@@ -201,8 +201,8 @@ func (r *PermissionResource) Read(ctx context.Context, req resource.ReadRequest,
 
 	for _, priv := range privs {
 		hasPriv, err := r.client.CheckPermissionForRole(
-			fmt.Sprintf("%s:%s", data.Resource.Kind.ValueString(), joinID(data.Resource.Branch.ValueString(), data.Resource.Name.ValueString())),
-			fmt.Sprintf("%s:%s", data.Role.Kind.ValueString(), joinID(data.Role.Branch.ValueString(), data.Role.Name.ValueString())),
+			fullyQualifiedID(r.client, data.Resource.Kind.ValueString(), joinID(data.Resource.Branch.ValueString(), data.Resource.Name.ValueString())),
+			fullyQualifiedID(r.client, data.Role.Kind.ValueString(), joinID(data.Role.Branch.ValueString(), data.Role.Name.ValueString())),
 			priv,
 		)
 		if err != nil {
