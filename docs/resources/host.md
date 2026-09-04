@@ -14,7 +14,7 @@ CyberArk Secrets Manager host resource
 
 ```terraform
 resource "conjur_host" "my_host" {
-  name = "my-host"
+  name   = "my-host"
   branch = "data/terraform/test"
   annotations = {
     description = "Workload managed by Terraform",
@@ -24,6 +24,25 @@ resource "conjur_host" "my_host" {
   authn_descriptors = [
     {
       type = "api_key"
+    }
+  ]
+}
+
+resource "conjur_host" "my_jwt_host" {
+  name   = "my-jwt-host"
+  branch = "data/terraform/test"
+  authn_descriptors = [
+    {
+      type       = "jwt"
+      service_id = "my-jwt-service"
+      # "data" maps authenticator-specific keys (here, JWT claim names) to
+      # expected values. Express multiple expected values
+      # for a single key as a JSON array string, e.g. an "aud" claim that
+      # must match more than one audience.
+      data = {
+        sub = "my-workload-identity"
+        aud = jsonencode(["app1", "app2"])
+      }
     }
   ]
 }
@@ -54,16 +73,8 @@ Required:
 
 Optional:
 
-- `data` (Attributes) Additional data for the authentication descriptor (see [below for nested schema](#nestedatt--authn_descriptors--data))
+- `data` (Map of String) Map of keys to expected values for the authentication descriptor (e.g. JWT claim names to expected claim values, or other authenticator-specific data), sent to the API as-is. To specify multiple values for a single key (e.g. a JWT `aud` claim that must match more than one audience), use a JSON array string, e.g. `jsonencode(["app1", "app2"])`; any other value is sent to the API as a single scalar string.
 - `service_id` (String) Service ID for the authentication type
-
-<a id="nestedatt--authn_descriptors--data"></a>
-### Nested Schema for `authn_descriptors.data`
-
-Optional:
-
-- `claims` (Map of String) Map of claim keys to expected values
-
 
 
 <a id="nestedatt--owner"></a>

@@ -2,7 +2,9 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/cyberark/conjur-api-go/conjurapi"
 	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api"
@@ -53,14 +55,10 @@ type HostOwnerModel struct {
 	ID   types.String `tfsdk:"id"`
 }
 
-type HostAuthnDescriptorData struct {
-	Claims map[string]string `tfsdk:"claims"`
-}
-
 type HostAuthnDescriptor struct {
-	Type      types.String             `tfsdk:"type"`
-	ServiceID types.String             `tfsdk:"service_id"`
-	Data      *HostAuthnDescriptorData `tfsdk:"data"`
+	Type      types.String `tfsdk:"type"`
+	ServiceID types.String `tfsdk:"service_id"`
+	Data map[string]string `tfsdk:"data"`
 }
 
 func (r *HostResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -140,18 +138,12 @@ func (r *HostResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 								stringplanmodifier.RequiresReplace(),
 							},
 						},
-						"data": schema.SingleNestedAttribute{
-							MarkdownDescription: "Additional data for the authentication descriptor",
+						"data": schema.MapAttribute{
+							MarkdownDescription: "Map of keys to expected values for the authentication descriptor (e.g. JWT claim names to expected claim values, or other authenticator-specific data), sent to the API as-is. To specify multiple values for a single key (e.g. a JWT `aud` claim that must match more than one audience), use a JSON array string, e.g. `jsonencode([\"app1\", \"app2\"])`; any other value is sent to the API as a single scalar string.",
+							ElementType:         types.StringType,
 							Optional:            true,
-							Attributes: map[string]schema.Attribute{
-								"claims": schema.MapAttribute{
-									MarkdownDescription: "Map of claim keys to expected values",
-									ElementType:         types.StringType,
-									Optional:            true,
-									PlanModifiers: []planmodifier.Map{
-										mapplanmodifier.RequiresReplace(),
-									},
-								},
+							PlanModifiers: []planmodifier.Map{
+								mapplanmodifier.RequiresReplace(),
 							},
 						},
 					},
@@ -185,6 +177,16 @@ func (r *HostResource) ValidateConfig(ctx context.Context, req resource.Validate
 			"Invalid authn_descriptors",
 			"At least one authentication descriptor is required.",
 		)
+	}
+
+	// Validate each descriptor's type is set.
+	for i, descriptor := range data.AuthnDescriptors {
+		if descriptor.Type.ValueString() == "" {
+			resp.Diagnostics.AddError(
+				"Invalid authn_descriptors",
+				fmt.Sprintf("authn_descriptors[%d] is missing a type.", i),
+			)
+		}
 	}
 }
 
@@ -232,8 +234,10 @@ func (r *HostResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	}
 	var data HostResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
-	// Just validate the host exists in Conjur since we can't fully hydrate the state via API currently
 	hostID := fmt.Sprintf("host:%s/%s", data.Branch.ValueString(), data.Name.ValueString())
 	exists, err := r.client.RoleExists(hostID)
 	if err != nil {
@@ -307,10 +311,15 @@ func (r *HostResource) buildHostPayload(data *HostResourceModel) (*conjurapi.Wor
 			descriptor.ServiceID = v.ServiceID.ValueString()
 		}
 
-		if v.Data != nil && len(v.Data.Claims) > 0 {
-			descriptor.Data = &conjurapi.AuthnDescriptorData{
-				Claims: v.Data.Claims,
+		if len(v.Data) > 0 {
+			// The client's AuthnDescriptor.Data is map[string]any (structure
+			// varies by authenticator type). A JSON array value is decoded
+			// into a []string; otherwise it is sent as-is.
+			descriptorData := make(map[string]any, len(v.Data))
+			for k, val := range v.Data {
+				descriptorData[k] = claimValueToAPI(val)
 			}
+			descriptor.Data = descriptorData
 		}
 		authnDescriptors[i] = descriptor
 	}
@@ -341,4 +350,20 @@ func (r *HostResource) buildHostPayload(data *HostResourceModel) (*conjurapi.Wor
 	}
 
 	return &host, nil
+}
+
+// claimValueToAPI decodes a JSON array string into []string, or returns the raw string.
+// Values starting with "[" are parsed as JSON;
+// invalid JSON or non-[]string values are returned as-is.
+func claimValueToAPI(raw string) any {
+	trimmed := strings.TrimSpace(raw)
+	if !strings.HasPrefix(trimmed, "[") {
+		return raw
+	}
+
+	var values []string
+	if err := json.Unmarshal([]byte(trimmed), &values); err != nil {
+		return raw
+	}
+	return values
 }

@@ -43,7 +43,6 @@ func TestHostResource_buildHostPayload(t *testing.T) {
 				{
 					Type:      types.StringValue("api_key"),
 					ServiceID: types.StringNull(),
-					Data:      nil,
 				},
 			},
 			RestrictedTo: types.ListNull(types.StringType),
@@ -87,17 +86,14 @@ func TestHostResource_buildHostPayload(t *testing.T) {
 				{
 					Type:      types.StringValue("jwt"),
 					ServiceID: types.StringValue("jwt-service"),
-					Data: &HostAuthnDescriptorData{
-						Claims: map[string]string{
-							"sub": "test-subject",
-							"aud": "test-audience",
-						},
+					Data: map[string]string{
+						"sub": "test-subject",
+						"aud": "test-audience",
 					},
 				},
 				{
 					Type:      types.StringValue("jwt"),
 					ServiceID: types.StringValue("jenkins"),
-					Data:      nil,
 				},
 			},
 			Annotations: map[string]string{
@@ -131,8 +127,8 @@ func TestHostResource_buildHostPayload(t *testing.T) {
 		assert.Equal(t, "jwt", host.AuthnDescriptors[0].Type)
 		assert.Equal(t, "jwt-service", host.AuthnDescriptors[0].ServiceID)
 		require.NotNil(t, host.AuthnDescriptors[0].Data)
-		assert.Equal(t, "test-subject", host.AuthnDescriptors[0].Data.Claims["sub"])
-		assert.Equal(t, "test-audience", host.AuthnDescriptors[0].Data.Claims["aud"])
+		assert.Equal(t, "test-subject", host.AuthnDescriptors[0].Data["sub"])
+		assert.Equal(t, "test-audience", host.AuthnDescriptors[0].Data["aud"])
 
 		// Second descriptor without claims
 		assert.Equal(t, "jwt", host.AuthnDescriptors[1].Type)
@@ -154,7 +150,6 @@ func TestHostResource_buildHostPayload(t *testing.T) {
 				{
 					Type:      types.StringValue("api_key"),
 					ServiceID: types.StringValue(""),
-					Data:      nil,
 				},
 			},
 			RestrictedTo: types.ListNull(types.StringType),
@@ -171,7 +166,7 @@ func TestHostResource_buildHostPayload(t *testing.T) {
 		assert.Empty(t, host.AuthnDescriptors[0].ServiceID)
 	})
 
-	t.Run("Authn descriptor with empty claims", func(t *testing.T) {
+	t.Run("Authn descriptor with empty data", func(t *testing.T) {
 		data := &HostResourceModel{
 			Name:   types.StringValue("test-host"),
 			Branch: types.StringValue("data"),
@@ -180,9 +175,7 @@ func TestHostResource_buildHostPayload(t *testing.T) {
 				{
 					Type:      types.StringValue("jwt"),
 					ServiceID: types.StringValue("jwt-service"),
-					Data: &HostAuthnDescriptorData{
-						Claims: map[string]string{},
-					},
+					Data:      map[string]string{},
 				},
 			},
 			RestrictedTo: types.ListNull(types.StringType),
@@ -197,7 +190,80 @@ func TestHostResource_buildHostPayload(t *testing.T) {
 		assert.Len(t, host.AuthnDescriptors, 1)
 		assert.Equal(t, "jwt", host.AuthnDescriptors[0].Type)
 		assert.Equal(t, "jwt-service", host.AuthnDescriptors[0].ServiceID)
-		assert.Nil(t, host.AuthnDescriptors[0].Data) // Should be nil due to empty claims check
+		assert.Nil(t, host.AuthnDescriptors[0].Data) // Should be nil due to empty data check
+	})
+
+	t.Run("Authn descriptor with multi-valued claim", func(t *testing.T) {
+		data := &HostResourceModel{
+			Name:   types.StringValue("test-host"),
+			Branch: types.StringValue("data"),
+			Type:   types.StringNull(),
+			AuthnDescriptors: []HostAuthnDescriptor{
+				{
+					Type:      types.StringValue("jwt"),
+					ServiceID: types.StringValue("jwt-service"),
+					Data: map[string]string{
+						"aud": `["app1", "app2", "app3"]`,
+						"sub": "single-value",
+						// A comma is a legal URI character (e.g. a query
+						// string), and must be preserved unchanged since it
+						// has no meaning outside a JSON array value.
+						"iss": "https://issuer.example.com/path?a=1,2",
+					},
+				},
+			},
+			RestrictedTo: types.ListNull(types.StringType),
+			Owner:        nil,
+			Annotations:  nil,
+		}
+
+		host, err := r.buildHostPayload(data)
+
+		require.NoError(t, err)
+		assert.NotNil(t, host)
+		require.NotNil(t, host.AuthnDescriptors[0].Data)
+		// A JSON array value is decoded into a []string.
+		assert.Equal(t, []string{"app1", "app2", "app3"}, host.AuthnDescriptors[0].Data["aud"])
+		// A value that isn't a JSON array is sent unchanged as a scalar string.
+		assert.Equal(t, "single-value", host.AuthnDescriptors[0].Data["sub"])
+		// A comma inside a value (e.g. a URI query string) is preserved.
+		assert.Equal(t, "https://issuer.example.com/path?a=1,2", host.AuthnDescriptors[0].Data["iss"])
+	})
+
+	t.Run("Authn descriptor with bracket-leading scalar claim values", func(t *testing.T) {
+		data := &HostResourceModel{
+			Name:   types.StringValue("test-host"),
+			Branch: types.StringValue("data"),
+			Type:   types.StringNull(),
+			AuthnDescriptors: []HostAuthnDescriptor{
+				{
+					Type:      types.StringValue("jwt"),
+					ServiceID: types.StringValue("jwt-service"),
+					Data: map[string]string{
+						// Starts with "[" but isn't valid JSON: sent
+						// unchanged as a literal string rather than
+						// rejected, since there's no way to tell a
+						// malformed array apart from an intentional
+						// bracket-leading scalar.
+						"aud": "[redacted]",
+						// Valid JSON, but not an array of strings (an
+						// array of numbers): also sent unchanged.
+						"sub": "[1, 2]",
+					},
+				},
+			},
+			RestrictedTo: types.ListNull(types.StringType),
+			Owner:        nil,
+			Annotations:  nil,
+		}
+
+		host, err := r.buildHostPayload(data)
+
+		require.NoError(t, err)
+		assert.NotNil(t, host)
+		require.NotNil(t, host.AuthnDescriptors[0].Data)
+		assert.Equal(t, "[redacted]", host.AuthnDescriptors[0].Data["aud"])
+		assert.Equal(t, "[1, 2]", host.AuthnDescriptors[0].Data["sub"])
 	})
 
 	t.Run("Unknown fields are empty", func(t *testing.T) {
@@ -209,7 +275,6 @@ func TestHostResource_buildHostPayload(t *testing.T) {
 				{
 					Type:      types.StringValue("jwt"),
 					ServiceID: types.StringUnknown(),
-					Data:      nil,
 				},
 			},
 			RestrictedTo: types.ListNull(types.StringType),
@@ -237,7 +302,6 @@ func TestHostResource_buildHostPayload(t *testing.T) {
 				{
 					Type:      types.StringValue("jwt"),
 					ServiceID: types.StringNull(),
-					Data:      nil,
 				},
 			},
 			RestrictedTo: emptyList,
@@ -264,7 +328,6 @@ func TestHostResource_buildHostPayload(t *testing.T) {
 				{
 					Type:      types.StringValue("jwt"),
 					ServiceID: types.StringNull(),
-					Data:      nil,
 				},
 			},
 			RestrictedTo: restrictedToList,
@@ -289,7 +352,6 @@ func TestHostResource_buildHostPayload(t *testing.T) {
 				{
 					Type:      types.StringValue("jwt"),
 					ServiceID: types.StringNull(),
-					Data:      nil,
 				},
 			},
 			RestrictedTo: types.ListNull(types.StringType),
@@ -313,21 +375,16 @@ func TestHostResource_buildHostPayload(t *testing.T) {
 				{
 					Type:      types.StringValue("jwt"),
 					ServiceID: types.StringValue("jwt-service"),
-					Data: &HostAuthnDescriptorData{
-						Claims: map[string]string{"sub": "user1"},
-					},
+					Data:      map[string]string{"sub": "user1"},
 				},
 				{
 					Type:      types.StringValue("api_key"),
 					ServiceID: types.StringValue(""),
-					Data:      nil,
 				},
 				{
 					Type:      types.StringValue("ldap"),
 					ServiceID: types.StringValue("ldap-service"),
-					Data: &HostAuthnDescriptorData{
-						Claims: map[string]string{}, // Empty claims
-					},
+					Data:      map[string]string{}, // Empty data
 				},
 			},
 			RestrictedTo: types.ListNull(types.StringType),
@@ -345,7 +402,7 @@ func TestHostResource_buildHostPayload(t *testing.T) {
 		assert.Equal(t, "jwt", host.AuthnDescriptors[0].Type)
 		assert.Equal(t, "jwt-service", host.AuthnDescriptors[0].ServiceID)
 		require.NotNil(t, host.AuthnDescriptors[0].Data)
-		assert.Equal(t, "user1", host.AuthnDescriptors[0].Data.Claims["sub"])
+		assert.Equal(t, "user1", host.AuthnDescriptors[0].Data["sub"])
 
 		// Second descriptor without service ID or data
 		assert.Equal(t, "api_key", host.AuthnDescriptors[1].Type)
