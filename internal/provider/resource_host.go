@@ -56,9 +56,9 @@ type HostOwnerModel struct {
 }
 
 type HostAuthnDescriptor struct {
-	Type      types.String `tfsdk:"type"`
-	ServiceID types.String `tfsdk:"service_id"`
-	Data map[string]string `tfsdk:"data"`
+	Type      types.String      `tfsdk:"type"`
+	ServiceID types.String      `tfsdk:"service_id"`
+	Data      map[string]string `tfsdk:"data"`
 }
 
 func (r *HostResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -168,7 +168,7 @@ func (r *HostResource) ValidateConfig(ctx context.Context, req resource.Validate
 		return
 	}
 
-	ValidateNonEmpty(data.Name, &resp.Diagnostics, "Host name")
+	ValidateNonBlank(data.Name, &resp.Diagnostics, "Host name")
 	ValidateBranch(data.Branch, &resp.Diagnostics, "branch")
 
 	// Validate authn_descriptors are not empty

@@ -113,7 +113,7 @@ func (r *GroupResource) ValidateConfig(ctx context.Context, req resource.Validat
 		return
 	}
 
-	ValidateNonEmpty(data.Name, &resp.Diagnostics, "Group name")
+	ValidateNonBlank(data.Name, &resp.Diagnostics, "Group name")
 	ValidateBranch(data.Branch, &resp.Diagnostics, "branch")
 }
 

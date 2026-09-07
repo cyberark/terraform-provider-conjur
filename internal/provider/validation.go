@@ -14,6 +14,10 @@ func ValidateBranch(branch types.String, diagnostics *diag.Diagnostics, fieldNam
 		return
 	}
 
+	if branch.IsNull() || branch.IsUnknown() {
+		return
+	}
+
 	branchValue := branch.ValueString()
 
 	normalized := strings.Trim(branchValue, "/")
@@ -36,14 +40,14 @@ func ValidateBranch(branch types.String, diagnostics *diag.Diagnostics, fieldNam
 	}
 }
 
-// ValidateNonEmpty validates that a string value is not empty or whitespace-only.
+// ValidateNonBlank validates that a string value is not whitespace-only.
 // Unknown values are skipped because they may not be resolved during ValidateConfig..
-func ValidateNonEmpty(val types.String, diagnostics *diag.Diagnostics, fieldName string) {
+func ValidateNonBlank(val types.String, diagnostics *diag.Diagnostics, fieldName string) {
 	if diagnostics == nil {
 		return
 	}
 
-	if val.IsUnknown() {
+	if val.IsNull() || val.IsUnknown() {
 		return
 	}
 

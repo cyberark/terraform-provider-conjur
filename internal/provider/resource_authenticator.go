@@ -225,7 +225,7 @@ func (r *AuthenticatorResource) ValidateConfig(ctx context.Context, req resource
 	}
 
 	ValidateContainedIn(data.Type, &resp.Diagnostics, "Authenticator type", []string{"jwt", "aws_iam", "certificate"}, false)
-	ValidateNonEmpty(data.Name, &resp.Diagnostics, "Authenticator name")
+	ValidateNonBlank(data.Name, &resp.Diagnostics, "Authenticator name")
 	ValidateContainedIn(data.Subtype, &resp.Diagnostics, "Authenticator subtype", []string{"gitlab", "github_actions", "kubernetes", "jenkins"}, true)
 }
 
