@@ -89,9 +89,9 @@ func (r *membershipResource) ValidateConfig(ctx context.Context, req resource.Va
 		return
 	}
 
-	ValidateNonEmpty(data.GroupID, &resp.Diagnostics, "group_id")
+	ValidateNonBlank(data.GroupID, &resp.Diagnostics, "group_id")
 	ValidateContainedIn(data.MemberKind, &resp.Diagnostics, "member_kind", []string{"user", "host", "group"}, false)
-	ValidateNonEmpty(data.MemberID, &resp.Diagnostics, "member_id")
+	ValidateNonBlank(data.MemberID, &resp.Diagnostics, "member_id")
 }
 
 func (r *membershipResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
