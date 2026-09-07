@@ -51,7 +51,7 @@ type AuthenticatorResourceModel struct {
 	Enabled     types.Bool              `tfsdk:"enabled"`
 	Owner       types.Object            `tfsdk:"owner"`
 	Data        *AuthenticatorDataModel `tfsdk:"data"`
-	Annotations map[string]string       `tfsdk:"annotations"`
+	Annotations map[string]types.String `tfsdk:"annotations"`
 }
 
 type AuthenticatorDataModel struct {
@@ -398,7 +398,11 @@ func (r *AuthenticatorResource) buildAuthenticatorPayload(data *AuthenticatorRes
 	}
 
 	if len(data.Annotations) > 0 {
-		authenticator.Annotations = data.Annotations
+		ann := map[string]string{}
+		for i, v := range data.Annotations {
+			ann[i] = v.ValueString()
+		}
+		authenticator.Annotations = ann
 	}
 
 	return &authenticator, nil
@@ -479,7 +483,12 @@ func (r *AuthenticatorResource) parseAuthenticatorResponse(authenticator *conjur
 		data.Data = authenticatorData
 	}
 
-	data.Annotations = authenticator.Annotations
+	if authenticator.Annotations != nil {
+		data.Annotations = map[string]types.String{}
+	}
+	for i, v := range authenticator.Annotations {
+		data.Annotations[i] = types.StringValue(v)
+	}
 	return nil
 }
 
