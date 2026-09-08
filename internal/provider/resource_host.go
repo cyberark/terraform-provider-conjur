@@ -56,9 +56,9 @@ type HostOwnerModel struct {
 }
 
 type HostAuthnDescriptor struct {
-	Type      types.String `tfsdk:"type"`
-	ServiceID types.String `tfsdk:"service_id"`
-	Data map[string]string `tfsdk:"data"`
+	Type      types.String      `tfsdk:"type"`
+	ServiceID types.String      `tfsdk:"service_id"`
+	Data      map[string]string `tfsdk:"data"`
 }
 
 func (r *HostResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -120,31 +120,22 @@ func (r *HostResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 				},
 			},
 			"authn_descriptors": schema.ListNestedAttribute{
-				MarkdownDescription: "List of authentication descriptors for the host",
+				MarkdownDescription: "List of authentication descriptors for the host. Adding or removing descriptors, or changing a descriptor's `data`, is applied in place via a PATCH request rather than replacing the host.",
 				Required:            true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"type": schema.StringAttribute{
 							MarkdownDescription: "Type of authentication",
 							Required:            true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.RequiresReplace(),
-							},
 						},
 						"service_id": schema.StringAttribute{
 							MarkdownDescription: "Service ID for the authentication type",
 							Optional:            true,
-							PlanModifiers: []planmodifier.String{
-								stringplanmodifier.RequiresReplace(),
-							},
 						},
 						"data": schema.MapAttribute{
 							MarkdownDescription: "Map of keys to expected values for the authentication descriptor (e.g. JWT claim names to expected claim values, or other authenticator-specific data), sent to the API as-is. To specify multiple values for a single key (e.g. a JWT `aud` claim that must match more than one audience), use a JSON array string, e.g. `jsonencode([\"app1\", \"app2\"])`; any other value is sent to the API as a single scalar string.",
 							ElementType:         types.StringType,
 							Optional:            true,
-							PlanModifiers: []planmodifier.Map{
-								mapplanmodifier.RequiresReplace(),
-							},
 						},
 					},
 				},
@@ -260,15 +251,33 @@ func (r *HostResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-// Update replaces the host by deleting and recreating it since there's no PATCH support
+// Update patches the host's authn_descriptors via PATCH /workloads/{path}. All
+// other attributes require replacement, per the schema's plan modifiers.
 func (r *HostResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	if r.client == nil {
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
 		return
 	}
-	// This should never be called since in-place updates are not supported by the API. Therefore any attribute changes
-	// require replacement of the resource (Delete + Create) as denoted by the plan modifiers.
-	resp.Diagnostics.AddWarning("Update not supported", "Host resources require replacement for any changes, so update is not supported. Please recreate the resource with the desired changes.")
+	var data HostResourceModel
+
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	hostID := fmt.Sprintf("%s/%s", data.Branch.ValueString(), data.Name.ValueString())
+	update := conjurapi.WorkloadFields{
+		AuthnDescriptors: authnDescriptorsToAPI(data.AuthnDescriptors),
+	}
+
+	_, err := r.client.UpdateWorkload(hostID, update)
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update host, got error: %s", err))
+		return
+	}
+
+	tflog.Trace(ctx, "updated host resource")
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *HostResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -301,29 +310,7 @@ func (r *HostResource) buildHostPayload(data *HostResourceModel) (*conjurapi.Wor
 		Name:   data.Name.ValueString(),
 		Branch: data.Branch.ValueString(),
 	}
-	authnDescriptors := make([]conjurapi.AuthnDescriptor, len(data.AuthnDescriptors))
-	for i, v := range data.AuthnDescriptors {
-		descriptor := conjurapi.AuthnDescriptor{
-			Type: v.Type.ValueString(),
-		}
-
-		if v.ServiceID.ValueString() != "" {
-			descriptor.ServiceID = v.ServiceID.ValueString()
-		}
-
-		if len(v.Data) > 0 {
-			// The client's AuthnDescriptor.Data is map[string]any (structure
-			// varies by authenticator type). A JSON array value is decoded
-			// into a []string; otherwise it is sent as-is.
-			descriptorData := make(map[string]any, len(v.Data))
-			for k, val := range v.Data {
-				descriptorData[k] = claimValueToAPI(val)
-			}
-			descriptor.Data = descriptorData
-		}
-		authnDescriptors[i] = descriptor
-	}
-	host.AuthnDescriptors = authnDescriptors
+	host.AuthnDescriptors = authnDescriptorsToAPI(data.AuthnDescriptors)
 
 	// Add optional fields only if they are set
 	if !data.Type.IsNull() && !data.Type.IsUnknown() {
@@ -350,6 +337,34 @@ func (r *HostResource) buildHostPayload(data *HostResourceModel) (*conjurapi.Wor
 	}
 
 	return &host, nil
+}
+
+// authnDescriptorsToAPI maps the resource model's authn_descriptors to the API's
+// AuthnDescriptor type, shared by Create (full payload) and Update (PATCH body).
+func authnDescriptorsToAPI(descriptors []HostAuthnDescriptor) []conjurapi.AuthnDescriptor {
+	authnDescriptors := make([]conjurapi.AuthnDescriptor, len(descriptors))
+	for i, v := range descriptors {
+		descriptor := conjurapi.AuthnDescriptor{
+			Type: v.Type.ValueString(),
+		}
+
+		if v.ServiceID.ValueString() != "" {
+			descriptor.ServiceID = v.ServiceID.ValueString()
+		}
+
+		if len(v.Data) > 0 {
+			// The client's AuthnDescriptor.Data is map[string]any (structure
+			// varies by authenticator type). A JSON array value is decoded
+			// into a []string; otherwise it is sent as-is.
+			descriptorData := make(map[string]any, len(v.Data))
+			for k, val := range v.Data {
+				descriptorData[k] = claimValueToAPI(val)
+			}
+			descriptor.Data = descriptorData
+		}
+		authnDescriptors[i] = descriptor
+	}
+	return authnDescriptors
 }
 
 // claimValueToAPI decodes a JSON array string into []string, or returns the raw string.

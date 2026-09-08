@@ -176,6 +176,119 @@ func TestHostResource_Create(t *testing.T) {
 	}
 }
 
+func TestHostResource_Update(t *testing.T) {
+	tests := []struct {
+		name          string
+		data          HostResourceModel
+		setupMock     func(*mocks.MockClientV2)
+		expectedError bool
+		errorContains string
+	}{
+		{
+			name: "descriptor added",
+			data: HostResourceModel{
+				Name:         types.StringValue("test-host"),
+				Branch:       types.StringValue("data"),
+				RestrictedTo: types.ListNull(types.StringType),
+				AuthnDescriptors: []HostAuthnDescriptor{
+					{Type: types.StringValue("api_key")},
+					{Type: types.StringValue("jwt"), ServiceID: types.StringValue("jwt-service")},
+				},
+			},
+			setupMock: func(mockV2 *mocks.MockClientV2) {
+				mockV2.On("UpdateWorkload", "data/test-host", mock.MatchedBy(func(f conjurapi.WorkloadFields) bool {
+					return len(f.AuthnDescriptors) == 2 && f.AuthnDescriptors[1].ServiceID == "jwt-service"
+				})).Return(&conjurapi.Workload{}, nil)
+			},
+			expectedError: false,
+		},
+		{
+			name: "descriptor removed",
+			data: HostResourceModel{
+				Name:         types.StringValue("test-host"),
+				Branch:       types.StringValue("data"),
+				RestrictedTo: types.ListNull(types.StringType),
+				AuthnDescriptors: []HostAuthnDescriptor{
+					{Type: types.StringValue("api_key")},
+				},
+			},
+			setupMock: func(mockV2 *mocks.MockClientV2) {
+				mockV2.On("UpdateWorkload", "data/test-host", mock.MatchedBy(func(f conjurapi.WorkloadFields) bool {
+					return len(f.AuthnDescriptors) == 1 && f.AuthnDescriptors[0].Type == "api_key"
+				})).Return(&conjurapi.Workload{}, nil)
+			},
+			expectedError: false,
+		},
+		{
+			name: "API error during update",
+			data: HostResourceModel{
+				Name:         types.StringValue("error-host"),
+				Branch:       types.StringValue("data"),
+				RestrictedTo: types.ListNull(types.StringType),
+				AuthnDescriptors: []HostAuthnDescriptor{
+					{Type: types.StringValue("api_key")},
+				},
+			},
+			setupMock: func(mockV2 *mocks.MockClientV2) {
+				mockV2.On("UpdateWorkload", "data/error-host", mock.Anything).Return(nil, fmt.Errorf("permission denied"))
+			},
+			expectedError: true,
+			errorContains: "Unable to update host",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockV2 := mocks.NewMockClientV2(t)
+			tt.setupMock(mockV2)
+
+			r := &HostResource{
+				client: mockV2,
+			}
+
+			req := resource.UpdateRequest{
+				Plan: tfsdk.Plan{
+					Raw:    tftypes.NewValue(tftypes.Object{}, nil),
+					Schema: getHostTestSchema(),
+				},
+			}
+			resp := &resource.UpdateResponse{
+				State: tfsdk.State{
+					Raw:    tftypes.NewValue(tftypes.Object{}, nil),
+					Schema: getHostTestSchema(),
+				},
+			}
+
+			ctx := context.Background()
+			req.Plan.Set(ctx, &tt.data)
+
+			r.Update(ctx, req, resp)
+
+			if tt.expectedError {
+				assert.True(t, resp.Diagnostics.HasError())
+				if tt.errorContains != "" {
+					found := false
+					for _, diag := range resp.Diagnostics.Errors() {
+						if contains(diag.Summary(), tt.errorContains) || contains(diag.Detail(), tt.errorContains) {
+							found = true
+							break
+						}
+					}
+					assert.True(t, found, "Expected error to contain: %s", tt.errorContains)
+				}
+			} else {
+				assert.False(t, resp.Diagnostics.HasError())
+				var result HostResourceModel
+				resp.State.Get(ctx, &result)
+				assert.Equal(t, tt.data.Name.ValueString(), result.Name.ValueString())
+				assert.Len(t, result.AuthnDescriptors, len(tt.data.AuthnDescriptors))
+			}
+
+			mockV2.AssertExpectations(t)
+		})
+	}
+}
+
 func TestHostResource_Read(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -542,7 +655,7 @@ func TestHostResource_ValidateConfig(t *testing.T) {
 				RestrictedTo: types.ListNull(types.StringType),
 				AuthnDescriptors: []HostAuthnDescriptor{
 					{
-						Type:    types.StringValue("jwt"),
+						Type: types.StringValue("jwt"),
 						Data: map[string]string{"aud": `["aud1", "aud2"]`},
 					},
 				},
@@ -608,4 +721,3 @@ func TestHostResource_ValidateConfig(t *testing.T) {
 		})
 	}
 }
-

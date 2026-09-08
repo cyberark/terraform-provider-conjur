@@ -53,7 +53,7 @@ resource "conjur_host" "my_jwt_host" {
 
 ### Required
 
-- `authn_descriptors` (Attributes List) List of authentication descriptors for the host (see [below for nested schema](#nestedatt--authn_descriptors))
+- `authn_descriptors` (Attributes List) List of authentication descriptors for the host. Adding or removing descriptors, or changing a descriptor's `data`, is applied in place via a PATCH request rather than replacing the host. (see [below for nested schema](#nestedatt--authn_descriptors))
 - `branch` (String) The policy branch of the host
 - `name` (String) The name of the host
 
