@@ -435,10 +435,11 @@ func (r *ServerResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				},
 			},
 			"name": schema.StringAttribute{
-				MarkdownDescription: "The name of the server.",
+				MarkdownDescription: "The name of the server. Must be 1-51 characters and may include letters, numbers, periods, underscores, and hyphens only.",
 				Required:            true,
 				Validators: []validator.String{
 					stringvalidator.LengthBetween(1, 51),
+					stringvalidator.RegexMatches(swaResourceNamePattern, "must contain only letters, numbers, periods, underscores, and hyphens"),
 				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -463,8 +464,11 @@ func (r *ServerResource) Schema(ctx context.Context, req resource.SchemaRequest,
 				Required:            true,
 				Attributes: map[string]schema.Attribute{
 					"type": schema.StringAttribute{
-						MarkdownDescription: "The authentication type (e.g., 'JWT'). Changing this forces a new server to be created.",
+						MarkdownDescription: "The authentication type. One of `JWT`. Changing this forces a new server to be created.",
 						Required:            true,
+						Validators: []validator.String{
+							stringvalidator.OneOf("JWT"),
+						},
 						PlanModifiers: []planmodifier.String{
 							stringplanmodifier.RequiresReplace(),
 						},
@@ -477,20 +481,32 @@ func (r *ServerResource) Schema(ctx context.Context, req resource.SchemaRequest,
 						},
 					},
 					"audience": schema.StringAttribute{
-						MarkdownDescription: "The expected audience for JWT authentication.",
+						MarkdownDescription: "The expected audience for JWT authentication. Up to 1000 characters.",
 						Optional:            true,
+						Validators: []validator.String{
+							stringvalidator.LengthBetween(1, 1000),
+						},
 					},
 					"jwks_uri": schema.StringAttribute{
-						MarkdownDescription: "The JWKS URI for JWT verification.",
+						MarkdownDescription: "The JWKS URI for JWT verification. Up to 255 characters.",
 						Optional:            true,
+						Validators: []validator.String{
+							stringvalidator.LengthBetween(1, 255),
+						},
 					},
 					"issuer": schema.StringAttribute{
-						MarkdownDescription: "The expected issuer for JWT authentication.",
+						MarkdownDescription: "The expected issuer for JWT authentication. Up to 255 characters.",
 						Optional:            true,
+						Validators: []validator.String{
+							stringvalidator.LengthBetween(1, 255),
+						},
 					},
 					"ca_cert": schema.StringAttribute{
-						MarkdownDescription: "PEM-encoded CA certificate for validating the JWKS provider's TLS certificate. Changing this forces a new server to be created.",
+						MarkdownDescription: "PEM-encoded CA certificate for validating the JWKS provider's TLS certificate. Up to 10000 characters. Changing this forces a new server to be created.",
 						Optional:            true,
+						Validators: []validator.String{
+							stringvalidator.LengthBetween(1, 10000),
+						},
 						PlanModifiers: []planmodifier.String{
 							stringplanmodifier.RequiresReplace(),
 						},
@@ -520,12 +536,18 @@ func (r *ServerResource) Schema(ctx context.Context, req resource.SchemaRequest,
 								ElementType:         types.StringType,
 							},
 							"identity_path": schema.StringAttribute{
-								MarkdownDescription: "The workload's policy ID in Secrets Manager.",
+								MarkdownDescription: "The workload's policy ID in Secrets Manager. Up to 1000 characters.",
 								Optional:            true,
+								Validators: []validator.String{
+									stringvalidator.LengthBetween(1, 1000),
+								},
 							},
 							"token_app_property": schema.StringAttribute{
-								MarkdownDescription: "The name of the JWT claim whose value identifies the workload.",
+								MarkdownDescription: "The name of the JWT claim whose value identifies the workload. Up to 1000 characters.",
 								Optional:            true,
+								Validators: []validator.String{
+									stringvalidator.LengthBetween(1, 1000),
+								},
 							},
 						},
 					},

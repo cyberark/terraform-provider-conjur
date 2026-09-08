@@ -64,6 +64,33 @@ resource "conjur_swa_server_group" "aws_iid" {
   }
 }
 
+# Server group using Kubernetes JWT (Projected Service Account Token via OIDC) attestation
+resource "conjur_swa_server_group" "k8s_jwt" {
+  trust_domain_name = "prod.example.org"
+  name              = "k8s-jwt-servers"
+  description       = "Kubernetes workload server group using JWT attestation"
+
+  attestation = {
+    k8s_jwt = {
+      clusters = {
+        "prod-cluster" = {
+          issuer                      = "https://kubernetes.default.svc.cluster.local"
+          audience                    = "swa-node-attestation"
+          service_account_allow_list  = ["swa-system:swa-agent-payments", "swa-system:swa-agent-frontend"]
+          # Use jwks_uri ...
+          jwks_uri                    = "https://oidc.eks.eu-west-1.amazonaws.com/id/EXAMPLED539D4633E53DE1B71EXAMPLE/keys"
+          # ...or public_keys for clusters with no reachable JWKS endpoint (e.g. OpenShift).
+          # jwks_uri and public_keys are mutually exclusive.
+          # public_keys = jsonencode({
+          #   type  = "jwks"
+          #   value = { keys = [...] }
+          # })
+        }
+      }
+    }
+  }
+}
+
 # Server group with no node attestation (attestation is optional)
 resource "conjur_swa_server_group" "no_attestation" {
   trust_domain_name = "prod.example.org"

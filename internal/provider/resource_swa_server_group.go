@@ -2,10 +2,13 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -55,6 +58,7 @@ type AttestationModel struct {
 	K8sPsat           *K8sPsatModel           `tfsdk:"k8s_psat"`
 	GcpServiceAccount *GcpServiceAccountModel `tfsdk:"gcp_service_account"`
 	AwsIid            *AwsIidModel            `tfsdk:"aws_iid"`
+	K8sJwt            *K8sJwtModel            `tfsdk:"k8s_jwt"`
 }
 
 type X509PopModel struct {
@@ -100,6 +104,32 @@ func k8sPsatClusterAttrTypes() map[string]attr.Type {
 	}
 }
 
+type K8sJwtModel struct {
+	Clusters types.Map `tfsdk:"clusters"`
+}
+
+// K8sJwtClusterModel's PublicKeys reuses the JSON-string idiom established by
+// ServerAuthenticationModel.PublicKeys (resource_swa_server.go) for the same
+// `{"type":"jwks","value":<JWKS>}` shape, rather than modeling it as nested
+// attributes, so both places that accept this shape look the same in HCL.
+type K8sJwtClusterModel struct {
+	Issuer                  types.String `tfsdk:"issuer"`
+	Audience                types.String `tfsdk:"audience"`
+	ServiceAccountAllowList types.List   `tfsdk:"service_account_allow_list"`
+	JwksUri                 types.String `tfsdk:"jwks_uri"`
+	PublicKeys              types.String `tfsdk:"public_keys"`
+}
+
+func k8sJwtClusterAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"issuer":                     types.StringType,
+		"audience":                   types.StringType,
+		"service_account_allow_list": types.ListType{ElemType: types.StringType},
+		"jwks_uri":                   types.StringType,
+		"public_keys":                types.StringType,
+	}
+}
+
 func NewServerGroupResource() resource.Resource {
 	return &ServerGroupResource{typeName: "conjur_swa_server_group"}
 }
@@ -120,6 +150,9 @@ func attestationNestedAttributes() map[string]schema.Attribute {
 					MarkdownDescription: "PEM-encoded CA certificates for X.509 POP node attestation.",
 					Required:            true,
 					Sensitive:           true,
+					Validators: []validator.String{
+						stringvalidator.LengthAtLeast(1),
+					},
 				},
 			},
 		},
@@ -192,8 +225,11 @@ func attestationNestedAttributes() map[string]schema.Attribute {
 			Optional:            true,
 			Attributes: map[string]schema.Attribute{
 				"assume_role": schema.StringAttribute{
-					MarkdownDescription: "Bare IAM role name, optionally path-prefixed (e.g. `service-role/SWAServerRole`), to describe the attesting instance — not a full ARN. Used to build the full ARN per-attestation as `arn:{partition}:iam::{account-id}:role/{assume_role}`, taking the account ID from the attesting instance's Instance Identity Document. Omitted means ambient credentials (e.g. IRSA/Pod Identity) are used.",
+					MarkdownDescription: "Bare IAM role name, optionally path-prefixed (e.g. `service-role/SWAServerRole`), to describe the attesting instance — not a full ARN. Used to build the full ARN per-attestation as `arn:{partition}:iam::{account-id}:role/{assume_role}`, taking the account ID from the attesting instance's Instance Identity Document. Omitted means ambient credentials (e.g. IRSA/Pod Identity) are used. Up to 576 characters; an empty string is treated the same as omitted.",
 					Optional:            true,
+					Validators: []validator.String{
+						stringvalidator.LengthAtMost(576),
+					},
 				},
 				"partition": schema.StringAttribute{
 					MarkdownDescription: "AWS partition the server operates in. One of `aws`, `aws-cn`, `aws-us-gov`. Defaults to `aws`.",
@@ -215,22 +251,90 @@ func attestationNestedAttributes() map[string]schema.Attribute {
 						"management_account_id": schema.StringAttribute{
 							MarkdownDescription: "12-digit AWS account ID of the organization's management (root) account.",
 							Optional:            true,
+							Validators: []validator.String{
+								stringvalidator.RegexMatches(regexp.MustCompile(`^\d{12}$`), "must be a 12-digit AWS account ID"),
+							},
 						},
 						"management_account_region": schema.StringAttribute{
 							MarkdownDescription: "AWS region where the management account is hosted.",
 							Optional:            true,
+							Validators: []validator.String{
+								stringvalidator.LengthAtLeast(1),
+							},
 						},
 						"assume_org_role": schema.StringAttribute{
 							MarkdownDescription: "IAM role name in the management account with organizations:ListAccounts permissions.",
 							Optional:            true,
+							Validators: []validator.String{
+								stringvalidator.LengthAtLeast(1),
+							},
 						},
 						"org_account_map_ttl": schema.StringAttribute{
 							MarkdownDescription: "Cache TTL duration for the organization account list as a Go duration string (e.g. `15m`, `1h`, `90s`). Minimum duration is 1 minute (`1m`). Omitted means the attestor default is used.",
 							Optional:            true,
+							Validators: []validator.String{
+								stringvalidator.RegexMatches(regexp.MustCompile(`^([0-9]+(h|m|s))+$`), "must be a Go duration string, e.g. '15m', '1h', '90s'"),
+							},
 						},
 						"account_list_file": schema.StringAttribute{
 							MarkdownDescription: "Path on the SWA server host/container to a file containing a JSON array of AWS account IDs. Mutually exclusive with `management_account_id` and `assume_org_role`.",
 							Optional:            true,
+							Validators: []validator.String{
+								stringvalidator.LengthAtLeast(1),
+							},
+						},
+					},
+				},
+			},
+		},
+		"k8s_jwt": schema.SingleNestedAttribute{
+			MarkdownDescription: "Kubernetes JWT attestation configuration.",
+			Optional:            true,
+			Attributes: map[string]schema.Attribute{
+				"clusters": schema.MapNestedAttribute{
+					MarkdownDescription: "Map of cluster identifier to Kubernetes JWT cluster configuration. Each key must match the name of an existing node group in this server group; that match is how an attesting workload's cluster is routed to a node group.",
+					Required:            true,
+					Validators: []validator.Map{
+						mapvalidator.SizeAtLeast(1),
+					},
+					NestedObject: schema.NestedAttributeObject{
+						Attributes: map[string]schema.Attribute{
+							"issuer": schema.StringAttribute{
+								MarkdownDescription: "OIDC issuer URL of the cluster, as it appears in the `iss` claim of its projected service account tokens. Up to 255 characters.",
+								Required:            true,
+								Validators: []validator.String{
+									stringvalidator.LengthBetween(1, 255),
+								},
+							},
+							"audience": schema.StringAttribute{
+								MarkdownDescription: "Expected audience (`aud` claim) for projected service account tokens from this cluster. Up to 1000 characters.",
+								Required:            true,
+								Validators: []validator.String{
+									stringvalidator.LengthBetween(1, 1000),
+								},
+							},
+							"service_account_allow_list": schema.ListAttribute{
+								MarkdownDescription: "Non-empty allowlist of Kubernetes service accounts (`namespace:name`) permitted to attest.",
+								Required:            true,
+								ElementType:         types.StringType,
+								Validators: []validator.List{
+									listvalidator.SizeAtLeast(1),
+								},
+							},
+							"jwks_uri": schema.StringAttribute{
+								MarkdownDescription: "Cluster's published JWKS endpoint. Required for clusters that rotate signing keys too frequently for static keys (e.g. EKS, GKE, AKS). Must use `https` and resolve to a public host; `http`, localhost, loopback, and private/link-local/multicast addresses are rejected. Up to 255 characters. Mutually exclusive with `public_keys`.",
+								Optional:            true,
+								Validators: []validator.String{
+									stringvalidator.LengthAtMost(255),
+								},
+							},
+							"public_keys": schema.StringAttribute{
+								MarkdownDescription: `Inline JWKS as a JSON string, in the form {"type":"jwks","value":{"keys":[...]}}. Requires no outbound network access; typically used for OpenShift and self-managed clusters. Mutually exclusive with jwks_uri.`,
+								Optional:            true,
+								PlanModifiers: []planmodifier.String{
+									jsonEquivalentPlanModifier{},
+								},
+							},
 						},
 					},
 				},
@@ -309,6 +413,53 @@ func updateAttestationFromResponse(ctx context.Context, model *ServerGroupResour
 		attestation.AwsIid = awsIidModel
 	}
 
+	if k8sJwt := at.K8sJwt; k8sJwt != nil {
+		// Look up prior per-cluster public_keys JSON so preferPriorJSONString below can
+		// keep the user's original formatting instead of a reformatted-but-equivalent value.
+		priorClusters := map[string]K8sJwtClusterModel{}
+		if model.Attestation != nil && model.Attestation.K8sJwt != nil &&
+			!model.Attestation.K8sJwt.Clusters.IsNull() && !model.Attestation.K8sJwt.Clusters.IsUnknown() {
+			diags.Append(model.Attestation.K8sJwt.Clusters.ElementsAs(ctx, &priorClusters, false)...)
+		}
+
+		clusterObjs := make(map[string]attr.Value, len(k8sJwt.Clusters))
+		for clusterName, clusterConfig := range k8sJwt.Clusters {
+			cluster := K8sJwtClusterModel{
+				Issuer:   types.StringValue(clusterConfig.Issuer),
+				Audience: types.StringValue(clusterConfig.Audience),
+				JwksUri:  optionalStringValue(clusterConfig.JwksUri),
+			}
+
+			saList, saDiags := types.ListValueFrom(ctx, types.StringType, clusterConfig.ServiceAccountAllowList)
+			diags.Append(saDiags...)
+			cluster.ServiceAccountAllowList = saList
+
+			cluster.PublicKeys = types.StringNull()
+			if clusterConfig.PublicKeys != nil {
+				raw, err := json.Marshal(clusterConfig.PublicKeys)
+				if err != nil {
+					diags.AddError("Error encoding k8s_jwt public_keys", err.Error())
+				} else {
+					incoming := types.StringValue(string(raw))
+					if prior, ok := priorClusters[clusterName]; ok {
+						incoming = preferPriorJSONString(prior.PublicKeys, incoming)
+					}
+					cluster.PublicKeys = incoming
+				}
+			}
+
+			obj, objDiags := types.ObjectValueFrom(ctx, k8sJwtClusterAttrTypes(), cluster)
+			diags.Append(objDiags...)
+			clusterObjs[clusterName] = obj
+		}
+		clustersMap, mapDiags := types.MapValue(
+			types.ObjectType{AttrTypes: k8sJwtClusterAttrTypes()},
+			clusterObjs,
+		)
+		diags.Append(mapDiags...)
+		attestation.K8sJwt = &K8sJwtModel{Clusters: clustersMap}
+	}
+
 	model.Attestation = attestation
 	return diags
 }
@@ -349,6 +500,45 @@ func buildK8sPsatClusters(ctx context.Context, k8sPsat *K8sPsatModel) (map[strin
 			var nodeLabels []string
 			diags.Append(clusterConfig.AllowedNodeLabelKeys.ElementsAs(ctx, &nodeLabels, false)...)
 			cluster.AllowedNodeLabelKeys = &nodeLabels
+		}
+
+		clusters[clusterName] = cluster
+	}
+	return clusters, diags
+}
+
+// buildK8sJwtClusters converts the Terraform model to the API client cluster map.
+func buildK8sJwtClusters(ctx context.Context, k8sJwt *K8sJwtModel) (map[string]swaclient.K8sJwtCluster, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	if k8sJwt == nil || k8sJwt.Clusters.IsNull() || k8sJwt.Clusters.IsUnknown() {
+		return nil, diags
+	}
+
+	clusterModels := make(map[string]K8sJwtClusterModel)
+	diags.Append(k8sJwt.Clusters.ElementsAs(ctx, &clusterModels, false)...)
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	clusters := make(map[string]swaclient.K8sJwtCluster, len(clusterModels))
+	for clusterName, clusterConfig := range clusterModels {
+		cluster := swaclient.K8sJwtCluster{
+			Issuer:   clusterConfig.Issuer.ValueString(),
+			Audience: clusterConfig.Audience.ValueString(),
+			JwksUri:  stringPointerFromValue(clusterConfig.JwksUri),
+		}
+
+		var saList []string
+		diags.Append(clusterConfig.ServiceAccountAllowList.ElementsAs(ctx, &saList, false)...)
+		cluster.ServiceAccountAllowList = saList
+
+		if knownStringValue(clusterConfig.PublicKeys) {
+			var pk swaclient.K8sJwtClusterPublicKeys
+			if err := json.Unmarshal([]byte(clusterConfig.PublicKeys.ValueString()), &pk); err != nil {
+				diags.AddError("Invalid k8s_jwt public_keys JSON", err.Error())
+				continue
+			}
+			cluster.PublicKeys = &pk
 		}
 
 		clusters[clusterName] = cluster
@@ -427,6 +617,12 @@ func buildAttestationRequest(ctx context.Context, at *AttestationModel) (*swacli
 
 	attestation.AwsIid = buildAwsIid(at.AwsIid)
 
+	k8sJwtClusters, k8sJwtDiags := buildK8sJwtClusters(ctx, at.K8sJwt)
+	diags.Append(k8sJwtDiags...)
+	if k8sJwtClusters != nil {
+		attestation.K8sJwt = &swaclient.K8sJwtAttestationConfiguration{Clusters: k8sJwtClusters}
+	}
+
 	return attestation, diags
 }
 
@@ -446,15 +642,22 @@ func (r *ServerGroupResource) Schema(ctx context.Context, req resource.SchemaReq
 				},
 			},
 			"name": schema.StringAttribute{
-				MarkdownDescription: "The name of the server group.",
+				MarkdownDescription: "The name of the server group. Case-sensitive; must be 1-60 characters and may include letters, numbers, periods, underscores, and hyphens only.",
 				Required:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
+				Validators: []validator.String{
+					stringvalidator.LengthBetween(1, 60),
+					stringvalidator.RegexMatches(swaResourceNamePattern, "must contain only letters, numbers, periods, underscores, and hyphens"),
+				},
 			},
 			"description": schema.StringAttribute{
-				MarkdownDescription: "A description of the server group.",
+				MarkdownDescription: "A description of the server group. Up to 1024 characters.",
 				Optional:            true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtMost(1024),
+				},
 			},
 			"trust_domain_name": schema.StringAttribute{
 				MarkdownDescription: "The name of the trust domain this server group belongs to.",
@@ -464,7 +667,7 @@ func (r *ServerGroupResource) Schema(ctx context.Context, req resource.SchemaReq
 				},
 			},
 			"attestation": schema.SingleNestedAttribute{
-				MarkdownDescription: "Node attestation configuration. Optionally specify any of x509pop, k8s_psat, gcp_service_account, or aws_iid; omit entirely for a server group with no attestation.",
+				MarkdownDescription: "Node attestation configuration. Optionally specify any of x509pop, k8s_psat, gcp_service_account, aws_iid, or k8s_jwt; omit entirely for a server group with no attestation.",
 				Optional:            true,
 				Attributes:          attestationNestedAttributes(),
 			},
@@ -500,6 +703,52 @@ func (r *ServerGroupResource) ValidateConfig(ctx context.Context, req resource.V
 				"this one replaces. Update your configuration to use "+
 				"`attestation` instead.",
 		)
+	}
+
+	if data.Attestation != nil {
+		validateK8sJwtClusters(ctx, data.Attestation.K8sJwt, &resp.Diagnostics)
+	}
+}
+
+// validateK8sJwtClusters enforces that each k8s_jwt cluster sets exactly one of
+// jwks_uri or public_keys, mirroring validateCreateServerAuthConfig's equivalent check
+// for the server auth resource. Values sourced from variables or other resources are
+// unknown at ValidateConfig time; the check is skipped for a cluster whose relevant
+// fields are unknown to avoid false positives, since Create/Update run the same
+// request-building path once values are resolved and the API enforces this too.
+func validateK8sJwtClusters(ctx context.Context, k8sJwt *K8sJwtModel, diags *diag.Diagnostics) {
+	if k8sJwt == nil || k8sJwt.Clusters.IsNull() || k8sJwt.Clusters.IsUnknown() {
+		return
+	}
+
+	clusterModels := make(map[string]K8sJwtClusterModel)
+	if d := k8sJwt.Clusters.ElementsAs(ctx, &clusterModels, false); d.HasError() {
+		return
+	}
+
+	clustersPath := path.Root("attestation").AtName("k8s_jwt").AtName("clusters")
+	for clusterName, cluster := range clusterModels {
+		hasJwksURI := nonEmptyKnownStringValue(cluster.JwksUri)
+		hasPublicKeys := nonEmptyKnownStringValue(cluster.PublicKeys)
+		jwksUnknown := cluster.JwksUri.IsUnknown()
+		publicKeysUnknown := cluster.PublicKeys.IsUnknown()
+
+		if !hasJwksURI && !hasPublicKeys && !jwksUnknown && !publicKeysUnknown {
+			diags.AddAttributeError(
+				clustersPath.AtMapKey(clusterName),
+				"Invalid k8s_jwt cluster configuration",
+				fmt.Sprintf("cluster %q: one of jwks_uri or public_keys must be set.", clusterName),
+			)
+			continue
+		}
+
+		if hasJwksURI && hasPublicKeys {
+			diags.AddAttributeError(
+				clustersPath.AtMapKey(clusterName),
+				"Invalid k8s_jwt cluster configuration",
+				fmt.Sprintf("cluster %q: only one of jwks_uri or public_keys may be set, not both.", clusterName),
+			)
+		}
 	}
 }
 

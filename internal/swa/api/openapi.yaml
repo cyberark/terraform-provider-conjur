@@ -1421,6 +1421,185 @@ components:
           $ref: '#/components/schemas/GeminiEnterpriseAttestationConfiguration'
         aws_iid:
           $ref: '#/components/schemas/AwsIidAttestationConfiguration'
+        k8s_jwt:
+          $ref: '#/components/schemas/K8sJwtAttestationConfiguration'
+
+    K8sJwtAttestationConfiguration:
+      type: object
+      required:
+        - clusters
+      properties:
+        clusters:
+          type: object
+          description: >
+            Map of cluster identifier to Kubernetes JWT cluster configuration. Each key MUST
+            match the name of an existing node group in this server group — that match is how an
+            attesting workload's cluster is routed to a node group. Not validated or enforced by
+            this API; a mismatch (typo, or a node group renamed/removed afterwards) causes
+            attestation to fail to route rather than being rejected at configuration time.
+          minProperties: 1
+          additionalProperties:
+            $ref: '#/components/schemas/K8sJwtCluster'
+
+    K8sJwtCluster:
+      type: object
+      required:
+        - issuer
+        - audience
+        - service_account_allow_list
+      # Exactly one trust mode: the cluster's signing keys come from a live JWKS endpoint or
+      # from customer-supplied static keys, never both and never neither. Reuses the
+      # jwks_uri/public_keys idiom already used for JWT server authentication (see
+      # UpdateServerJWTAuthenticationData above) instead of inventing new field names for the
+      # same concept.
+      #
+      # Deliberately NOT expressed as `oneOf`/`allOf` here, even though that's the more obvious
+      # JSON Schema encoding of "exactly one of". jwks_uri/public_keys are plain optional
+      # siblings, not distinct shapes — a oneOf branch here would add no properties of its own,
+      # only a `required` constraint — so oapi-codegen still treats it as a type-level union: it
+      # generates a trailing `union json.RawMessage` field plus custom Marshal/UnmarshalJSON that
+      # seeds the output from the union's raw bytes and merges struct fields on top additively,
+      # with no path to delete a key. Concretely: decode a cluster that has jwks_uri set, clear
+      # JwksUri, set PublicKeys, and re-marshal — jwks_uri reappears in the output because it's
+      # still sitting in the raw union bytes captured at decode time and nothing ever removes it.
+      # UpdateServerJWTAuthenticationData already establishes the precedent of modelling this
+      # exact field pair as plain optional siblings plus prose + a hand-written check instead of
+      # `oneOf`; validateK8sJwtCluster (internal/service/server_group_service.go) is that check
+      # here, and it already covers both-set/neither-set/each-alone in its test suite.
+      properties:
+        issuer:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: >
+            OIDC issuer URL of the cluster, as it appears in the `iss` claim of its projected
+            service account tokens. Two clusters may report the same issuer; the cluster's signing
+            keys are what actually distinguish them.
+          example: 'https://kubernetes.default.svc.cluster.local'
+        audience:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: Expected audience (`aud` claim) for projected service account tokens from this cluster.
+          example: 'swa-node-attestation'
+        service_account_allow_list:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          minItems: 1
+          description: >
+            Non-empty allowlist of Kubernetes service accounts (`namespace:name`) permitted to
+            attest. Mandatory in every configuration; there is no way to leave this open.
+          example: ['swa-system:swa-agent-payments', 'swa-system:swa-agent-frontend']
+        # https-only/no-private-IP rule (see description below) is enforced by
+        # jwks.ValidateJwksURI (/conjur/swa-portable/pkg/jwks), not by the
+        # `pattern` below — JSON Schema `pattern` can't practically express IP-class checks.
+        jwks_uri:
+          type: string
+          pattern: '[^<> ?]'
+          minLength: 1
+          maxLength: 255
+          description: >
+            Cluster's published JWKS endpoint. Keys are fetched and cached; rotation is picked up
+            automatically with no restart. Required for clusters that rotate signing keys too
+            frequently for static keys (e.g. EKS, GKE, AKS). Mutually exclusive with public_keys.
+            Must use the `https` scheme and resolve to a public hostname or IP — `http`,
+            `localhost`, loopback, unspecified, private, link-local, multicast, and
+            carrier-grade NAT addresses are all rejected.
+          example: 'https://oidc.eks.eu-west-1.amazonaws.com/id/EXAMPLED539D4633E53DE1B71EXAMPLE/keys'
+        public_keys:
+          $ref: '#/components/schemas/K8sJwtClusterPublicKeys'
+
+    K8sJwtClusterPublicKeys:
+      type: object
+      required:
+        - value
+      additionalProperties: false
+      description: >
+        Inline JWKS, in the same `{"type":"jwks", "value":<JWKS>}` shape as
+        `UpdateServerJWTAuthenticationData.public_keys` above, requiring no outbound network
+        access. The JWKS `keys` array may hold several keys at once so key rotation does not
+        cause an outage. Typically used for OpenShift and self-managed clusters with no
+        reachable unauthenticated keys endpoint. Mutually exclusive with jwks_uri.
+      properties:
+        type:
+          type: string
+          enum: [jwks]
+          # Pins the generated Go constant name. Without this, oapi-codegen names it after the
+          # value alone (`Jwks`) whenever no other schema claims that identifier, so the constant
+          # would silently rename itself as unrelated schemas come and go.
+          x-enum-varnames: [K8sJwtClusterPublicKeysTypeJwks]
+          default: jwks
+          description: >
+            Key format. Always "jwks" — currently the only supported inline format. Optional
+            on input; always present in the response.
+        value:
+          $ref: '#/components/schemas/K8sJwtJwks'
+
+    K8sJwtJwk:
+      type: object
+      required:
+        - kty
+      # Deliberately kept false, not relaxed to allow x5c/x5t/key_ops etc. domain.Jwk (the type
+      # this decodes into) is a fixed struct with exactly these fields — relaxing this would make
+      # the API silently *drop* any unrecognised member instead of rejecting the request, which is
+      # worse for key material than a hard failure.
+      additionalProperties: false
+      description: >
+        A single JSON Web Key (RFC 7517 §4) from a Kubernetes cluster's service-account-token
+        signing key set. Restricted to RSA and EC — kube-apiserver's JWTTokenGenerator (upstream
+        and OpenShift's fork) only ever signs service account tokens with *rsa.PrivateKey or
+        *ecdsa.PrivateKey; no other key type reaches a cluster's JWKS.
+      properties:
+        kty:
+          type: string
+          enum: [RSA, EC]
+          # Pins the generated Go constant names. Without this, oapi-codegen disambiguates the
+          # RSA/EC value clash with the pre-existing JWKKty enum by renaming *that* enum's
+          # constants (JWKKty.RSA/EC -> JWKKtyRSA/JWKKtyEC) instead — a breaking rename of an
+          # already-public constant, unrelated to this schema.
+          x-enum-varnames: [K8sJwtJwkKtyRSA, K8sJwtJwkKtyEC]
+          description: Key type.
+        use:
+          type: string
+          description: Intended use of the key.
+          example: sig
+        kid:
+          type: string
+          description: Key ID, matched against the `kid` claim in a token's header.
+        alg:
+          type: string
+          description: Signing algorithm — RS256 for RSA; ES256/ES384/ES512 for EC by curve.
+          example: RS256
+        n:
+          type: string
+          description: RSA modulus (base64url). Present when kty is "RSA".
+        e:
+          type: string
+          description: RSA public exponent (base64url). Present when kty is "RSA".
+        crv:
+          type: string
+          description: EC curve name ("P-256", "P-384", "P-521"). Present when kty is "EC".
+        x:
+          type: string
+          description: EC public key x-coordinate (base64url). Present when kty is "EC".
+        y:
+          type: string
+          description: EC public key y-coordinate (base64url). Present when kty is "EC".
+
+    K8sJwtJwks:
+      type: object
+      required:
+        - keys
+      additionalProperties: false
+      description: A JSON Web Key Set (RFC 7517 §5) — a cluster's service-account-token signing keys.
+      properties:
+        keys:
+          type: array
+          items:
+            $ref: '#/components/schemas/K8sJwtJwk'
+          minItems: 1
 
     X509PopConfigurationInput:
       type: object

@@ -211,6 +211,177 @@ func TestUpdateAttestationFromResponse(t *testing.T) {
 		assert.Equal(t, "15m", vo.OrgAccountMapTTL.ValueString())
 		assert.True(t, vo.AccountListFile.IsNull())
 	})
+
+	t.Run("k8s_jwt from attestation field is reconciled into state", func(t *testing.T) {
+		model := &ServerGroupResourceModel{}
+		at := &swaclient.AttestationConfiguration{
+			K8sJwt: &swaclient.K8sJwtAttestationConfiguration{
+				Clusters: map[string]swaclient.K8sJwtCluster{
+					"cluster-a": {
+						Issuer:                  "https://kubernetes.default.svc.cluster.local",
+						Audience:                "swa-node-attestation",
+						ServiceAccountAllowList: []string{"swa-system:swa-agent"},
+						JwksUri:                 new("https://oidc.eks.example.com/keys"),
+					},
+				},
+			},
+		}
+
+		diags := updateAttestationFromResponse(ctx, model, at)
+		assert.False(t, diags.HasError())
+		require.NotNil(t, model.Attestation)
+		require.NotNil(t, model.Attestation.K8sJwt)
+
+		var clusters map[string]K8sJwtClusterModel
+		require.False(t, model.Attestation.K8sJwt.Clusters.ElementsAs(ctx, &clusters, false).HasError())
+		require.Contains(t, clusters, "cluster-a")
+		cluster := clusters["cluster-a"]
+		assert.Equal(t, "https://kubernetes.default.svc.cluster.local", cluster.Issuer.ValueString())
+		assert.Equal(t, "swa-node-attestation", cluster.Audience.ValueString())
+		assert.Equal(t, "https://oidc.eks.example.com/keys", cluster.JwksUri.ValueString())
+		assert.True(t, cluster.PublicKeys.IsNull())
+
+		var sas []string
+		require.False(t, cluster.ServiceAccountAllowList.ElementsAs(ctx, &sas, false).HasError())
+		assert.Equal(t, []string{"swa-system:swa-agent"}, sas)
+	})
+
+	t.Run("k8s_jwt public_keys keeps prior JSON formatting when semantically equal", func(t *testing.T) {
+		priorPublicKeys := `{
+  "type": "jwks",
+  "value": {"keys": [{"kty": "RSA"}]}
+}`
+		priorClusters := map[string]K8sJwtClusterModel{
+			"cluster-a": {
+				Issuer:                  types.StringValue("https://issuer.example.com"),
+				Audience:                types.StringValue("swa-node-attestation"),
+				ServiceAccountAllowList: mustStringList(t, "ns:sa"),
+				JwksUri:                 types.StringNull(),
+				PublicKeys:              types.StringValue(priorPublicKeys),
+			},
+		}
+		clustersMap, diags := types.MapValueFrom(ctx, types.ObjectType{AttrTypes: k8sJwtClusterAttrTypes()}, priorClusters)
+		require.False(t, diags.HasError())
+		model := &ServerGroupResourceModel{
+			Attestation: &AttestationModel{
+				K8sJwt: &K8sJwtModel{Clusters: clustersMap},
+			},
+		}
+
+		at := &swaclient.AttestationConfiguration{
+			K8sJwt: &swaclient.K8sJwtAttestationConfiguration{
+				Clusters: map[string]swaclient.K8sJwtCluster{
+					"cluster-a": {
+						Issuer:                  "https://issuer.example.com",
+						Audience:                "swa-node-attestation",
+						ServiceAccountAllowList: []string{"ns:sa"},
+						PublicKeys: &swaclient.K8sJwtClusterPublicKeys{
+							Type:  new(swaclient.K8sJwtClusterPublicKeysTypeJwks),
+							Value: swaclient.K8sJwtJwks{Keys: []swaclient.K8sJwtJwk{{Kty: swaclient.K8sJwtJwkKtyRSA}}},
+						},
+					},
+				},
+			},
+		}
+
+		updateDiags := updateAttestationFromResponse(ctx, model, at)
+		assert.False(t, updateDiags.HasError())
+
+		var clusters map[string]K8sJwtClusterModel
+		require.False(t, model.Attestation.K8sJwt.Clusters.ElementsAs(ctx, &clusters, false).HasError())
+		assert.Equal(t, priorPublicKeys, clusters["cluster-a"].PublicKeys.ValueString(), "prior JSON formatting should be preserved when semantically equal")
+	})
+}
+
+func TestBuildK8sJwtClusters(t *testing.T) {
+	ctx := context.Background()
+
+	k8sJwtClusterModel := func(t *testing.T, ctx context.Context, m map[string]K8sJwtClusterModel) types.Map {
+		t.Helper()
+		objs := make(map[string]attr.Value, len(m))
+		for k, v := range m {
+			obj, diags := types.ObjectValueFrom(ctx, k8sJwtClusterAttrTypes(), v)
+			require.False(t, diags.HasError(), "failed to build cluster object: %v", diags)
+			objs[k] = obj
+		}
+		mapValue, diags := types.MapValue(types.ObjectType{AttrTypes: k8sJwtClusterAttrTypes()}, objs)
+		require.False(t, diags.HasError(), "failed to build clusters map: %v", diags)
+		return mapValue
+	}
+
+	t.Run("nil model returns nil map", func(t *testing.T) {
+		clusters, diags := buildK8sJwtClusters(ctx, nil)
+		require.Nil(t, clusters)
+		assert.False(t, diags.HasError())
+	})
+
+	t.Run("null clusters returns nil map", func(t *testing.T) {
+		clusters, diags := buildK8sJwtClusters(ctx, &K8sJwtModel{
+			Clusters: types.MapNull(types.ObjectType{AttrTypes: k8sJwtClusterAttrTypes()}),
+		})
+		require.Nil(t, clusters)
+		assert.False(t, diags.HasError())
+	})
+
+	t.Run("converts jwks_uri cluster", func(t *testing.T) {
+		clusters, diags := buildK8sJwtClusters(ctx, &K8sJwtModel{
+			Clusters: k8sJwtClusterModel(t, ctx, map[string]K8sJwtClusterModel{
+				"cluster-a": {
+					Issuer:                  types.StringValue("https://issuer.example.com"),
+					Audience:                types.StringValue("swa-node-attestation"),
+					ServiceAccountAllowList: mustStringList(t, "ns:sa"),
+					JwksUri:                 types.StringValue("https://issuer.example.com/keys"),
+					PublicKeys:              types.StringNull(),
+				},
+			}),
+		})
+
+		require.False(t, diags.HasError())
+		require.Len(t, clusters, 1)
+		cluster := clusters["cluster-a"]
+		assert.Equal(t, "https://issuer.example.com", cluster.Issuer)
+		assert.Equal(t, "swa-node-attestation", cluster.Audience)
+		assert.Equal(t, []string{"ns:sa"}, cluster.ServiceAccountAllowList)
+		require.NotNil(t, cluster.JwksUri)
+		assert.Equal(t, "https://issuer.example.com/keys", *cluster.JwksUri)
+		assert.Nil(t, cluster.PublicKeys)
+	})
+
+	t.Run("converts public_keys cluster", func(t *testing.T) {
+		clusters, diags := buildK8sJwtClusters(ctx, &K8sJwtModel{
+			Clusters: k8sJwtClusterModel(t, ctx, map[string]K8sJwtClusterModel{
+				"cluster-a": {
+					Issuer:                  types.StringValue("https://issuer.example.com"),
+					Audience:                types.StringValue("swa-node-attestation"),
+					ServiceAccountAllowList: mustStringList(t, "ns:sa"),
+					JwksUri:                 types.StringNull(),
+					PublicKeys:              types.StringValue(`{"type":"jwks","value":{"keys":[{"kty":"RSA"}]}}`),
+				},
+			}),
+		})
+
+		require.False(t, diags.HasError())
+		require.Len(t, clusters, 1)
+		cluster := clusters["cluster-a"]
+		require.NotNil(t, cluster.PublicKeys)
+		require.Len(t, cluster.PublicKeys.Value.Keys, 1)
+		assert.Equal(t, swaclient.K8sJwtJwkKtyRSA, cluster.PublicKeys.Value.Keys[0].Kty)
+	})
+
+	t.Run("invalid public_keys JSON reports diagnostics", func(t *testing.T) {
+		_, diags := buildK8sJwtClusters(ctx, &K8sJwtModel{
+			Clusters: k8sJwtClusterModel(t, ctx, map[string]K8sJwtClusterModel{
+				"cluster-a": {
+					Issuer:                  types.StringValue("https://issuer.example.com"),
+					Audience:                types.StringValue("swa-node-attestation"),
+					ServiceAccountAllowList: mustStringList(t, "ns:sa"),
+					JwksUri:                 types.StringNull(),
+					PublicKeys:              types.StringValue(`not-json`),
+				},
+			}),
+		})
+		assert.True(t, diags.HasError())
+	})
 }
 
 func TestBuildK8sPsatClusters(t *testing.T) {
@@ -1804,6 +1975,234 @@ func TestServerGroupResource_AwsIid_ValidateConfig_RejectsInvalidPartition(t *te
 			{
 				Config:      awsIidTestConfig("test-sg", "test-td", `partition = "invalid-partition"`),
 				ExpectError: regexp.MustCompile(`(?s)value must be one of`),
+			},
+		},
+	})
+}
+
+// TestServerGroupResource_K8sJwt_JwksUri exercises a k8s_jwt cluster configured with
+// jwks_uri end to end through the mocked SWA client.
+func TestServerGroupResource_K8sJwt_JwksUri(t *testing.T) {
+	t.Parallel()
+
+	mockClient := swamocks.NewMockClientWithResponsesInterface(t)
+
+	att := &swaclient.AttestationConfiguration{
+		K8sJwt: &swaclient.K8sJwtAttestationConfiguration{
+			Clusters: map[string]swaclient.K8sJwtCluster{
+				"cluster-1": {
+					Issuer:                  "https://kubernetes.default.svc.cluster.local",
+					Audience:                "swa-node-attestation",
+					ServiceAccountAllowList: []string{"swa-system:swa-agent"},
+					JwksUri:                 new("https://oidc.eks.example.com/keys"),
+				},
+			},
+		},
+	}
+
+	mockClient.EXPECT().
+		PostServerGroupWithResponse(mock.Anything, "test-td", mock.Anything,
+			mock.MatchedBy(func(body swaclient.PostServerGroupJSONRequestBody) bool {
+				return body.Attestation != nil && reflect.DeepEqual(body.Attestation.K8sJwt, att.K8sJwt)
+			})).
+		Return(&swaclient.PostServerGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusCreated),
+			ApplicationxSecretsmgrV2JSON201: &swaclient.ServerGroupResponse{
+				Name: "test-sg", TrustDomainName: "test-td", Attestation: att,
+			},
+		}, nil).Times(1)
+
+	mockClient.EXPECT().
+		GetServerGroupWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything).
+		Return(&swaclient.GetServerGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: &swaclient.ServerGroupResponse{
+				Name: "test-sg", TrustDomainName: "test-td", Attestation: att,
+			},
+		}, nil).Maybe()
+
+	mockClient.EXPECT().
+		DeleteServerGroupWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything).
+		Return(&swaclient.DeleteServerGroupResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
+
+	tfresource.Test(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
+		Steps: []tfresource.TestStep{
+			{
+				Config: `
+resource "conjur_swa_server_group" "test" {
+  name              = "test-sg"
+  trust_domain_name = "test-td"
+  attestation = {
+    k8s_jwt = {
+      clusters = {
+        "cluster-1" = {
+          issuer                      = "https://kubernetes.default.svc.cluster.local"
+          audience                    = "swa-node-attestation"
+          service_account_allow_list  = ["swa-system:swa-agent"]
+          jwks_uri                    = "https://oidc.eks.example.com/keys"
+        }
+      }
+    }
+  }
+}
+`,
+				Check: tfresource.ComposeTestCheckFunc(
+					tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.k8s_jwt.clusters.cluster-1.issuer", "https://kubernetes.default.svc.cluster.local"),
+					tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.k8s_jwt.clusters.cluster-1.audience", "swa-node-attestation"),
+					tfresource.TestCheckResourceAttr("conjur_swa_server_group.test", "attestation.k8s_jwt.clusters.cluster-1.jwks_uri", "https://oidc.eks.example.com/keys"),
+					tfresource.TestCheckNoResourceAttr("conjur_swa_server_group.test", "attestation.k8s_jwt.clusters.cluster-1.public_keys"),
+				),
+			},
+		},
+	})
+}
+
+// TestServerGroupResource_K8sJwt_PublicKeys exercises a k8s_jwt cluster configured with
+// an inline public_keys JSON document instead of jwks_uri.
+func TestServerGroupResource_K8sJwt_PublicKeys(t *testing.T) {
+	t.Parallel()
+
+	mockClient := swamocks.NewMockClientWithResponsesInterface(t)
+
+	att := &swaclient.AttestationConfiguration{
+		K8sJwt: &swaclient.K8sJwtAttestationConfiguration{
+			Clusters: map[string]swaclient.K8sJwtCluster{
+				"cluster-1": {
+					Issuer:                  "https://issuer.example.com",
+					Audience:                "swa-node-attestation",
+					ServiceAccountAllowList: []string{"swa-system:swa-agent"},
+					PublicKeys: &swaclient.K8sJwtClusterPublicKeys{
+						Type:  new(swaclient.K8sJwtClusterPublicKeysTypeJwks),
+						Value: swaclient.K8sJwtJwks{Keys: []swaclient.K8sJwtJwk{{Kty: swaclient.K8sJwtJwkKtyRSA}}},
+					},
+				},
+			},
+		},
+	}
+
+	mockClient.EXPECT().
+		PostServerGroupWithResponse(mock.Anything, "test-td", mock.Anything,
+			mock.MatchedBy(func(body swaclient.PostServerGroupJSONRequestBody) bool {
+				return body.Attestation != nil && reflect.DeepEqual(body.Attestation.K8sJwt, att.K8sJwt)
+			})).
+		Return(&swaclient.PostServerGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusCreated),
+			ApplicationxSecretsmgrV2JSON201: &swaclient.ServerGroupResponse{
+				Name: "test-sg", TrustDomainName: "test-td", Attestation: att,
+			},
+		}, nil).Times(1)
+
+	mockClient.EXPECT().
+		GetServerGroupWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything).
+		Return(&swaclient.GetServerGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: &swaclient.ServerGroupResponse{
+				Name: "test-sg", TrustDomainName: "test-td", Attestation: att,
+			},
+		}, nil).Maybe()
+
+	mockClient.EXPECT().
+		DeleteServerGroupWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything).
+		Return(&swaclient.DeleteServerGroupResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
+
+	tfresource.Test(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
+		Steps: []tfresource.TestStep{
+			{
+				Config: `
+resource "conjur_swa_server_group" "test" {
+  name              = "test-sg"
+  trust_domain_name = "test-td"
+  attestation = {
+    k8s_jwt = {
+      clusters = {
+        "cluster-1" = {
+          issuer                     = "https://issuer.example.com"
+          audience                   = "swa-node-attestation"
+          service_account_allow_list = ["swa-system:swa-agent"]
+          public_keys                = jsonencode({ type = "jwks", value = { keys = [{ kty = "RSA" }] } })
+        }
+      }
+    }
+  }
+}
+`,
+				Check: tfresource.ComposeTestCheckFunc(
+					tfresource.TestCheckResourceAttrSet("conjur_swa_server_group.test", "attestation.k8s_jwt.clusters.cluster-1.public_keys"),
+					tfresource.TestCheckNoResourceAttr("conjur_swa_server_group.test", "attestation.k8s_jwt.clusters.cluster-1.jwks_uri"),
+				),
+			},
+		},
+	})
+}
+
+// TestServerGroupResource_ValidateConfig_RejectsK8sJwtBothJwksUriAndPublicKeys and
+// TestServerGroupResource_ValidateConfig_RejectsK8sJwtNeitherJwksUriNorPublicKeys exercise
+// the mutual-exclusivity check in validateK8sJwtClusters.
+func TestServerGroupResource_ValidateConfig_RejectsK8sJwtBothJwksUriAndPublicKeys(t *testing.T) {
+	t.Parallel()
+
+	mockClient := swamocks.NewMockClientWithResponsesInterface(t)
+
+	tfresource.Test(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
+		Steps: []tfresource.TestStep{
+			{
+				Config: `
+resource "conjur_swa_server_group" "test" {
+  name              = "test-sg"
+  trust_domain_name = "test-td"
+
+  attestation = {
+    k8s_jwt = {
+      clusters = {
+        "cluster-1" = {
+          issuer                     = "https://issuer.example.com"
+          audience                   = "swa-node-attestation"
+          service_account_allow_list = ["swa-system:swa-agent"]
+          jwks_uri                   = "https://issuer.example.com/keys"
+          public_keys                = jsonencode({ type = "jwks", value = { keys = [{ kty = "RSA" }] } })
+        }
+      }
+    }
+  }
+}
+`,
+				ExpectError: regexp.MustCompile(`(?s)only one of jwks_uri or public_keys`),
+			},
+		},
+	})
+}
+
+func TestServerGroupResource_ValidateConfig_RejectsK8sJwtNeitherJwksUriNorPublicKeys(t *testing.T) {
+	t.Parallel()
+
+	mockClient := swamocks.NewMockClientWithResponsesInterface(t)
+
+	tfresource.Test(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
+		Steps: []tfresource.TestStep{
+			{
+				Config: `
+resource "conjur_swa_server_group" "test" {
+  name              = "test-sg"
+  trust_domain_name = "test-td"
+
+  attestation = {
+    k8s_jwt = {
+      clusters = {
+        "cluster-1" = {
+          issuer                     = "https://issuer.example.com"
+          audience                   = "swa-node-attestation"
+          service_account_allow_list = ["swa-system:swa-agent"]
+        }
+      }
+    }
+  }
+}
+`,
+				ExpectError: regexp.MustCompile(`(?s)one of jwks_uri or public_keys must be set`),
 			},
 		},
 	})

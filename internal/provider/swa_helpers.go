@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -12,6 +13,11 @@ import (
 
 	swaclient "github.com/cyberark/terraform-provider-conjur/internal/swa/client"
 )
+
+// swaResourceNamePattern mirrors the charset every SWA resource name path
+// parameter shares in openapi.yaml (trust domain, server group, server): 1-60
+// characters, letters, numbers, periods, underscores, and hyphens only.
+var swaResourceNamePattern = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
 
 // configureSWAClient centralizes ProviderData type assertion for SWA resources
 // and enforces that the deployment offers CapabilitySWA. It delegates the
