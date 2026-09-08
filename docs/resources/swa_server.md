@@ -83,7 +83,7 @@ Optional:
 - `identity` (Attributes) Identity mapping configuration for the JWT authenticator. Changing this forces a new server to be created. (see [below for nested schema](#nestedatt--auth--identity))
 - `issuer` (String) The expected issuer for JWT authentication.
 - `jwks_uri` (String) The JWKS URI for JWT verification.
-- `public_keys` (String) Inline JWKS as a JSON string. Sent to the server as compact, canonical JSON.
+- `public_keys` (String) Inline JWKS as a JSON string, e.g. `jsonencode({type = "jwks", value = {keys = [...]}})`. A hand-written JSON string is accepted too; sent to the server as compact, canonical JSON.
 
 <a id="nestedatt--auth--identity"></a>
 ### Nested Schema for `auth.identity`

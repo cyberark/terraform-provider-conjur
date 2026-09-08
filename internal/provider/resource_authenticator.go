@@ -169,7 +169,7 @@ func (r *AuthenticatorResource) Schema(ctx context.Context, req resource.SchemaR
 						},
 					},
 					"public_keys": schema.StringAttribute{
-						MarkdownDescription: "Public keys",
+						MarkdownDescription: "Inline JWKS as a JSON string, e.g. `jsonencode({type = \"jwks\", value = {keys = [...]}})`. A hand-written JSON string is accepted too.",
 						Optional:            true,
 						PlanModifiers: []planmodifier.String{
 							stringplanmodifier.RequiresReplace(),
