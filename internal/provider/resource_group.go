@@ -182,7 +182,7 @@ func (r *GroupResource) Read(ctx context.Context, req resource.ReadRequest, resp
 		return
 	}
 
-	groupID := fullyQualifiedID(r.client, "group", fmt.Sprintf("%s/%s", data.Branch.ValueString(), data.Name.ValueString()))
+	groupID := fullyQualifiedID(r.client, "group", branchQualifiedID(data.Branch.ValueString(), data.Name.ValueString()))
 	exists, err := r.client.RoleExists(groupID)
 	if err != nil {
 		resp.Diagnostics.AddError(

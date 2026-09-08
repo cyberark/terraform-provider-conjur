@@ -229,7 +229,7 @@ func (r *HostResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	hostID := fullyQualifiedID(r.client, "host", fmt.Sprintf("%s/%s", data.Branch.ValueString(), data.Name.ValueString()))
+	hostID := fullyQualifiedID(r.client, "host", branchQualifiedID(data.Branch.ValueString(), data.Name.ValueString()))
 	exists, err := r.client.RoleExists(hostID)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -265,7 +265,7 @@ func (r *HostResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	hostID := fmt.Sprintf("%s/%s", data.Branch.ValueString(), data.Name.ValueString())
+	hostID := branchQualifiedID(data.Branch.ValueString(), data.Name.ValueString())
 	update := conjurapi.WorkloadFields{
 		AuthnDescriptors: authnDescriptorsToAPI(data.AuthnDescriptors),
 	}
@@ -292,7 +292,7 @@ func (r *HostResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 		return
 	}
 
-	_, err := r.client.DeleteWorkload(fmt.Sprintf("%s/%s", data.Branch.ValueString(), data.Name.ValueString()))
+	_, err := r.client.DeleteWorkload(branchQualifiedID(data.Branch.ValueString(), data.Name.ValueString()))
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete host, got error: %s", err))
 		return

@@ -268,7 +268,7 @@ func (r *SecretResource) Read(ctx context.Context, req resource.ReadRequest, res
 	var data SecretResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
-	secretID := fmt.Sprintf("%s/%s", data.Branch.ValueString(), data.Name.ValueString())
+	secretID := branchQualifiedID(data.Branch.ValueString(), data.Name.ValueString())
 	secretResp, err := r.client.GetStaticSecretDetails(secretID)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -336,7 +336,7 @@ func (r *SecretResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	secretID := fmt.Sprintf("%s/%s", data.Branch.ValueString(), data.Name.ValueString())
+	secretID := branchQualifiedID(data.Branch.ValueString(), data.Name.ValueString())
 
 	var err error
 	// Read value_wo from Config (write-only attributes are in Config, not Plan)
