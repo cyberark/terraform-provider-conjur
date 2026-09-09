@@ -52,7 +52,7 @@ resource "conjur_swa_trust_domain" "full" {
 
 ### Required
 
-- `name` (String) The name of the trust domain (e.g., 'prod.example.org').
+- `name` (String) The trust domain name (e.g., `prod.example.org`). Case-sensitive; must be 1-60 characters and may include letters, numbers, periods, underscores, and hyphens only.
 
 ### Optional
 
@@ -68,10 +68,10 @@ resource "conjur_swa_trust_domain" "full" {
 
 Optional:
 
-- `signature_algorithm` (String) The signature algorithm for JWTs (e.g., 'ES256', 'RS256').
-- `signing_key_ttl` (Number) TTL for signing keys in seconds.
-- `signing_key_type` (String) The type of signing key (e.g., 'EC_P256', 'RSA_2048').
-- `token_ttl` (Number) TTL for JWT tokens in seconds.
+- `signature_algorithm` (String) The signature algorithm for JWT-SVIDs. One of `ES256`, `ES384`, `ES512`, `RS256`, `RS384`, `RS512`. Defaults to `RS512`.
+- `signing_key_ttl` (Number) Signing key lifetime in seconds. Between 3600 and 2592000. Defaults to 86400.
+- `signing_key_type` (String) The signing key type for JWT-SVIDs. One of `EC_P256`, `EC_P384`, `EC_P521`, `RSA_2048`, `RSA_4096`. Defaults to `RSA_4096`.
+- `token_ttl` (Number) JWT-SVID lifetime in seconds. Between 60 and 86400. Defaults to 300.
 
 
 <a id="nestedatt--x509"></a>
@@ -79,7 +79,7 @@ Optional:
 
 Optional:
 
-- `workload_ttl` (Number) TTL for workload X.509 SVIDs in seconds.
+- `workload_ttl` (Number) Workload X.509 SVID lifetime in seconds. Between 600 and 86400. Defaults to 3600.
 
 ## Import
 

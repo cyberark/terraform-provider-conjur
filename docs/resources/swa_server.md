@@ -60,7 +60,7 @@ resource "conjur_swa_server" "inline_keys" {
 ### Required
 
 - `auth` (Attributes) Authentication configuration for the server. (see [below for nested schema](#nestedatt--auth))
-- `name` (String) The name of the server.
+- `name` (String) The name of the server. Must be 1-51 characters and may include letters, numbers, periods, underscores, and hyphens only.
 - `server_group_id` (String) The ID of the server group this server belongs to.
 
 ### Read-Only
@@ -74,15 +74,15 @@ resource "conjur_swa_server" "inline_keys" {
 Required:
 
 - `subject` (String) The expected subject claim value from the workload JWT. Changing this forces a new server to be created.
-- `type` (String) The authentication type (e.g., 'JWT'). Changing this forces a new server to be created.
+- `type` (String) The authentication type. One of `JWT`. Changing this forces a new server to be created.
 
 Optional:
 
-- `audience` (String) The expected audience for JWT authentication.
-- `ca_cert` (String) PEM-encoded CA certificate for validating the JWKS provider's TLS certificate. Changing this forces a new server to be created.
+- `audience` (String) The expected audience for JWT authentication. Up to 1000 characters.
+- `ca_cert` (String) PEM-encoded CA certificate for validating the JWKS provider's TLS certificate. Up to 10000 characters. Changing this forces a new server to be created.
 - `identity` (Attributes) Identity mapping configuration for the JWT authenticator. Changing this forces a new server to be created. (see [below for nested schema](#nestedatt--auth--identity))
-- `issuer` (String) The expected issuer for JWT authentication.
-- `jwks_uri` (String) The JWKS URI for JWT verification.
+- `issuer` (String) The expected issuer for JWT authentication. Up to 255 characters.
+- `jwks_uri` (String) The JWKS URI for JWT verification. Up to 255 characters.
 - `public_keys` (String) Inline JWKS as a JSON string, e.g. `jsonencode({type = "jwks", value = {keys = [...]}})`. A hand-written JSON string is accepted too; sent to the server as compact, canonical JSON.
 
 <a id="nestedatt--auth--identity"></a>
@@ -92,8 +92,8 @@ Optional:
 
 - `claim_aliases` (Map of String) A map of claim aliases to JWT claim names.
 - `enforced_claims` (List of String) A list of enforced claims.
-- `identity_path` (String) The workload's policy ID in Secrets Manager.
-- `token_app_property` (String) The name of the JWT claim whose value identifies the workload.
+- `identity_path` (String) The workload's policy ID in Secrets Manager. Up to 1000 characters.
+- `token_app_property` (String) The name of the JWT claim whose value identifies the workload. Up to 1000 characters.
 
 ## Import
 

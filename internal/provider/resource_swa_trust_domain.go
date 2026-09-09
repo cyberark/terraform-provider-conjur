@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -130,10 +131,14 @@ func (r *TrustDomainResource) Schema(ctx context.Context, req resource.SchemaReq
 				},
 			},
 			"name": schema.StringAttribute{
-				MarkdownDescription: "The name of the trust domain (e.g., 'prod.example.org').",
+				MarkdownDescription: "The trust domain name (e.g., `prod.example.org`). Case-sensitive; must be 1-60 characters and may include letters, numbers, periods, underscores, and hyphens only.",
 				Required:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
+				},
+				Validators: []validator.String{
+					stringvalidator.LengthBetween(1, 60),
+					stringvalidator.RegexMatches(swaResourceNamePattern, "must contain only letters, numbers, periods, underscores, and hyphens"),
 				},
 			},
 			"jwt": schema.SingleNestedAttribute{
@@ -145,28 +150,40 @@ func (r *TrustDomainResource) Schema(ctx context.Context, req resource.SchemaReq
 				},
 				Attributes: map[string]schema.Attribute{
 					"signature_algorithm": schema.StringAttribute{
-						MarkdownDescription: "The signature algorithm for JWTs (e.g., 'ES256', 'RS256').",
+						MarkdownDescription: "The signature algorithm for JWT-SVIDs. One of `ES256`, `ES384`, `ES512`, `RS256`, `RS384`, `RS512`. Defaults to `RS512`.",
 						Optional:            true,
 						Computed:            true,
 						Default:             stringdefault.StaticString("RS512"),
+						Validators: []validator.String{
+							stringvalidator.OneOf("ES256", "ES384", "ES512", "RS256", "RS384", "RS512"),
+						},
 					},
 					"signing_key_type": schema.StringAttribute{
-						MarkdownDescription: "The type of signing key (e.g., 'EC_P256', 'RSA_2048').",
+						MarkdownDescription: "The signing key type for JWT-SVIDs. One of `EC_P256`, `EC_P384`, `EC_P521`, `RSA_2048`, `RSA_4096`. Defaults to `RSA_4096`.",
 						Optional:            true,
 						Computed:            true,
 						Default:             stringdefault.StaticString("RSA_4096"),
+						Validators: []validator.String{
+							stringvalidator.OneOf("EC_P256", "EC_P384", "EC_P521", "RSA_2048", "RSA_4096"),
+						},
 					},
 					"signing_key_ttl": schema.Int64Attribute{
-						MarkdownDescription: "TTL for signing keys in seconds.",
+						MarkdownDescription: "Signing key lifetime in seconds. Between 3600 and 2592000. Defaults to 86400.",
 						Optional:            true,
 						Computed:            true,
 						Default:             int64default.StaticInt64(86400),
+						Validators: []validator.Int64{
+							int64validator.Between(3600, 2592000),
+						},
 					},
 					"token_ttl": schema.Int64Attribute{
-						MarkdownDescription: "TTL for JWT tokens in seconds.",
+						MarkdownDescription: "JWT-SVID lifetime in seconds. Between 60 and 86400. Defaults to 300.",
 						Optional:            true,
 						Computed:            true,
 						Default:             int64default.StaticInt64(300),
+						Validators: []validator.Int64{
+							int64validator.Between(60, 86400),
+						},
 					},
 				},
 			},
@@ -179,7 +196,7 @@ func (r *TrustDomainResource) Schema(ctx context.Context, req resource.SchemaReq
 				},
 				Attributes: map[string]schema.Attribute{
 					"workload_ttl": schema.Int64Attribute{
-						MarkdownDescription: "TTL for workload X.509 SVIDs in seconds.",
+						MarkdownDescription: "Workload X.509 SVID lifetime in seconds. Between 600 and 86400. Defaults to 3600.",
 						Optional:            true,
 						Computed:            true,
 						Default:             int64default.StaticInt64(3600),

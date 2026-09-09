@@ -5,6 +5,13 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.9.11] - 2026-09-09
+### Added
+- `conjur_swa_server_group`'s `attestation` now supports `k8s_jwt`, for attesting
+  Kubernetes workloads by validating projected service account token JWTs against
+  a per-cluster issuer, audience, and service account allowlist, with signing keys
+  from either `jwks_uri` or an inline `public_keys` document.
 ### Changed
 - `conjur_host`'s `authn_descriptors` can now be added, removed, or have their
   `data` changed in place via `terraform apply`, applied as a `PATCH` request

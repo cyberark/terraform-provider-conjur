@@ -255,6 +255,39 @@ func (e JWTConfigurationInputSigningKeyType) Valid() bool {
 	}
 }
 
+// Defines values for K8sJwtClusterPublicKeysType.
+const (
+	K8sJwtClusterPublicKeysTypeJwks K8sJwtClusterPublicKeysType = "jwks"
+)
+
+// Valid indicates whether the value is a known member of the K8sJwtClusterPublicKeysType enum.
+func (e K8sJwtClusterPublicKeysType) Valid() bool {
+	switch e {
+	case K8sJwtClusterPublicKeysTypeJwks:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for K8sJwtJwkKty.
+const (
+	K8sJwtJwkKtyEC  K8sJwtJwkKty = "EC"
+	K8sJwtJwkKtyRSA K8sJwtJwkKty = "RSA"
+)
+
+// Valid indicates whether the value is a known member of the K8sJwtJwkKty enum.
+func (e K8sJwtJwkKty) Valid() bool {
+	switch e {
+	case K8sJwtJwkKtyEC:
+		return true
+	case K8sJwtJwkKtyRSA:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for NodeGroupCreateRequestWorkloadType.
 const (
 	NodeGroupCreateRequestWorkloadTypeKubernetes NodeGroupCreateRequestWorkloadType = "kubernetes"
@@ -416,6 +449,7 @@ type AttestationConfiguration struct {
 	AwsIid            *AwsIidAttestationConfiguration            `json:"aws_iid,omitempty"`
 	GcpServiceAccount *GcpServiceAccountAttestationConfiguration `json:"gcp_service_account,omitempty"`
 	GeminiEnterprise  *GeminiEnterpriseAttestationConfiguration  `json:"gemini_enterprise,omitempty"`
+	K8sJwt            *K8sJwtAttestationConfiguration            `json:"k8s_jwt,omitempty"`
 	K8sPsat           *K8sPsatConfigurationInput                 `json:"k8s_psat,omitempty"`
 	X509pop           *X509PopConfigurationInput                 `json:"x509pop,omitempty"`
 }
@@ -1059,6 +1093,95 @@ type JWTConfigurationInputSignatureAlgorithm string
 //
 // Example: EC_P256
 type JWTConfigurationInputSigningKeyType string
+
+// K8sJwtAttestationConfiguration defines model for K8sJwtAttestationConfiguration.
+type K8sJwtAttestationConfiguration struct {
+	// Clusters Map of cluster identifier to Kubernetes JWT cluster configuration. Each key MUST match the name of an existing node group in this server group — that match is how an attesting workload's cluster is routed to a node group. Not validated or enforced by this API; a mismatch (typo, or a node group renamed/removed afterwards) causes attestation to fail to route rather than being rejected at configuration time.
+	Clusters map[string]K8sJwtCluster `json:"clusters"`
+}
+
+// K8sJwtCluster defines model for K8sJwtCluster.
+type K8sJwtCluster struct {
+	// Audience Expected audience (`aud` claim) for projected service account tokens from this cluster.
+	//
+	// Example: swa-node-attestation
+	Audience string `json:"audience"`
+
+	// Issuer OIDC issuer URL of the cluster, as it appears in the `iss` claim of its projected service account tokens. Two clusters may report the same issuer; the cluster's signing keys are what actually distinguish them.
+	//
+	//
+	// Example: https://kubernetes.default.svc.cluster.local
+	Issuer string `json:"issuer"`
+
+	// JwksUri Cluster's published JWKS endpoint. Keys are fetched and cached; rotation is picked up automatically with no restart. Required for clusters that rotate signing keys too frequently for static keys (e.g. EKS, GKE, AKS). Mutually exclusive with public_keys. Must use the `https` scheme and resolve to a public hostname or IP — `http`, `localhost`, loopback, unspecified, private, link-local, multicast, and carrier-grade NAT addresses are all rejected.
+	//
+	//
+	// Example: https://oidc.eks.eu-west-1.amazonaws.com/id/EXAMPLED539D4633E53DE1B71EXAMPLE/keys
+	JwksUri *string `json:"jwks_uri,omitempty"`
+
+	// PublicKeys Inline JWKS, in the same `{"type":"jwks", "value":<JWKS>}` shape as `UpdateServerJWTAuthenticationData.public_keys` above, requiring no outbound network access. The JWKS `keys` array may hold several keys at once so key rotation does not cause an outage. Typically used for OpenShift and self-managed clusters with no reachable unauthenticated keys endpoint. Mutually exclusive with jwks_uri.
+	PublicKeys *K8sJwtClusterPublicKeys `json:"public_keys,omitempty"`
+
+	// ServiceAccountAllowList Non-empty allowlist of Kubernetes service accounts (`namespace:name`) permitted to attest. Mandatory in every configuration; there is no way to leave this open.
+	//
+	//
+	// Example: ["swa-system:swa-agent-payments","swa-system:swa-agent-frontend"]
+	ServiceAccountAllowList []string `json:"service_account_allow_list"`
+}
+
+// K8sJwtClusterPublicKeys Inline JWKS, in the same `{"type":"jwks", "value":<JWKS>}` shape as `UpdateServerJWTAuthenticationData.public_keys` above, requiring no outbound network access. The JWKS `keys` array may hold several keys at once so key rotation does not cause an outage. Typically used for OpenShift and self-managed clusters with no reachable unauthenticated keys endpoint. Mutually exclusive with jwks_uri.
+type K8sJwtClusterPublicKeys struct {
+	// Type Key format. Always "jwks" — currently the only supported inline format. Optional on input; always present in the response.
+	Type *K8sJwtClusterPublicKeysType `json:"type,omitempty"`
+
+	// Value A JSON Web Key Set (RFC 7517 §5) — a cluster's service-account-token signing keys.
+	Value K8sJwtJwks `json:"value"`
+}
+
+// K8sJwtClusterPublicKeysType Key format. Always "jwks" — currently the only supported inline format. Optional on input; always present in the response.
+type K8sJwtClusterPublicKeysType string
+
+// K8sJwtJwk A single JSON Web Key (RFC 7517 §4) from a Kubernetes cluster's service-account-token signing key set. Restricted to RSA and EC — kube-apiserver's JWTTokenGenerator (upstream and OpenShift's fork) only ever signs service account tokens with *rsa.PrivateKey or *ecdsa.PrivateKey; no other key type reaches a cluster's JWKS.
+type K8sJwtJwk struct {
+	// Alg Signing algorithm — RS256 for RSA; ES256/ES384/ES512 for EC by curve.
+	//
+	// Example: RS256
+	Alg *string `json:"alg,omitempty"`
+
+	// Crv EC curve name ("P-256", "P-384", "P-521"). Present when kty is "EC".
+	Crv *string `json:"crv,omitempty"`
+
+	// E RSA public exponent (base64url). Present when kty is "RSA".
+	E *string `json:"e,omitempty"`
+
+	// Kid Key ID, matched against the `kid` claim in a token's header.
+	Kid *string `json:"kid,omitempty"`
+
+	// Kty Key type.
+	Kty K8sJwtJwkKty `json:"kty"`
+
+	// N RSA modulus (base64url). Present when kty is "RSA".
+	N *string `json:"n,omitempty"`
+
+	// Use Intended use of the key.
+	//
+	// Example: sig
+	Use *string `json:"use,omitempty"`
+
+	// X EC public key x-coordinate (base64url). Present when kty is "EC".
+	X *string `json:"x,omitempty"`
+
+	// Y EC public key y-coordinate (base64url). Present when kty is "EC".
+	Y *string `json:"y,omitempty"`
+}
+
+// K8sJwtJwkKty Key type.
+type K8sJwtJwkKty string
+
+// K8sJwtJwks A JSON Web Key Set (RFC 7517 §5) — a cluster's service-account-token signing keys.
+type K8sJwtJwks struct {
+	Keys []K8sJwtJwk `json:"keys"`
+}
 
 // K8sPsatCluster defines model for K8sPsatCluster.
 type K8sPsatCluster struct {

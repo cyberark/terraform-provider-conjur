@@ -79,6 +79,33 @@ resource "conjur_swa_server_group" "aws_iid" {
   }
 }
 
+# Server group using Kubernetes JWT (Projected Service Account Token via OIDC) attestation
+resource "conjur_swa_server_group" "k8s_jwt" {
+  trust_domain_name = "prod.example.org"
+  name              = "k8s-jwt-servers"
+  description       = "Kubernetes workload server group using JWT attestation"
+
+  attestation = {
+    k8s_jwt = {
+      clusters = {
+        "prod-cluster" = {
+          issuer                      = "https://kubernetes.default.svc.cluster.local"
+          audience                    = "swa-node-attestation"
+          service_account_allow_list  = ["swa-system:swa-agent-payments", "swa-system:swa-agent-frontend"]
+          # Use jwks_uri ...
+          jwks_uri                    = "https://oidc.eks.eu-west-1.amazonaws.com/id/EXAMPLED539D4633E53DE1B71EXAMPLE/keys"
+          # ...or public_keys for clusters with no reachable JWKS endpoint (e.g. OpenShift).
+          # jwks_uri and public_keys are mutually exclusive.
+          # public_keys = jsonencode({
+          #   type  = "jwks"
+          #   value = { keys = [...] }
+          # })
+        }
+      }
+    }
+  }
+}
+
 # Server group with no node attestation (attestation is optional)
 resource "conjur_swa_server_group" "no_attestation" {
   trust_domain_name = "prod.example.org"
@@ -93,13 +120,13 @@ resource "conjur_swa_server_group" "no_attestation" {
 
 ### Required
 
-- `name` (String) The name of the server group.
+- `name` (String) The name of the server group. Case-sensitive; must be 1-60 characters and may include letters, numbers, periods, underscores, and hyphens only.
 - `trust_domain_name` (String) The name of the trust domain this server group belongs to.
 
 ### Optional
 
-- `attestation` (Attributes) Node attestation configuration. Optionally specify any of x509pop, k8s_psat, gcp_service_account, or aws_iid; omit entirely for a server group with no attestation. (see [below for nested schema](#nestedatt--attestation))
-- `description` (String) A description of the server group.
+- `attestation` (Attributes) Node attestation configuration. Optionally specify any of x509pop, k8s_psat, gcp_service_account, aws_iid, or k8s_jwt; omit entirely for a server group with no attestation. (see [below for nested schema](#nestedatt--attestation))
+- `description` (String) A description of the server group. Up to 1024 characters.
 - `node_attestation` (Attributes, Deprecated) Deprecated: use `attestation` instead. (see [below for nested schema](#nestedatt--node_attestation))
 
 ### Read-Only
@@ -113,6 +140,7 @@ Optional:
 
 - `aws_iid` (Attributes) AWS Instance Identity Document (IID) attestation configuration. (see [below for nested schema](#nestedatt--attestation--aws_iid))
 - `gcp_service_account` (Attributes) GCP service account attestation configuration. (see [below for nested schema](#nestedatt--attestation--gcp_service_account))
+- `k8s_jwt` (Attributes) Kubernetes JWT attestation configuration. (see [below for nested schema](#nestedatt--attestation--k8s_jwt))
 - `k8s_psat` (Attributes) Kubernetes Projected Service Account Token attestation configuration. (see [below for nested schema](#nestedatt--attestation--k8s_psat))
 - `x509pop` (Attributes) X.509 Proof of Possession attestation configuration. (see [below for nested schema](#nestedatt--attestation--x509pop))
 
@@ -121,7 +149,7 @@ Optional:
 
 Optional:
 
-- `assume_role` (String) Bare IAM role name, optionally path-prefixed (e.g. `service-role/SWAServerRole`), to describe the attesting instance — not a full ARN. Used to build the full ARN per-attestation as `arn:{partition}:iam::{account-id}:role/{assume_role}`, taking the account ID from the attesting instance's Instance Identity Document. Omitted means ambient credentials (e.g. IRSA/Pod Identity) are used.
+- `assume_role` (String) Bare IAM role name, optionally path-prefixed (e.g. `service-role/SWAServerRole`), to describe the attesting instance — not a full ARN. Used to build the full ARN per-attestation as `arn:{partition}:iam::{account-id}:role/{assume_role}`, taking the account ID from the attesting instance's Instance Identity Document. Omitted means ambient credentials (e.g. IRSA/Pod Identity) are used. Up to 576 characters; an empty string is treated the same as omitted.
 - `partition` (String) AWS partition the server operates in. One of `aws`, `aws-cn`, `aws-us-gov`. Defaults to `aws`.
 - `verify_organization` (Attributes) Verify the attesting instance belongs to an AWS Organization. (see [below for nested schema](#nestedatt--attestation--aws_iid--verify_organization))
 
@@ -148,6 +176,29 @@ Required:
 Optional:
 
 - `audiences` (List of String) Expected audience values for the GCP identity token (`aud` claim). Defaults to `urn:panw:swa` when omitted.
+
+
+<a id="nestedatt--attestation--k8s_jwt"></a>
+### Nested Schema for `attestation.k8s_jwt`
+
+Required:
+
+- `clusters` (Attributes Map) Map of cluster identifier to Kubernetes JWT cluster configuration. Each key must match the name of an existing node group in this server group; that match is how an attesting workload's cluster is routed to a node group. (see [below for nested schema](#nestedatt--attestation--k8s_jwt--clusters))
+
+<a id="nestedatt--attestation--k8s_jwt--clusters"></a>
+### Nested Schema for `attestation.k8s_jwt.clusters`
+
+Required:
+
+- `audience` (String) Expected audience (`aud` claim) for projected service account tokens from this cluster. Up to 1000 characters.
+- `issuer` (String) OIDC issuer URL of the cluster, as it appears in the `iss` claim of its projected service account tokens. Up to 255 characters.
+- `service_account_allow_list` (List of String) Non-empty allowlist of Kubernetes service accounts (`namespace:name`) permitted to attest.
+
+Optional:
+
+- `jwks_uri` (String) Cluster's published JWKS endpoint. Required for clusters that rotate signing keys too frequently for static keys (e.g. EKS, GKE, AKS). Must use `https` and resolve to a public host; `http`, localhost, loopback, and private/link-local/multicast addresses are rejected. Up to 255 characters. Mutually exclusive with `public_keys`.
+- `public_keys` (String) Inline JWKS as a JSON string, in the form {"type":"jwks","value":{"keys":[...]}}. Requires no outbound network access; typically used for OpenShift and self-managed clusters. Mutually exclusive with jwks_uri.
+
 
 
 <a id="nestedatt--attestation--k8s_psat"></a>
