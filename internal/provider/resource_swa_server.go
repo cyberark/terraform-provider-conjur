@@ -496,7 +496,7 @@ func (r *ServerResource) Schema(ctx context.Context, req resource.SchemaRequest,
 						},
 					},
 					"public_keys": schema.StringAttribute{
-						MarkdownDescription: `Inline JWKS as a JSON string. Sent to the server as compact, canonical JSON.`,
+						MarkdownDescription: "Inline JWKS as a JSON string, e.g. `jsonencode({type = \"jwks\", value = {keys = [...]}})`. A hand-written JSON string is accepted too; sent to the server as compact, canonical JSON.",
 						Optional:            true,
 						PlanModifiers: []planmodifier.String{
 							jsonEquivalentPlanModifier{},

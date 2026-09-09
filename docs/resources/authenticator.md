@@ -30,7 +30,21 @@ resource "conjur_authenticator" "jwt_authenticator" {
       enforced_claims = ["sub","email"],
     },
     ca_cert = "-----BEGIN CERTIFICATE-----",
-    public_keys = "{\"type\":\"jwks\",\"value\":{\"keys\":[{\"alg\":\"RS256\",\"e\":\"AQAB\",\"kid\":\"F8...\",\"kty\":\"RSA\",\"n\":\"8158...\",\"use\":\"sig\"}]}}"
+    public_keys = jsonencode({
+      type = "jwks"
+      value = {
+        keys = [
+          {
+            alg = "RS256"
+            e   = "AQAB"
+            kid = "F8..."
+            kty = "RSA"
+            n   = "8158..."
+            use = "sig"
+          }
+        ]
+      }
+    })
   }
   annotations = {
     note = "Enable JWT login for CI runner in TF",
@@ -65,7 +79,7 @@ Optional:
 - `identity` (Attributes) Identity configuration (see [below for nested schema](#nestedatt--data--identity))
 - `issuer` (String)
 - `jwks_uri` (String) JWKS URI
-- `public_keys` (String) Public keys
+- `public_keys` (String) Inline JWKS as a JSON string, e.g. `jsonencode({type = "jwks", value = {keys = [...]}})`. A hand-written JSON string is accepted too.
 
 <a id="nestedatt--data--identity"></a>
 ### Nested Schema for `data.identity`

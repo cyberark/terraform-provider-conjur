@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- `conjur_host`'s `authn_descriptors` can now be added, removed, or have their
+  `data` changed in place via `terraform apply`, applied as a `PATCH` request
+  instead of replacing the host.
 
 ## [0.9.10] - 2026-09-04
 ### Fixed
