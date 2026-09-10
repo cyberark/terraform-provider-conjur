@@ -116,7 +116,7 @@ func (r *PolicyBranchResource) ValidateConfig(ctx context.Context, req resource.
 		return
 	}
 
-	ValidateNonEmpty(data.Name, &resp.Diagnostics, "Policy branch name")
+	ValidateNonBlank(data.Name, &resp.Diagnostics, "Policy branch name")
 	ValidateBranch(data.Branch, &resp.Diagnostics, "branch")
 }
 
