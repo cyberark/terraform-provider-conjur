@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [0.9.12] - 2026-09-10
+### Fixed
+- `conjur_swa_server_group` and `conjur_swa_server` no longer fail `terraform validate`/`plan`
+  with "Value Conversion Error: Received unknown value, however the target type cannot handle
+  unknown values" when an optional nested attestation/auth block (`attestation.gcp_service_account`,
+  `attestation.k8s_jwt`, `auth.identity`) is set to a value that can't be resolved until apply,
+  e.g. a conditional expression over a variable or another resource's attribute.
+
 ## [0.9.11] - 2026-09-09
 ### Added
 - `conjur_swa_server_group`'s `attestation` now supports `k8s_jwt`, for attesting
