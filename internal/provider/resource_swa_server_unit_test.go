@@ -10,6 +10,8 @@ import (
 
 	swaclient "github.com/cyberark/terraform-provider-conjur/internal/swa/client"
 	swamocks "github.com/cyberark/terraform-provider-conjur/internal/swa/client/mocks"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -797,9 +799,17 @@ func TestServerResource_NilClientWarning(t *testing.T) {
 }
 
 func TestServerResource_ValidateConfig(t *testing.T) {
+	identityAttrTypes := map[string]attr.Type{
+		"claim_aliases":      types.MapType{ElemType: types.StringType},
+		"enforced_claims":    types.ListType{ElemType: types.StringType},
+		"identity_path":      types.StringType,
+		"token_app_property": types.StringType,
+	}
+
 	tests := []struct {
 		name          string
 		data          ServerResourceModel
+		mutatePlan    func(t *testing.T, plan *tfsdk.Plan)
 		expectedError bool
 		errorContains string
 	}{
@@ -876,6 +886,38 @@ func TestServerResource_ValidateConfig(t *testing.T) {
 			},
 			expectedError: false,
 		},
+		{
+			// identity wholly Unknown (e.g. HCL like `identity = var.enable ? {...} :
+			// null` where var.enable can't be resolved statically) used to make
+			// ValidateConfig hard-error trying to reflect that Unknown value into the
+			// plain *ServerAuthenticationIdentityModel struct, instead of deferring the
+			// check like every other Unknown field here already does. This can't be
+			// expressed via the data literal above (a struct pointer field has no
+			// Unknown state to assign), so identity is overwritten directly on the raw
+			// plan value via mutatePlan.
+			name: "unknown identity does not trigger a decode crash",
+			data: ServerResourceModel{
+				Name:          types.StringValue("my-server"),
+				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
+				Auth: &ServerAuthenticationModel{
+					Type:       types.StringValue("JWT"),
+					Subject:    types.StringValue("sub"),
+					Issuer:     types.StringNull(),
+					Audience:   types.StringNull(),
+					JWKSURI:    types.StringValue("https://issuer.example.org/.well-known/jwks.json"),
+					CACert:     types.StringNull(),
+					PublicKeys: types.StringNull(),
+				},
+			},
+			mutatePlan: func(t *testing.T, plan *tfsdk.Plan) {
+				require.False(t, plan.SetAttribute(
+					context.Background(),
+					path.Root("auth").AtName("identity"),
+					types.ObjectUnknown(identityAttrTypes),
+				).HasError())
+			},
+			expectedError: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -883,7 +925,10 @@ func TestServerResource_ValidateConfig(t *testing.T) {
 			r := &ServerResource{}
 			s := getServerTestSchema()
 			plan := newPlanWithSchema(s)
-			plan.Set(context.Background(), &tt.data)
+			require.False(t, plan.Set(context.Background(), &tt.data).HasError())
+			if tt.mutatePlan != nil {
+				tt.mutatePlan(t, &plan)
+			}
 
 			req := resource.ValidateConfigRequest{
 				Config: buildServerConfigFromPlan(plan, s),

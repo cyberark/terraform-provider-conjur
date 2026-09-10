@@ -12,6 +12,7 @@ import (
 	swaclient "github.com/cyberark/terraform-provider-conjur/internal/swa/client"
 	swamocks "github.com/cyberark/terraform-provider-conjur/internal/swa/client/mocks"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -1708,6 +1709,53 @@ resource "conjur_swa_server_group" "test" {
 			},
 		},
 	})
+}
+
+// TestServerGroupResource_ValidateConfig_UnknownGCPServiceAccount guards against the
+// bug reported against this resource: HCL like
+//
+//	attestation = {
+//	  gcp_service_account = var.enable_gcp ? { ... } : null
+//	}
+//
+// leaves attestation.gcp_service_account wholly Unknown at validate-time (Terraform
+// core can't statically resolve a conditional between an object and null), and
+// ValidateConfig used to decode the whole `attestation` block into *AttestationModel in
+// one shot, which hard-errored trying to reflect that Unknown value into the plain
+// *GcpServiceAccountModel struct. This can't be expressed via a *ServerGroupResourceModel
+// Go literal (a struct pointer field has no Unknown state to assign), so
+// gcp_service_account is overwritten directly on the raw plan value via SetAttribute,
+// mirroring TestServerResource_ValidateConfig_UnknownIdentity.
+func TestServerGroupResource_ValidateConfig_UnknownGCPServiceAccount(t *testing.T) {
+	data := ServerGroupResourceModel{
+		Name:            types.StringValue("test-sg"),
+		TrustDomainName: types.StringValue("test-td"),
+		Attestation:     &AttestationModel{},
+	}
+
+	gcpAttrTypes := map[string]attr.Type{
+		"allowed_project_ids": types.ListType{ElemType: types.StringType},
+		"audiences":           types.ListType{ElemType: types.StringType},
+	}
+
+	s := getServerGroupTestSchema()
+	plan := newPlanWithSchema(s)
+	require.False(t, plan.Set(context.Background(), &data).HasError())
+	require.False(t, plan.SetAttribute(
+		context.Background(),
+		path.Root("attestation").AtName("gcp_service_account"),
+		types.ObjectUnknown(gcpAttrTypes),
+	).HasError())
+
+	r := &ServerGroupResource{}
+	req := resource.ValidateConfigRequest{
+		Config: buildServerConfigFromPlan(plan, s),
+	}
+	resp := &resource.ValidateConfigResponse{}
+
+	r.ValidateConfig(context.Background(), req, resp)
+
+	assert.False(t, resp.Diagnostics.HasError())
 }
 
 // TestServerGroupResource_ValidateConfig_RejectsNodeAttestation exercises the

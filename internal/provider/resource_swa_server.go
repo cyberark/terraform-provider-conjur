@@ -62,6 +62,23 @@ type ServerAuthenticationIdentityModel struct {
 	TokenAppProperty types.String `tfsdk:"token_app_property"`
 }
 
+// serverAuthValidateModel mirrors ServerAuthenticationModel but types Identity as
+// types.Object instead of *ServerAuthenticationIdentityModel, so ValidateConfig can
+// decode the whole `auth` object in one modelFromObject call: identity is Optional, and
+// reflecting a wholly-Unknown config value (e.g. behind a conditional over a
+// not-yet-resolved value) into a plain struct pointer is a hard error, whereas
+// types.Object tolerates Unknown natively.
+type serverAuthValidateModel struct {
+	Type       types.String `tfsdk:"type"`
+	Subject    types.String `tfsdk:"subject"`
+	Audience   types.String `tfsdk:"audience"`
+	JWKSURI    types.String `tfsdk:"jwks_uri"`
+	Issuer     types.String `tfsdk:"issuer"`
+	CACert     types.String `tfsdk:"ca_cert"`
+	PublicKeys types.String `tfsdk:"public_keys"`
+	Identity   types.Object `tfsdk:"identity"`
+}
+
 func NewServerResource() resource.Resource {
 	return &ServerResource{typeName: "conjur_swa_server"}
 }
@@ -558,12 +575,44 @@ func (r *ServerResource) Schema(ctx context.Context, req resource.SchemaRequest,
 }
 
 func (r *ServerResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	var data ServerResourceModel
-	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	// auth is decoded into serverAuthValidateModel (identity as types.Object) rather
+	// than directly into *ServerAuthenticationModel: identity is Optional, so a config
+	// expression that leaves it wholly Unknown at validate-time (e.g. a conditional over
+	// a not-yet-resolved value) would otherwise make reflection error trying to decode
+	// an Unknown value into the plain *ServerAuthenticationIdentityModel struct.
+	var authObj types.Object
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("auth"), &authObj)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	validateCreateServerAuthConfig(data.Auth, &resp.Diagnostics)
+	if authObj.IsUnknown() {
+		return
+	}
+	if authObj.IsNull() {
+		resp.Diagnostics.AddError("Missing auth configuration", "auth block is required")
+		return
+	}
+
+	auth := modelFromObject[serverAuthValidateModel](ctx, authObj, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	identity := modelFromObject[ServerAuthenticationIdentityModel](ctx, auth.Identity, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	validateCreateServerAuthConfig(&ServerAuthenticationModel{
+		Type:       auth.Type,
+		Subject:    auth.Subject,
+		Audience:   auth.Audience,
+		JWKSURI:    auth.JWKSURI,
+		Issuer:     auth.Issuer,
+		CACert:     auth.CACert,
+		PublicKeys: auth.PublicKeys,
+		Identity:   identity,
+	}, &resp.Diagnostics)
 }
 
 func (r *ServerResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
