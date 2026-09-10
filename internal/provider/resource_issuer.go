@@ -194,9 +194,9 @@ func (r *IssuerResource) Create(ctx context.Context, req resource.CreateRequest,
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	// ValidateConfig skips inspecting aws when it's unknown at plan time; re-check the "exactly one
-	// issuer type block" invariant here in case it resolved to null by apply, which would otherwise
-	// send a type-less payload and surface as an opaque API error.
+	// ValidateConfig skips inspecting aws when it's unknown at plan time; re-check here in case it
+	// resolved to null (type-less payload -> opaque API error) or to blank secret refs (which would
+	// surface as a generic API error instead of the friendly validation message) by apply.
 	if !r.validateIssuerType(aws, &resp.Diagnostics) {
 		return
 	}
@@ -260,10 +260,11 @@ func (r *IssuerResource) Update(ctx context.Context, req resource.UpdateRequest,
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	// ValidateConfig skips inspecting aws when it's unknown at plan time; re-check the "exactly one
-	// issuer type block" invariant here in case it resolved to null by apply. Otherwise, the PATCH
-	// would omit Data, leaving stale credentials attached server-side while state drops them, which
-	// Terraform reports as an "inconsistent result after apply" error.
+	// ValidateConfig skips inspecting aws when it's unknown at plan time; re-check here in case it
+	// resolved to null or to blank secret refs by apply. If aws resolved to null the PATCH would omit
+	// Data, leaving stale credentials attached server-side while state drops them, which Terraform
+	// reports as an "inconsistent result after apply" error; blank refs would surface as a generic
+	// API error instead of the friendly validation message.
 	if !r.validateIssuerType(aws, &resp.Diagnostics) {
 		return
 	}
@@ -311,15 +312,18 @@ func (r *IssuerResource) ImportState(ctx context.Context, req resource.ImportSta
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
 }
 
-// validateIssuerType enforces the "exactly one issuer type block" invariant at apply time, mirroring
-// ValidateConfig's check for the case where aws was unknown at plan time and resolved to null. It
-// reports true when the invariant holds, false (with a diagnostic added) otherwise.
+// validateIssuerType re-runs the apply-time invariants that ValidateConfig skips when aws is unknown
+// at plan time: the "exactly one issuer type block" invariant (aws resolving to null) and the
+// non-blank checks on the inner secret refs (which only become known at apply time). It reports true
+// when the config is valid, false (with a diagnostic added) otherwise.
 func (r *IssuerResource) validateIssuerType(aws *AWSIssuerModel, diags *diag.Diagnostics) bool {
 	if aws == nil {
 		diags.AddError("Invalid issuer configuration", "Exactly one issuer type block must be specified (e.g., aws {}).")
 		return false
 	}
-	return true
+	ValidateNonBlank(aws.AccessKeyIdSecretRef, diags, "AWS access key ID secret ref")
+	ValidateNonBlank(aws.SecretAccessKeySecretRef, diags, "AWS secret access key secret ref")
+	return !diags.HasError()
 }
 
 func (r *IssuerResource) buildIssuerPayload(data *IssuerResourceModel, aws *AWSIssuerModel) conjurapi.Issuer {
