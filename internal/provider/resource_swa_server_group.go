@@ -677,13 +677,12 @@ func (r *ServerGroupResource) Schema(ctx context.Context, req resource.SchemaReq
 }
 
 func (r *ServerGroupResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	var data ServerGroupResourceModel
-	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	var nodeAttestation types.Object
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("node_attestation"), &nodeAttestation)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	if data.NodeAttestation != nil {
+	if !nodeAttestation.IsNull() {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("node_attestation"),
 			"Unsupported Attribute: node_attestation",
@@ -693,9 +692,29 @@ func (r *ServerGroupResource) ValidateConfig(ctx context.Context, req resource.V
 		)
 	}
 
-	if data.Attestation != nil {
-		validateK8sJwtClusters(ctx, data.Attestation.K8sJwt, &resp.Diagnostics)
+	validateK8sJwtConfig(ctx, req, resp)
+}
+
+// validateK8sJwtConfig fetches attestation.k8s_jwt directly by path rather than by
+// decoding the whole attestation object into *AttestationModel: a sibling attestation
+// variant (e.g. gcp_service_account) can be Unknown here when its config expression
+// depends on a not-yet-resolved value (a conditional over an unresolved
+// variable/resource attribute, for example), and reflecting an Unknown value into
+// anything but a `types` package type is a hard error. Fetching just this one
+// sub-attribute keeps that irrelevant, possibly-Unknown sibling out of the decode
+// entirely.
+func validateK8sJwtConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var k8sJwtObj types.Object
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("attestation").AtName("k8s_jwt"), &k8sJwtObj)...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
+
+	k8sJwt := modelFromObject[K8sJwtModel](ctx, k8sJwtObj, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	validateK8sJwtClusters(ctx, k8sJwt, &resp.Diagnostics)
 }
 
 // validateK8sJwtClusters enforces that each k8s_jwt cluster sets exactly one of
