@@ -41,6 +41,7 @@ services:
       TF_VAR_conjur_group_name:
       TF_VAR_conjur_secret_name:
       TF_VAR_conjur_policy_branch_name:
+      TF_VAR_conjur_issuer_name:
       TF_VAR_conjur_trust_domain_name:
       TF_VAR_conjur_server_group_name:
       TF_VAR_conjur_server_name:

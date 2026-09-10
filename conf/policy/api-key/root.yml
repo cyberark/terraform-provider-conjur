@@ -15,6 +15,14 @@
     privilege: [ read, execute ]
     resource: *variables
 
+  # AWS credentials referenced by the conjur_issuer tests. The Issuers API validates the format
+  # of the values it reads from these, so they hold the AWS documentation example keys. The "-2"
+  # pair lets the update stage rotate the issuer onto different references.
+  - !variable aws-access-key-id
+  - !variable aws-secret-access-key
+  - !variable aws-access-key-id-2
+  - !variable aws-secret-access-key-2
+
   # Child policy for the testapp user to manipulate
   - !policy 
     id: test
