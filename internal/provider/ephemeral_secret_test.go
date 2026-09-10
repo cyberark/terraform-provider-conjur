@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api/mocks"
@@ -213,20 +212,8 @@ func TestEphemeralSecretResource_Open(t *testing.T) {
 
 			r.Open(ctx, req, resp)
 
-			if tt.expectedError {
-				assert.True(t, resp.Diagnostics.HasError())
-				if tt.errorContains != "" {
-					found := false
-					for _, diag := range resp.Diagnostics.Errors() {
-						if strings.Contains(diag.Summary(), tt.errorContains) || strings.Contains(diag.Detail(), tt.errorContains) {
-							found = true
-							break
-						}
-					}
-					assert.True(t, found, "Expected error to contain: %s", tt.errorContains)
-				}
-			} else {
-				assert.False(t, resp.Diagnostics.HasError())
+			assertDiagOutcome(t, resp.Diagnostics, tt.expectedError, tt.errorContains)
+			if !tt.expectedError {
 				var result EphemeralSecretResourceModel
 				resp.Result.Get(ctx, &result)
 				assert.Equal(t, tt.config.Name.ValueString(), result.Name.ValueString())

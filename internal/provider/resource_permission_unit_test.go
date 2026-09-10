@@ -159,21 +159,7 @@ func TestPermissionResource_Create(t *testing.T) {
 
 			r.Create(ctx, req, resp)
 
-			if tt.expectedError {
-				assert.True(t, resp.Diagnostics.HasError())
-				if tt.errorContains != "" {
-					found := false
-					for _, diag := range resp.Diagnostics.Errors() {
-						if contains(diag.Summary(), tt.errorContains) || contains(diag.Detail(), tt.errorContains) {
-							found = true
-							break
-						}
-					}
-					assert.True(t, found, "Expected error to contain: %s", tt.errorContains)
-				}
-			} else {
-				assert.False(t, resp.Diagnostics.HasError())
-			}
+			assertDiagOutcome(t, resp.Diagnostics, tt.expectedError, tt.errorContains)
 			mockV2.AssertExpectations(t)
 		})
 	}
@@ -353,20 +339,8 @@ func TestPermissionResource_Read(t *testing.T) {
 
 			r.Read(ctx, req, resp)
 
-			if tt.expectedError {
-				assert.True(t, resp.Diagnostics.HasError())
-				if tt.errorContains != "" {
-					found := false
-					for _, diag := range resp.Diagnostics.Errors() {
-						if contains(diag.Summary(), tt.errorContains) || contains(diag.Detail(), tt.errorContains) {
-							found = true
-							break
-						}
-					}
-					assert.True(t, found, "Expected error to contain: %s", tt.errorContains)
-				}
-			} else {
-				assert.False(t, resp.Diagnostics.HasError())
+			assertDiagOutcome(t, resp.Diagnostics, tt.expectedError, tt.errorContains)
+			if !tt.expectedError {
 				var result PermissionResourceModel
 				resp.State.Get(ctx, &result)
 
@@ -492,21 +466,7 @@ func TestPermissionResource_Update(t *testing.T) {
 
 			r.Update(ctx, req, resp)
 
-			if tt.expectedError {
-				assert.True(t, resp.Diagnostics.HasError())
-				if tt.errorContains != "" {
-					found := false
-					for _, diag := range resp.Diagnostics.Errors() {
-						if contains(diag.Summary(), tt.errorContains) || contains(diag.Detail(), tt.errorContains) {
-							found = true
-							break
-						}
-					}
-					assert.True(t, found, "Expected error to contain: %s", tt.errorContains)
-				}
-			} else {
-				assert.False(t, resp.Diagnostics.HasError())
-			}
+			assertDiagOutcome(t, resp.Diagnostics, tt.expectedError, tt.errorContains)
 			mockV2.AssertExpectations(t)
 		})
 	}
@@ -624,21 +584,7 @@ func TestPermissionResource_Delete(t *testing.T) {
 
 			r.Delete(ctx, req, resp)
 
-			if tt.expectedError {
-				assert.True(t, resp.Diagnostics.HasError())
-				if tt.errorContains != "" {
-					found := false
-					for _, diag := range resp.Diagnostics.Errors() {
-						if contains(diag.Summary(), tt.errorContains) || contains(diag.Detail(), tt.errorContains) {
-							found = true
-							break
-						}
-					}
-					assert.True(t, found, "Expected error to contain: %s", tt.errorContains)
-				}
-			} else {
-				assert.False(t, resp.Diagnostics.HasError())
-			}
+			assertDiagOutcome(t, resp.Diagnostics, tt.expectedError, tt.errorContains)
 			mockV2.AssertExpectations(t)
 		})
 	}

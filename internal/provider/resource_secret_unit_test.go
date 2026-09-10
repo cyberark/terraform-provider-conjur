@@ -15,7 +15,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -133,26 +132,7 @@ func TestSecretResource_Create(t *testing.T) {
 
 			r.Create(ctx, req, resp)
 
-			if tt.expectedError {
-				assert.True(t, resp.Diagnostics.HasError())
-				if tt.errorContains != "" {
-					found := false
-					for _, diag := range resp.Diagnostics.Errors() {
-						if contains(diag.Summary(), tt.errorContains) || contains(diag.Detail(), tt.errorContains) {
-							found = true
-							break
-						}
-					}
-					assert.True(t, found, "Expected error to contain: %s", tt.errorContains)
-				}
-			} else {
-				if resp.Diagnostics.HasError() {
-					for _, diag := range resp.Diagnostics.Errors() {
-						t.Logf("Unexpected error: %s - %s", diag.Summary(), diag.Detail())
-					}
-				}
-				assert.False(t, resp.Diagnostics.HasError())
-			}
+			assertDiagOutcome(t, resp.Diagnostics, tt.expectedError, tt.errorContains)
 
 			mockV2.AssertExpectations(t)
 		})
@@ -259,26 +239,7 @@ func TestSecretResource_Read(t *testing.T) {
 
 			r.Read(ctx, req, resp)
 
-			if tt.expectedError {
-				assert.True(t, resp.Diagnostics.HasError())
-				if tt.errorContains != "" {
-					found := false
-					for _, diag := range resp.Diagnostics.Errors() {
-						if contains(diag.Summary(), tt.errorContains) || contains(diag.Detail(), tt.errorContains) {
-							found = true
-							break
-						}
-					}
-					assert.True(t, found, "Expected error to contain: %s", tt.errorContains)
-				}
-			} else {
-				if resp.Diagnostics.HasError() {
-					for _, diag := range resp.Diagnostics.Errors() {
-						t.Logf("Unexpected error: %s - %s", diag.Summary(), diag.Detail())
-					}
-				}
-				assert.False(t, resp.Diagnostics.HasError())
-			}
+			assertDiagOutcome(t, resp.Diagnostics, tt.expectedError, tt.errorContains)
 
 			mockV2.AssertExpectations(t)
 		})
@@ -362,26 +323,7 @@ func TestSecretResource_Update(t *testing.T) {
 
 			r.Update(ctx, req, resp)
 
-			if tt.expectedError {
-				assert.True(t, resp.Diagnostics.HasError())
-				if tt.errorContains != "" {
-					found := false
-					for _, diag := range resp.Diagnostics.Errors() {
-						if contains(diag.Summary(), tt.errorContains) || contains(diag.Detail(), tt.errorContains) {
-							found = true
-							break
-						}
-					}
-					assert.True(t, found, "Expected error to contain: %s", tt.errorContains)
-				}
-			} else {
-				if resp.Diagnostics.HasError() {
-					for _, diag := range resp.Diagnostics.Errors() {
-						t.Logf("Unexpected error: %s - %s", diag.Summary(), diag.Detail())
-					}
-				}
-				assert.False(t, resp.Diagnostics.HasError())
-			}
+			assertDiagOutcome(t, resp.Diagnostics, tt.expectedError, tt.errorContains)
 			mockV2.AssertExpectations(t)
 		})
 	}
@@ -470,26 +412,7 @@ func TestSecretResource_Delete(t *testing.T) {
 
 			r.Delete(ctx, req, resp)
 
-			if tt.expectedError {
-				assert.True(t, resp.Diagnostics.HasError())
-				if tt.errorContains != "" {
-					found := false
-					for _, diag := range resp.Diagnostics.Errors() {
-						if contains(diag.Summary(), tt.errorContains) || contains(diag.Detail(), tt.errorContains) {
-							found = true
-							break
-						}
-					}
-					assert.True(t, found, "Expected error to contain: %s", tt.errorContains)
-				}
-			} else {
-				if resp.Diagnostics.HasError() {
-					for _, diag := range resp.Diagnostics.Errors() {
-						t.Logf("Unexpected error: %s - %s", diag.Summary(), diag.Detail())
-					}
-				}
-				assert.False(t, resp.Diagnostics.HasError())
-			}
+			assertDiagOutcome(t, resp.Diagnostics, tt.expectedError, tt.errorContains)
 
 			mockV2.AssertExpectations(t)
 		})
@@ -500,7 +423,7 @@ func TestSecretResource_ValidateConfig(t *testing.T) {
 	tests := []struct {
 		name          string
 		data          SecretResourceModel
-		expectError   bool
+		expectedError bool
 		errorContains string
 	}{
 		{
@@ -511,7 +434,7 @@ func TestSecretResource_ValidateConfig(t *testing.T) {
 				Value:   types.StringValue("secret123"),
 				ValueWO: types.StringValue("secret456"),
 			},
-			expectError:   true,
+			expectedError: true,
 			errorContains: "Invalid Attribute Combination",
 		},
 		{
@@ -521,7 +444,7 @@ func TestSecretResource_ValidateConfig(t *testing.T) {
 				Branch: types.StringValue("/data/test"),
 				Value:  types.StringValue("secret123"),
 			},
-			expectError: false,
+			expectedError: false,
 		},
 		{
 			name: "only value_wo set should be valid",
@@ -530,7 +453,7 @@ func TestSecretResource_ValidateConfig(t *testing.T) {
 				Branch:  types.StringValue("/data/test"),
 				ValueWO: types.StringValue("secret123"),
 			},
-			expectError: false,
+			expectedError: false,
 		},
 		{
 			name: "value_wo with version should be valid",
@@ -540,7 +463,7 @@ func TestSecretResource_ValidateConfig(t *testing.T) {
 				ValueWO:        types.StringValue("secret123"),
 				ValueWOVersion: types.Int32Value(1),
 			},
-			expectError: false,
+			expectedError: false,
 		},
 		{
 			name: "neither value nor value_wo set should be valid",
@@ -548,7 +471,7 @@ func TestSecretResource_ValidateConfig(t *testing.T) {
 				Name:   types.StringValue("test-secret"),
 				Branch: types.StringValue("/data/test"),
 			},
-			expectError: false,
+			expectedError: false,
 		},
 		{
 			name: "value_wo_version without value_wo should produce error",
@@ -557,7 +480,7 @@ func TestSecretResource_ValidateConfig(t *testing.T) {
 				Branch:         types.StringValue("/data/test"),
 				ValueWOVersion: types.Int32Value(1),
 			},
-			expectError:   true,
+			expectedError: true,
 			errorContains: "value_wo_version",
 		},
 		{
@@ -568,7 +491,7 @@ func TestSecretResource_ValidateConfig(t *testing.T) {
 				ValueWO:        types.StringUnknown(),
 				ValueWOVersion: types.Int32Value(1),
 			},
-			expectError: false,
+			expectedError: false,
 		},
 		{
 			name: "value_wo_version with value but not value_wo should produce error",
@@ -578,7 +501,7 @@ func TestSecretResource_ValidateConfig(t *testing.T) {
 				Value:          types.StringValue("secret123"),
 				ValueWOVersion: types.Int32Value(1),
 			},
-			expectError:   true,
+			expectedError: true,
 			errorContains: "value_wo_version",
 		},
 	}
@@ -603,21 +526,7 @@ func TestSecretResource_ValidateConfig(t *testing.T) {
 			// Also run ValidateConfig to check value_wo_version requirement
 			r.ValidateConfig(ctx, req, resp)
 
-			if tt.expectError {
-				assert.True(t, resp.Diagnostics.HasError(), "Expected validation error")
-				if tt.errorContains != "" {
-					found := false
-					for _, diag := range resp.Diagnostics.Errors() {
-						if contains(diag.Summary(), tt.errorContains) || contains(diag.Detail(), tt.errorContains) {
-							found = true
-							break
-						}
-					}
-					assert.True(t, found, "Expected error to contain: %s", tt.errorContains)
-				}
-			} else {
-				assert.False(t, resp.Diagnostics.HasError(), "Expected no validation errors, got: %v", resp.Diagnostics.Errors())
-			}
+			assertDiagOutcome(t, resp.Diagnostics, tt.expectedError, tt.errorContains)
 		})
 	}
 }
