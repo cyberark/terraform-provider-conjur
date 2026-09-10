@@ -116,7 +116,7 @@ func (r *PolicyBranchResource) ValidateConfig(ctx context.Context, req resource.
 		return
 	}
 
-	ValidateNonEmpty(data.Name, &resp.Diagnostics, "Policy branch name")
+	ValidateNonBlank(data.Name, &resp.Diagnostics, "Policy branch name")
 	ValidateBranch(data.Branch, &resp.Diagnostics, "branch")
 }
 
@@ -157,12 +157,8 @@ func (r *PolicyBranchResource) Create(ctx context.Context, req resource.CreateRe
 		}
 	}
 
-	if !data.Annotations.IsNull() && !data.Annotations.IsUnknown() {
-		var anns map[string]string
-		resp.Diagnostics.Append(data.Annotations.ElementsAs(ctx, &anns, false)...)
-		if len(anns) > 0 {
-			payload.Annotations = anns
-		}
+	if anns := mapAsStringMap(ctx, data.Annotations, &resp.Diagnostics); len(anns) > 0 {
+		payload.Annotations = anns
 	}
 
 	created, err := r.client.CreateBranch(payload)

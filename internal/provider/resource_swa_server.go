@@ -188,21 +188,15 @@ func buildCreateServerIdentity(ctx context.Context, model *ServerAuthenticationI
 		TokenAppProperty *string            `json:"token_app_property,omitempty"`
 	}{}
 
-	if !model.ClaimAliases.IsNull() && !model.ClaimAliases.IsUnknown() {
-		aliases := make(map[string]string)
-		diags.Append(model.ClaimAliases.ElementsAs(ctx, &aliases, false)...)
-		if diags.HasError() {
-			return nil, diags
-		}
+	if aliases := mapAsStringMap(ctx, model.ClaimAliases, &diags); diags.HasError() {
+		return nil, diags
+	} else if aliases != nil {
 		identity.ClaimAliases = &aliases
 	}
 
-	if !model.EnforcedClaims.IsNull() && !model.EnforcedClaims.IsUnknown() {
-		var claims []string
-		diags.Append(model.EnforcedClaims.ElementsAs(ctx, &claims, false)...)
-		if diags.HasError() {
-			return nil, diags
-		}
+	if claims := listAsStrings(ctx, model.EnforcedClaims, &diags); diags.HasError() {
+		return nil, diags
+	} else if claims != nil {
 		identity.EnforcedClaims = &claims
 	}
 

@@ -187,7 +187,7 @@ func (r *SecretResource) ValidateConfig(ctx context.Context, req resource.Valida
 	}
 
 	ValidateBranch(data.Branch, &resp.Diagnostics, "branch")
-	ValidateNonEmpty(data.Name, &resp.Diagnostics, "Secret name")
+	ValidateNonBlank(data.Name, &resp.Diagnostics, "Secret name")
 
 	// Validate that value and value_wo are mutually exclusive
 	hasValue := !data.Value.IsNull() && !data.Value.IsUnknown()
