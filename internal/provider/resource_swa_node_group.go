@@ -80,9 +80,7 @@ func buildWorkloadConfiguration(ctx context.Context, wcObj types.Object) (*swacl
 		t := wc.SpiffeIDTemplate.ValueString()
 		result.SpiffeIdTemplate = &t
 	}
-	if !wc.WorkloadRegistrationPolicies.IsNull() {
-		var policies []string
-		diags.Append(wc.WorkloadRegistrationPolicies.ElementsAs(ctx, &policies, false)...)
+	if policies := listAsStrings(ctx, wc.WorkloadRegistrationPolicies, &diags); policies != nil {
 		result.WorkloadRegistrationPolicies = &policies
 	}
 	return result, diags
