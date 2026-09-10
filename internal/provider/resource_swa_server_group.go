@@ -481,24 +481,16 @@ func buildK8sPsatClusters(ctx context.Context, k8sPsat *K8sPsatModel) (map[strin
 	for clusterName, clusterConfig := range clusterModels {
 		cluster := swaclient.K8sPsatCluster{}
 
-		if !clusterConfig.ServiceAccountAllowList.IsNull() {
-			var saList []string
-			diags.Append(clusterConfig.ServiceAccountAllowList.ElementsAs(ctx, &saList, false)...)
+		if saList := listAsStrings(ctx, clusterConfig.ServiceAccountAllowList, &diags); saList != nil {
 			cluster.ServiceAccountAllowList = &saList
 		}
-		if !clusterConfig.Audience.IsNull() {
-			var audList []string
-			diags.Append(clusterConfig.Audience.ElementsAs(ctx, &audList, false)...)
+		if audList := listAsStrings(ctx, clusterConfig.Audience, &diags); audList != nil {
 			cluster.Audience = &audList
 		}
-		if !clusterConfig.AllowedPodLabelKeys.IsNull() {
-			var podLabels []string
-			diags.Append(clusterConfig.AllowedPodLabelKeys.ElementsAs(ctx, &podLabels, false)...)
+		if podLabels := listAsStrings(ctx, clusterConfig.AllowedPodLabelKeys, &diags); podLabels != nil {
 			cluster.AllowedPodLabelKeys = &podLabels
 		}
-		if !clusterConfig.AllowedNodeLabelKeys.IsNull() {
-			var nodeLabels []string
-			diags.Append(clusterConfig.AllowedNodeLabelKeys.ElementsAs(ctx, &nodeLabels, false)...)
+		if nodeLabels := listAsStrings(ctx, clusterConfig.AllowedNodeLabelKeys, &diags); nodeLabels != nil {
 			cluster.AllowedNodeLabelKeys = &nodeLabels
 		}
 
@@ -554,12 +546,8 @@ func buildGcpServiceAccount(ctx context.Context, gcp *GcpServiceAccountModel) (*
 	}
 
 	config := &swaclient.GcpServiceAccountAttestationConfiguration{}
-	if !gcp.AllowedProjectIDs.IsNull() && !gcp.AllowedProjectIDs.IsUnknown() {
-		diags.Append(gcp.AllowedProjectIDs.ElementsAs(ctx, &config.AllowedProjectIds, false)...)
-	}
-	if !gcp.Audiences.IsNull() && !gcp.Audiences.IsUnknown() {
-		var audiences []string
-		diags.Append(gcp.Audiences.ElementsAs(ctx, &audiences, false)...)
+	config.AllowedProjectIds = listAsStrings(ctx, gcp.AllowedProjectIDs, &diags)
+	if audiences := listAsStrings(ctx, gcp.Audiences, &diags); audiences != nil {
 		config.Audiences = &audiences
 	}
 	return config, diags

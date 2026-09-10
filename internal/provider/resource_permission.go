@@ -135,12 +135,12 @@ func (r *PermissionResource) ValidateConfig(ctx context.Context, req resource.Va
 	}
 
 	// Validate role
-	ValidateNonEmpty(data.Role.Name, &resp.Diagnostics, "Role name")
+	ValidateNonBlank(data.Role.Name, &resp.Diagnostics, "Role name")
 	ValidateContainedIn(data.Role.Kind, &resp.Diagnostics, "Role kind", []string{"user", "group", "host", "layer", "variable", "policy"}, false)
 	ValidateBranch(data.Role.Branch, &resp.Diagnostics, "role branch")
 
 	// Validate resource
-	ValidateNonEmpty(data.Resource.Name, &resp.Diagnostics, "Resource name")
+	ValidateNonBlank(data.Resource.Name, &resp.Diagnostics, "Resource name")
 	ValidateContainedIn(data.Resource.Kind, &resp.Diagnostics, "Resource kind", []string{"user", "group", "host", "layer", "variable", "policy"}, false)
 	ValidateBranch(data.Resource.Branch, &resp.Diagnostics, "resource branch")
 

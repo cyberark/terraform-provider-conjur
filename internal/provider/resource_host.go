@@ -159,7 +159,7 @@ func (r *HostResource) ValidateConfig(ctx context.Context, req resource.Validate
 		return
 	}
 
-	ValidateNonEmpty(data.Name, &resp.Diagnostics, "Host name")
+	ValidateNonBlank(data.Name, &resp.Diagnostics, "Host name")
 	ValidateBranch(data.Branch, &resp.Diagnostics, "branch")
 
 	// Validate authn_descriptors are not empty

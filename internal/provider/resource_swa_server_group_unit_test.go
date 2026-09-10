@@ -450,7 +450,7 @@ func TestBuildK8sPsatClusters(t *testing.T) {
 		assert.Nil(t, cluster.AllowedNodeLabelKeys)
 	})
 
-	t.Run("unknown list reports diagnostics", func(t *testing.T) {
+	t.Run("unknown list attributes are omitted like null ones", func(t *testing.T) {
 		attrTypes := k8sPsatClusterAttrTypes()
 		obj, diags := types.ObjectValue(attrTypes, map[string]attr.Value{
 			"service_account_allow_list": types.ListNull(types.StringType),
@@ -462,8 +462,10 @@ func TestBuildK8sPsatClusters(t *testing.T) {
 		clustersMap, diags := types.MapValue(types.ObjectType{AttrTypes: attrTypes}, map[string]attr.Value{"cluster-a": obj})
 		require.False(t, diags.HasError())
 
-		_, diags = buildK8sPsatClusters(ctx, &K8sPsatModel{Clusters: clustersMap})
-		assert.True(t, diags.HasError())
+		clusters, diags := buildK8sPsatClusters(ctx, &K8sPsatModel{Clusters: clustersMap})
+		require.False(t, diags.HasError())
+		require.Len(t, clusters, 1)
+		assert.Nil(t, clusters["cluster-a"].Audience)
 	})
 }
 

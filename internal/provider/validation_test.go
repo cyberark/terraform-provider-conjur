@@ -62,49 +62,61 @@ func TestValidateBranch(t *testing.T) {
 	}
 }
 
-func TestValidateNonEmpty(t *testing.T) {
+func TestValidateNonBlank(t *testing.T) {
 	tests := []struct {
 		name      string
-		value     string
+		value     types.String
 		fieldName string
 		wantError bool
 	}{
 		{
 			name:      "valid value",
-			value:     "my-resource",
+			value:     types.StringValue("my-resource"),
 			fieldName: "name",
 			wantError: false,
 		},
 		{
 			name:      "empty string",
-			value:     "",
+			value:     types.StringValue(""),
 			fieldName: "name",
 			wantError: true,
 		},
 		{
 			name:      "whitespace only",
-			value:     "   ",
+			value:     types.StringValue("   "),
 			fieldName: "name",
 			wantError: true,
 		},
 		{
 			name:      "tab only",
-			value:     "\t",
+			value:     types.StringValue("\t"),
 			fieldName: "name",
 			wantError: true,
 		},
 		{
 			name:      "newline only",
-			value:     "\n",
+			value:     types.StringValue("\n"),
 			fieldName: "name",
 			wantError: true,
+		},
+		{
+			name:      "null value is skipped (presence is the schema's job)",
+			value:     types.StringNull(),
+			fieldName: "name",
+			wantError: false,
+		},
+		{
+			name:      "unknown value is skipped (not yet resolved)",
+			value:     types.StringUnknown(),
+			fieldName: "name",
+			wantError: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var diags diag.Diagnostics
-			ValidateNonEmpty(types.StringValue(tt.value), &diags, tt.fieldName)
+			ValidateNonBlank(tt.value, &diags, tt.fieldName)
 
 			if tt.wantError {
 				assert.Greater(t, diags.ErrorsCount(), 0, "Expected at least one error")

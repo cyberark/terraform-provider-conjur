@@ -2,6 +2,7 @@ package provider
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -19,14 +20,11 @@ func ValidateBranch(branch types.String, diagnostics *diag.Diagnostics, fieldNam
 	normalized := strings.Trim(branchValue, "/")
 	if normalized != "" {
 		parts := strings.Split(normalized, "/")
-		for _, part := range parts {
-			if part == "" {
-				diagnostics.AddError(
-					"Invalid branch",
-					fmt.Sprintf("%s branch cannot contain empty segments (double slashes or trailing slashes are not allowed).", fieldName),
-				)
-				break
-			}
+		if slices.Contains(parts, "") {
+			diagnostics.AddError(
+				"Invalid branch",
+				fmt.Sprintf("%s branch cannot contain empty segments (double slashes or trailing slashes are not allowed).", fieldName),
+			)
 		}
 	} else {
 		diagnostics.AddError(
@@ -36,14 +34,16 @@ func ValidateBranch(branch types.String, diagnostics *diag.Diagnostics, fieldNam
 	}
 }
 
-// ValidateNonEmpty validates that a string value is not empty or whitespace-only.
-// Unknown values are skipped because they may not be resolved during ValidateConfig..
-func ValidateNonEmpty(val types.String, diagnostics *diag.Diagnostics, fieldName string) {
+// ValidateNonBlank validates that a string value which is present is not blank
+// (empty or whitespace-only). Unknown values are skipped because they may not be
+// resolved during ValidateConfig. Null values are skipped because presence
+// checks belong at the schema level via the "Required" attribute.
+func ValidateNonBlank(val types.String, diagnostics *diag.Diagnostics, fieldName string) {
 	if diagnostics == nil {
 		return
 	}
 
-	if val.IsUnknown() {
+	if val.IsUnknown() || val.IsNull() {
 		return
 	}
 
