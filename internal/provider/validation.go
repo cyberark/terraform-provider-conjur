@@ -17,7 +17,7 @@ func ValidateBranch(branch types.String, diagnostics *diag.Diagnostics, fieldNam
 
 	branchValue := branch.ValueString()
 
-	normalized := strings.Trim(branchValue, "/")
+	normalized := strings.Trim(strings.TrimSpace(branchValue), "/")
 	if normalized != "" {
 		parts := strings.Split(normalized, "/")
 		if slices.Contains(parts, "") {

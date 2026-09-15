@@ -3,7 +3,7 @@ module github.com/cyberark/terraform-provider-conjur
 go 1.26.2
 
 require (
-	github.com/cyberark/conjur-api-go v0.15.9
+	github.com/cyberark/conjur-api-go v0.15.10
 	github.com/doodlesbykumbi/conjur-policy-go v0.0.0-20241022093904-5fc5921aee96
 	github.com/hashicorp/terraform-plugin-framework v1.19.0
 	github.com/hashicorp/terraform-plugin-framework-validators v0.19.0

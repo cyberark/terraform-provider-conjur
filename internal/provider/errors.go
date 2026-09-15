@@ -8,9 +8,10 @@ import (
 )
 
 // isNotFoundErr reports whether err represents a "not found" condition from the Conjur API.
-// conjur-api-go surfaces missing resources as plain errors rather than a typed sentinel, so
-// this matches on the message. It is used by resource Read methods to distinguish out-of-band
-// deletion (drift, which should remove the resource from state) from genuine errors.
+// conjur-api-go surfaces non-2xx responses as a typed *response.ConjurError carrying the HTTP
+// status code, so this matches on Code == 404 rather than on message text. Suitable for use by
+// resource Read methods to distinguish out-of-band deletion (drift, which should remove the
+// resource from state) from genuine errors.
 func isNotFoundErr(err error) bool {
 	if err == nil {
 		return false
