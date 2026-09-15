@@ -86,20 +86,8 @@ func TestMembershipResource_Create(t *testing.T) {
 
 			r.Create(ctx, req, resp)
 
-			if tt.expectedError {
-				assert.True(t, resp.Diagnostics.HasError())
-				if tt.errorContains != "" {
-					found := false
-					for _, diag := range resp.Diagnostics.Errors() {
-						if contains(diag.Summary(), tt.errorContains) || contains(diag.Detail(), tt.errorContains) {
-							found = true
-							break
-						}
-					}
-					assert.True(t, found, "Expected error to contain: %s", tt.errorContains)
-				}
-			} else {
-				assert.False(t, resp.Diagnostics.HasError())
+			assertDiagOutcome(t, resp.Diagnostics, tt.expectedError, tt.errorContains)
+			if !tt.expectedError {
 				var result membershipResourceModel
 				resp.State.Get(ctx, &result)
 				assert.Equal(t, tt.expectedID, result.ID.ValueString())
@@ -444,21 +432,7 @@ func TestMembershipResource_Delete(t *testing.T) {
 
 			r.Delete(ctx, req, resp)
 
-			if tt.expectedError {
-				assert.True(t, resp.Diagnostics.HasError())
-				if tt.errorContains != "" {
-					found := false
-					for _, diag := range resp.Diagnostics.Errors() {
-						if contains(diag.Summary(), tt.errorContains) || contains(diag.Detail(), tt.errorContains) {
-							found = true
-							break
-						}
-					}
-					assert.True(t, found, "Expected error to contain: %s", tt.errorContains)
-				}
-			} else {
-				assert.False(t, resp.Diagnostics.HasError())
-			}
+			assertDiagOutcome(t, resp.Diagnostics, tt.expectedError, tt.errorContains)
 			mockClient.AssertExpectations(t)
 		})
 	}

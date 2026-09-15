@@ -1,0 +1,18 @@
+# Self-hosted (enterprise) only. Unlike Cloud, self-hosted deployments have no loadable "conjur"
+# branch and no conjur/issuers policy by default, so this root-loaded policy both creates
+# conjur/issuers and grants the CI host (data/testapp) the create/read/update authority the Issuers
+# REST API checks on it. The !policy issuers declaration and the !permit live in the same policy
+# because Conjur requires a permit's resource to be defined alongside it. Loading is additive
+# (POST), so it never removes any resources that already exist under the conjur branch.
+#
+# OSS is intentionally not granted here: issuers are unsupported there and the issuer test is
+# skipped, so bin/test loads neither issuer-permissions file for the oss target.
+- !policy
+  id: conjur
+  body:
+  - !policy
+    id: issuers
+  - !permit
+    role: !host /data/testapp
+    privileges: [ create, read, update ]
+    resource: !policy issuers

@@ -30,6 +30,7 @@ const (
 	// (secret_static_v2.go).
 	CapabilityStaticSecretsV2
 	CapabilityGroupsV2
+	CapabilityIssuersV1
 	CapabilityIssuersV2
 	CapabilityWorkloadAuthnDescriptors
 	CapabilityBatchSecrets
@@ -70,6 +71,10 @@ var capabilities = map[Capability]capabilityDef{
 	CapabilityGroupsV2: {
 		name:         "Groups",
 		environments: []conjurapi.EnvironmentType{conjurapi.EnvironmentSaaS, conjurapi.EnvironmentSH, conjurapi.EnvironmentOSS},
+	},
+	CapabilityIssuersV1: {
+		name:         "Dynamic secret issuers",
+		environments: []conjurapi.EnvironmentType{conjurapi.EnvironmentSaaS, conjurapi.EnvironmentSH},
 	},
 	CapabilityIssuersV2: {
 		name:         "Certificate issuers",

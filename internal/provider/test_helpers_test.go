@@ -19,6 +19,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -40,6 +41,23 @@ func assertDiagContains(t *testing.T, diags diag.Diagnostics, expectedSubstring 
 		}
 	}
 	t.Fatalf("expected diagnostics to contain %q", expectedSubstring)
+}
+
+// assertDiagOutcome asserts the expectedError/errorContains expectation shared by the
+// table-driven tests in this package: either no error diagnostics at all, or at least one
+// error whose summary or detail contains errorContains (skipped when errorContains is empty).
+func assertDiagOutcome(t *testing.T, diags diag.Diagnostics, expectError bool, errorContains string) {
+	t.Helper()
+	if !expectError {
+		assert.False(t, diags.HasError(), "expected no error diagnostics, got: %v", diags.Errors())
+		return
+	}
+	if !assert.True(t, diags.HasError(), "expected an error diagnostic, got none") {
+		return
+	}
+	if errorContains != "" {
+		assertDiagContains(t, diags, errorContains)
+	}
 }
 
 func assertWarningContains(t *testing.T, diags diag.Diagnostics, expectedSubstring string) {

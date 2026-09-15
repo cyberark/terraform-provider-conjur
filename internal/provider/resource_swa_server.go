@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -18,6 +19,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	swaclient "github.com/cyberark/terraform-provider-conjur/internal/swa/client"
@@ -37,22 +39,22 @@ type ServerResource struct {
 }
 
 type ServerResourceModel struct {
-	ID            types.String               `tfsdk:"id"`
-	Name          types.String               `tfsdk:"name"`
-	ServerGroupID types.String               `tfsdk:"server_group_id"`
-	AuthnID       types.String               `tfsdk:"authn_id"`
-	Auth          *ServerAuthenticationModel `tfsdk:"auth"`
+	ID            types.String `tfsdk:"id"`
+	Name          types.String `tfsdk:"name"`
+	ServerGroupID types.String `tfsdk:"server_group_id"`
+	AuthnID       types.String `tfsdk:"authn_id"`
+	Auth          types.Object `tfsdk:"auth"`
 }
 
 type ServerAuthenticationModel struct {
-	Type       types.String                       `tfsdk:"type"`
-	Subject    types.String                       `tfsdk:"subject"`
-	Audience   types.String                       `tfsdk:"audience"`
-	JWKSURI    types.String                       `tfsdk:"jwks_uri"`
-	Issuer     types.String                       `tfsdk:"issuer"`
-	CACert     types.String                       `tfsdk:"ca_cert"`
-	PublicKeys types.String                       `tfsdk:"public_keys"`
-	Identity   *ServerAuthenticationIdentityModel `tfsdk:"identity"`
+	Type       types.String `tfsdk:"type"`
+	Subject    types.String `tfsdk:"subject"`
+	Audience   types.String `tfsdk:"audience"`
+	JWKSURI    types.String `tfsdk:"jwks_uri"`
+	Issuer     types.String `tfsdk:"issuer"`
+	CACert     types.String `tfsdk:"ca_cert"`
+	PublicKeys types.String `tfsdk:"public_keys"`
+	Identity   types.Object `tfsdk:"identity"`
 }
 
 type ServerAuthenticationIdentityModel struct {
@@ -62,21 +64,24 @@ type ServerAuthenticationIdentityModel struct {
 	TokenAppProperty types.String `tfsdk:"token_app_property"`
 }
 
-// serverAuthValidateModel mirrors ServerAuthenticationModel but types Identity as
-// types.Object instead of *ServerAuthenticationIdentityModel, so ValidateConfig can
-// decode the whole `auth` object in one modelFromObject call: identity is Optional, and
-// reflecting a wholly-Unknown config value (e.g. behind a conditional over a
-// not-yet-resolved value) into a plain struct pointer is a hard error, whereas
-// types.Object tolerates Unknown natively.
-type serverAuthValidateModel struct {
-	Type       types.String `tfsdk:"type"`
-	Subject    types.String `tfsdk:"subject"`
-	Audience   types.String `tfsdk:"audience"`
-	JWKSURI    types.String `tfsdk:"jwks_uri"`
-	Issuer     types.String `tfsdk:"issuer"`
-	CACert     types.String `tfsdk:"ca_cert"`
-	PublicKeys types.String `tfsdk:"public_keys"`
-	Identity   types.Object `tfsdk:"identity"`
+// serverAuthIdentityAttrTypes / serverAuthAttrTypes mirror the schema of the `auth` and
+// `auth.identity` nested attributes so the models can round-trip through types.Object.
+var serverAuthIdentityAttrTypes = map[string]attr.Type{
+	"claim_aliases":      types.MapType{ElemType: types.StringType},
+	"enforced_claims":    types.ListType{ElemType: types.StringType},
+	"identity_path":      types.StringType,
+	"token_app_property": types.StringType,
+}
+
+var serverAuthAttrTypes = map[string]attr.Type{
+	"type":        types.StringType,
+	"subject":     types.StringType,
+	"audience":    types.StringType,
+	"jwks_uri":    types.StringType,
+	"issuer":      types.StringType,
+	"ca_cert":     types.StringType,
+	"public_keys": types.StringType,
+	"identity":    types.ObjectType{AttrTypes: serverAuthIdentityAttrTypes},
 }
 
 func NewServerResource() resource.Resource {
@@ -170,14 +175,15 @@ func stringPointerFromValue(v types.String) *string {
 	return new(v.ValueString())
 }
 
-func buildCreateServerIdentity(ctx context.Context, model *ServerAuthenticationIdentityModel) (*struct {
+func buildCreateServerIdentity(ctx context.Context, identityObj types.Object) (*struct {
 	ClaimAliases     *map[string]string `json:"claim_aliases,omitempty"`
 	EnforcedClaims   *[]string          `json:"enforced_claims,omitempty"`
 	IdentityPath     *string            `json:"identity_path,omitempty"`
 	TokenAppProperty *string            `json:"token_app_property,omitempty"`
 }, diag.Diagnostics) {
 	var diags diag.Diagnostics
-	if model == nil {
+	model := modelFromObject[ServerAuthenticationIdentityModel](ctx, identityObj, &diags)
+	if diags.HasError() || model == nil {
 		return nil, diags
 	}
 
@@ -214,7 +220,7 @@ func splitServerGroupID(id string) (trustDomainName, serverGroupName string, err
 	return parts[0], parts[1], nil
 }
 
-func validateCreateServerAuthConfig(auth *ServerAuthenticationModel, diags *diag.Diagnostics) bool {
+func validateCreateServerAuthConfig(ctx context.Context, auth *ServerAuthenticationModel, diags *diag.Diagnostics) bool {
 	if auth == nil {
 		diags.AddError("Missing auth configuration", "auth block is required")
 		return false
@@ -264,9 +270,13 @@ func validateCreateServerAuthConfig(auth *ServerAuthenticationModel, diags *diag
 		return false
 	}
 
-	if auth.Identity != nil {
-		hasIdentityPath := nonEmptyKnownStringValue(auth.Identity.IdentityPath)
-		hasTokenAppProperty := nonEmptyKnownStringValue(auth.Identity.TokenAppProperty)
+	if !auth.Identity.IsNull() && !auth.Identity.IsUnknown() {
+		identity := modelFromObject[ServerAuthenticationIdentityModel](ctx, auth.Identity, diags)
+		if diags.HasError() {
+			return false
+		}
+		hasIdentityPath := nonEmptyKnownStringValue(identity.IdentityPath)
+		hasTokenAppProperty := nonEmptyKnownStringValue(identity.TokenAppProperty)
 		if hasIdentityPath != hasTokenAppProperty {
 			diags.AddError(
 				"Invalid auth.identity configuration",
@@ -364,15 +374,28 @@ func serverAuthFromCreateResponse(auth swaclient.CreateServerAuthentication) (*s
 
 func syncServerAuthFromResponse(ctx context.Context, state *ServerResourceModel, auth *swaclient.ServerAuthentication) error {
 	if auth == nil {
-		state.Auth = nil
+		state.Auth = types.ObjectNull(serverAuthAttrTypes)
 		return nil
 	}
 
-	if state.Auth == nil {
-		state.Auth = &ServerAuthenticationModel{}
+	// Decode any prior auth so we can preserve the subject the API does not echo (see below)
+	// and keep the user's original public_keys formatting via preferPriorJSONString.
+	prior := ServerAuthenticationModel{PublicKeys: types.StringNull()}
+	if !state.Auth.IsNull() && !state.Auth.IsUnknown() {
+		if diags := state.Auth.As(ctx, &prior, basetypes.ObjectAsOptions{}); diags.HasError() {
+			return fmt.Errorf("failed to decode prior auth from state: %v", diags)
+		}
 	}
 
-	state.Auth.Type = types.StringValue(strings.ToUpper(string(auth.Type)))
+	authModel := ServerAuthenticationModel{
+		Type:     types.StringValue(strings.ToUpper(string(auth.Type))),
+		Subject:  prior.Subject,
+		Audience: optionalStringValue(auth.Data.Audience),
+		JWKSURI:  optionalStringValue(auth.Data.JwksUri),
+		Issuer:   optionalStringValue(auth.Data.Issuer),
+		CACert:   optionalStringValue(auth.Data.CaCert),
+		Identity: types.ObjectNull(serverAuthIdentityAttrTypes),
+	}
 	// TEMPORARY: the API does not currently echo the JWT `sub` (subject) claim in
 	// the authentication data. Only overwrite the subject when the response
 	// includes it; otherwise keep the value already in state (originally from the
@@ -380,52 +403,55 @@ func syncServerAuthFromResponse(ctx context.Context, state *ServerResourceModel,
 	// and, because `auth` forces replacement, triggers a spurious destroy/create.
 	// Remove this fallback once the API returns `sub`.
 	if sub := optionalStringValue(auth.Data.Sub); knownStringValue(sub) {
-		state.Auth.Subject = sub
+		authModel.Subject = sub
 	}
-	state.Auth.Audience = optionalStringValue(auth.Data.Audience)
-	state.Auth.JWKSURI = optionalStringValue(auth.Data.JwksUri)
-	state.Auth.Issuer = optionalStringValue(auth.Data.Issuer)
-	state.Auth.CACert = optionalStringValue(auth.Data.CaCert)
 
 	if auth.Data.PublicKeys != nil {
 		publicKeysJSON, err := json.Marshal(*auth.Data.PublicKeys)
 		if err != nil {
 			return fmt.Errorf("failed to marshal auth.public_keys from response: %w", err)
 		}
-		state.Auth.PublicKeys = preferPriorJSONString(state.Auth.PublicKeys, types.StringValue(string(publicKeysJSON)))
+		authModel.PublicKeys = preferPriorJSONString(prior.PublicKeys, types.StringValue(string(publicKeysJSON)))
 	} else {
-		state.Auth.PublicKeys = types.StringNull()
+		authModel.PublicKeys = types.StringNull()
 	}
 
-	if auth.Data.Identity == nil {
-		state.Auth.Identity = nil
-		return nil
-	}
-
-	identity := &ServerAuthenticationIdentityModel{
-		ClaimAliases:     types.MapNull(types.StringType),
-		EnforcedClaims:   types.ListNull(types.StringType),
-		IdentityPath:     optionalStringValue(auth.Data.Identity.IdentityPath),
-		TokenAppProperty: optionalStringValue(auth.Data.Identity.TokenAppProperty),
-	}
-
-	if auth.Data.Identity.ClaimAliases != nil {
-		value, diags := types.MapValueFrom(ctx, types.StringType, *auth.Data.Identity.ClaimAliases)
-		if diags.HasError() {
-			return fmt.Errorf("failed to convert auth.identity.claim_aliases from response")
+	if auth.Data.Identity != nil {
+		identity := ServerAuthenticationIdentityModel{
+			ClaimAliases:     types.MapNull(types.StringType),
+			EnforcedClaims:   types.ListNull(types.StringType),
+			IdentityPath:     optionalStringValue(auth.Data.Identity.IdentityPath),
+			TokenAppProperty: optionalStringValue(auth.Data.Identity.TokenAppProperty),
 		}
-		identity.ClaimAliases = value
-	}
 
-	if auth.Data.Identity.EnforcedClaims != nil {
-		value, diags := types.ListValueFrom(ctx, types.StringType, *auth.Data.Identity.EnforcedClaims)
-		if diags.HasError() {
-			return fmt.Errorf("failed to convert auth.identity.enforced_claims from response")
+		if auth.Data.Identity.ClaimAliases != nil {
+			value, diags := types.MapValueFrom(ctx, types.StringType, *auth.Data.Identity.ClaimAliases)
+			if diags.HasError() {
+				return fmt.Errorf("failed to convert auth.identity.claim_aliases from response")
+			}
+			identity.ClaimAliases = value
 		}
-		identity.EnforcedClaims = value
+
+		if auth.Data.Identity.EnforcedClaims != nil {
+			value, diags := types.ListValueFrom(ctx, types.StringType, *auth.Data.Identity.EnforcedClaims)
+			if diags.HasError() {
+				return fmt.Errorf("failed to convert auth.identity.enforced_claims from response")
+			}
+			identity.EnforcedClaims = value
+		}
+
+		identityObj, diags := types.ObjectValueFrom(ctx, serverAuthIdentityAttrTypes, identity)
+		if diags.HasError() {
+			return fmt.Errorf("failed to build auth.identity object from response: %v", diags)
+		}
+		authModel.Identity = identityObj
 	}
 
-	state.Auth.Identity = identity
+	authObj, diags := types.ObjectValueFrom(ctx, serverAuthAttrTypes, authModel)
+	if diags.HasError() {
+		return fmt.Errorf("failed to build auth object from response: %v", diags)
+	}
+	state.Auth = authObj
 
 	return nil
 }
@@ -569,44 +595,25 @@ func (r *ServerResource) Schema(ctx context.Context, req resource.SchemaRequest,
 }
 
 func (r *ServerResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	// auth is decoded into serverAuthValidateModel (identity as types.Object) rather
-	// than directly into *ServerAuthenticationModel: identity is Optional, so a config
-	// expression that leaves it wholly Unknown at validate-time (e.g. a conditional over
-	// a not-yet-resolved value) would otherwise make reflection error trying to decode
-	// an Unknown value into the plain *ServerAuthenticationIdentityModel struct.
-	var authObj types.Object
-	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("auth"), &authObj)...)
+	// The whole model decodes in one Get because Auth is types.Object: a config expression that
+	// leaves `auth` (or its Optional `identity`) wholly Unknown at validate-time (e.g. a
+	// conditional over a not-yet-resolved value) is tolerated natively, whereas reflecting an
+	// Unknown value into a plain struct pointer would be a hard error.
+	var data ServerResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if authObj.IsUnknown() {
-		return
-	}
-	if authObj.IsNull() {
-		resp.Diagnostics.AddError("Missing auth configuration", "auth block is required")
+	if data.Auth.IsUnknown() {
 		return
 	}
 
-	auth := modelFromObject[serverAuthValidateModel](ctx, authObj, &resp.Diagnostics)
+	auth := modelFromObject[ServerAuthenticationModel](ctx, data.Auth, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	identity := modelFromObject[ServerAuthenticationIdentityModel](ctx, auth.Identity, &resp.Diagnostics)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	validateCreateServerAuthConfig(&ServerAuthenticationModel{
-		Type:       auth.Type,
-		Subject:    auth.Subject,
-		Audience:   auth.Audience,
-		JWKSURI:    auth.JWKSURI,
-		Issuer:     auth.Issuer,
-		CACert:     auth.CACert,
-		PublicKeys: auth.PublicKeys,
-		Identity:   identity,
-	}, &resp.Diagnostics)
+	validateCreateServerAuthConfig(ctx, auth, &resp.Diagnostics)
 }
 
 func (r *ServerResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -638,11 +645,16 @@ func (r *ServerResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	if !validateCreateServerAuthConfig(plan.Auth, &resp.Diagnostics) {
+	auth := modelFromObject[ServerAuthenticationModel](ctx, plan.Auth, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	jwtAuthData, jwtDiags := buildCreateServerJWTAuthData(ctx, plan.Auth)
+	if !validateCreateServerAuthConfig(ctx, auth, &resp.Diagnostics) {
+		return
+	}
+
+	jwtAuthData, jwtDiags := buildCreateServerJWTAuthData(ctx, auth)
 	resp.Diagnostics.Append(jwtDiags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -651,7 +663,7 @@ func (r *ServerResource) Create(ctx context.Context, req resource.CreateRequest,
 	createReq := swaclient.PostServerJSONRequestBody{
 		Name: plan.Name.ValueString(),
 		Authentication: swaclient.CreateServerAuthentication{
-			Type: swaclient.CreateServerAuthenticationType(plan.Auth.Type.ValueString()),
+			Type: swaclient.CreateServerAuthenticationType(auth.Type.ValueString()),
 			Data: swaclient.CreateServerAuthentication_Data{},
 		},
 	}
@@ -776,11 +788,16 @@ func (r *ServerResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 	trustDomainName, serverGroupName, serverName := parts[0], parts[1], parts[2]
 
-	if !validateCreateServerAuthConfig(plan.Auth, &resp.Diagnostics) {
+	auth := modelFromObject[ServerAuthenticationModel](ctx, plan.Auth, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	jwtAuthData, jwtDiags := buildUpdateServerJWTAuthData(plan.Auth)
+	if !validateCreateServerAuthConfig(ctx, auth, &resp.Diagnostics) {
+		return
+	}
+
+	jwtAuthData, jwtDiags := buildUpdateServerJWTAuthData(auth)
 	resp.Diagnostics.Append(jwtDiags...)
 	if resp.Diagnostics.HasError() {
 		return

@@ -89,6 +89,21 @@ func ValidateContainedIn(val types.String, diagnostics *diag.Diagnostics, fieldN
 	}
 }
 
+// ValidateIntInRange validates that an int32 value falls within [min, max] (inclusive).
+// Unknown and null values are skipped because they may not be resolved during ValidateConfig.
+func ValidateIntInRange(val types.Int32, diagnostics *diag.Diagnostics, fieldName string, min, max int32) {
+	if diagnostics == nil {
+		return
+	}
+	if val.IsUnknown() || val.IsNull() {
+		return
+	}
+	v := val.ValueInt32()
+	if v < min || v > max {
+		diagnostics.AddError("Invalid value", fmt.Sprintf("%s must be between %d and %d (inclusive). Got: %d", fieldName, min, max, v))
+	}
+}
+
 // ValidatePrivileges validates that privileges are valid and at least one is provided.
 // Valid privileges: read, update, execute, create
 func ValidatePrivileges(privileges types.List, diagnostics *diag.Diagnostics, fieldName string) {

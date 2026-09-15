@@ -199,3 +199,34 @@ func TestValidateContainedIn(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateIntInRange(t *testing.T) {
+	tests := []struct {
+		name      string
+		value     types.Int32
+		min       int32
+		max       int32
+		wantError bool
+	}{
+		{name: "value at minimum", value: types.Int32Value(1), min: 1, max: 10, wantError: false},
+		{name: "value at maximum", value: types.Int32Value(10), min: 1, max: 10, wantError: false},
+		{name: "value in range", value: types.Int32Value(5), min: 1, max: 10, wantError: false},
+		{name: "value below minimum", value: types.Int32Value(0), min: 1, max: 10, wantError: true},
+		{name: "value above maximum", value: types.Int32Value(11), min: 1, max: 10, wantError: true},
+		{name: "null value skipped", value: types.Int32Null(), min: 1, max: 10, wantError: false},
+		{name: "unknown value skipped", value: types.Int32Unknown(), min: 1, max: 10, wantError: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var diags diag.Diagnostics
+			ValidateIntInRange(tt.value, &diags, "field", tt.min, tt.max)
+
+			if tt.wantError {
+				assert.Greater(t, diags.ErrorsCount(), 0, "Expected at least one error")
+			} else {
+				assert.Equal(t, 0, diags.ErrorsCount(), "Expected no errors, got: %v", diags.Errors())
+			}
+		})
+	}
+}
