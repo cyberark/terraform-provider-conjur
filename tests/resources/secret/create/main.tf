@@ -69,3 +69,75 @@ resource "conjur_secret" "test_wo" {
     test_type = "write-only"
   }
 }
+
+# Third secret used to exercise batch secret retrieval alongside test_secret and test_wo.
+resource "conjur_secret" "test_secret2" {
+  name      = "${var.conjur_secret_name}-2"
+  branch    = "/data/terraform/test"
+  mime_type = "text/plain"
+  value     = "mysecretvalue2"
+}
+
+# Batch secret retrieval (strict): reads the three secrets created above via the batch
+# data source and ephemeral resource. Referencing the secret names plus depends_on defers
+# the reads to apply, after the secrets exist.
+data "conjur_secrets" "batch" {
+  names = [
+    "data/terraform/test/${conjur_secret.test_secret.name}",
+    "data/terraform/test/${conjur_secret.test_wo.name}",
+    "data/terraform/test/${conjur_secret.test_secret2.name}",
+  ]
+  fail_on_error = true
+  depends_on    = [conjur_secret.test_secret, conjur_secret.test_wo, conjur_secret.test_secret2]
+}
+
+# Ephemeral resources are opened during the plan phase whenever their configuration is fully
+# known; unlike data sources, depends_on does NOT defer the open. Deriving names from the
+# (apply-time) data source result keeps this config unknown at plan, so Terraform defers Open()
+# to apply after the secrets exist. keys(...) returns exactly the names the batch data source
+# successfully retrieved.
+ephemeral "conjur_secrets" "batch" {
+  names         = keys(data.conjur_secrets.batch.values)
+  fail_on_error = true
+}
+
+# Batch secret retrieval (non-strict): includes an unknown name to exercise the warning path.
+# apply must still succeed and the unknown key must be absent from values.
+data "conjur_secrets" "batch_warn" {
+  names = [
+    "data/terraform/test/${conjur_secret.test_secret.name}",
+    "data/terraform/test/does-not-exist-${var.conjur_secret_name}",
+  ]
+  fail_on_error = false
+  depends_on    = [conjur_secret.test_secret]
+}
+
+# Validation for batch retrieval. Content is static so no secret is written to disk; the
+# preconditions perform all assertions and fail terraform apply if any batch read is wrong.
+resource "local_file" "batch_check" {
+  content  = "batch-ok"
+  filename = "${path.module}/../batch_check"
+
+  lifecycle {
+    precondition {
+      condition     = data.conjur_secrets.batch.values["data/terraform/test/${conjur_secret.test_secret.name}"] == conjur_secret.test_secret.value
+      error_message = "Batch data source value for test_secret does not match"
+    }
+    precondition {
+      condition     = data.conjur_secrets.batch.values["data/terraform/test/${conjur_secret.test_wo.name}"] == "initial-secret-value-wo"
+      error_message = "Batch data source value for write-only secret does not match"
+    }
+    precondition {
+      condition     = data.conjur_secrets.batch.values["data/terraform/test/${conjur_secret.test_secret2.name}"] == conjur_secret.test_secret2.value
+      error_message = "Batch data source value for test_secret2 does not match"
+    }
+    precondition {
+      condition     = ephemeral.conjur_secrets.batch.values["data/terraform/test/${conjur_secret.test_secret.name}"] == data.conjur_secrets.batch.values["data/terraform/test/${conjur_secret.test_secret.name}"]
+      error_message = "Ephemeral batch value does not match data source batch value"
+    }
+    precondition {
+      condition     = length(data.conjur_secrets.batch_warn.values) == 1
+      error_message = "Warning-path batch should return only the existing secret (unknown name must be excluded)"
+    }
+  }
+}

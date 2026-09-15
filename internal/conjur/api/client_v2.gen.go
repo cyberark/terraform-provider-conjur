@@ -44,6 +44,8 @@ type ClientV2 interface {
 	CreateAuthenticatorRequest(*conjurapi.AuthenticatorBase) (*http.Request, error)
 	CreateBranch(conjurapi.Branch) (*conjurapi.Branch, error)
 	CreateBranchRequest(conjurapi.Branch) (*http.Request, error)
+	CreateGroup(conjurapi.Group) (*conjurapi.Group, error)
+	CreateGroupRequest(conjurapi.Group) (*http.Request, error)
 	CreateHost(string, string) (conjurapi.HostFactoryHostResponse, error)
 	CreateHostRequest(string, string) (*http.Request, error)
 	CreateHostWithAnnotations(string, string, map[string]string) (conjurapi.HostFactoryHostResponse, error)
@@ -58,6 +60,8 @@ type ClientV2 interface {
 	DeleteAuthenticatorRequest(string, string) (*http.Request, error)
 	DeleteBranch(string) ([]byte, error)
 	DeleteBranchRequest(string) (*http.Request, error)
+	DeleteGroup(string) error
+	DeleteGroupRequest(string) (*http.Request, error)
 	DeleteIssuer(string, bool) error
 	DeleteToken(string) error
 	DeleteTokenRequest(string) (*http.Request, error)
@@ -109,6 +113,8 @@ type ClientV2 interface {
 	LdapShowUserMappingRequest(string, string) (*http.Request, error)
 	ListAuthenticators() (*conjurapi.AuthenticatorListResponse, error)
 	ListAuthenticatorsRequest() (*http.Request, error)
+	ListGroupMembers(string, *conjurapi.GroupFilter) (conjurapi.GroupMembersResponse, error)
+	ListGroupMembersRequest(string, *conjurapi.GroupFilter) (*http.Request, error)
 	ListOidcProviders() ([]conjurapi.OidcProvider, error)
 	ListOidcProvidersRequest() (*http.Request, error)
 	LoadPolicy(conjurapi.PolicyMode, string, io.Reader) (*conjurapi.PolicyResponse, error)
@@ -129,6 +135,10 @@ type ClientV2 interface {
 	ReadBranchRequest(string) (*http.Request, error)
 	ReadBranches(*conjurapi.BranchFilter) (conjurapi.BranchesResponse, error)
 	ReadBranchesRequest(*conjurapi.BranchFilter) (*http.Request, error)
+	ReadGroup(string) (*conjurapi.Group, error)
+	ReadGroupRequest(string) (*http.Request, error)
+	ReadGroups(*conjurapi.GroupFilter) (conjurapi.GroupsResponse, error)
+	ReadGroupsRequest(*conjurapi.GroupFilter) (*http.Request, error)
 	RefreshToken() error
 	RemoveGroupMember(string, conjurapi.GroupMember) ([]byte, error)
 	RemoveGroupMemberRequest(string, conjurapi.GroupMember) (*http.Request, error)
@@ -180,6 +190,8 @@ type ClientV2 interface {
 	UpdateAuthnDescriptorRequest(string, conjurapi.AuthnDescriptor) (*http.Request, error)
 	UpdateBranch(conjurapi.Branch) ([]byte, error)
 	UpdateBranchRequest(string, *conjurapi.Owner, map[string]string) (*http.Request, error)
+	UpdateGroup(conjurapi.Group) (*conjurapi.Group, error)
+	UpdateGroupRequest(string, map[string]string) (*http.Request, error)
 	UpdateIssuer(string, conjurapi.IssuerUpdate) (conjurapi.Issuer, error)
 	UpdateWorkload(string, conjurapi.WorkloadFields) (*conjurapi.Workload, error)
 	UpdateWorkloadRequest(string, conjurapi.WorkloadFields) (*http.Request, error)

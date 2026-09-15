@@ -2,4 +2,8 @@
 package api
 
 //go:generate interfacer -for github.com/cyberark/conjur-api-go/conjurapi.ClientV2 -as api.ClientV2 -o client_v2.gen.go
+
+// Drop the SWA() method and its import: conjur-api-go exposes it via the internal package
+// github.com/cyberark/conjur-api-go/internal/swa-sdk-go, which Go forbids importing from another module.
+//go:generate sed -i -e /swa-sdk-go/d -e /swa.ManagementAPI/d client_v2.gen.go
 //go:generate goimports -w client_v2.gen.go

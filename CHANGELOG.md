@@ -8,8 +8,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Support for managing dynamic secret issuers via the `conjur_issuer` resource
   (AWS issuer type).
+- Support for V2 batch secret retrieval via the `conjur_secrets` data source and ephemeral resource (SaaS only).
 ### Changed
-- Updated conjur-api-go to v0.15.7.
+- Updated conjur-api-go to v0.15.9.
 
 ## [0.9.12] - 2026-09-10
 ### Fixed

@@ -23,3 +23,8 @@ func isNotFoundErr(err error) bool {
 
 	return false
 }
+
+// isSuccessStatus reports whether an HTTP status code is in the 2xx success range.
+func isSuccessStatus(code int) bool {
+	return code >= http.StatusOK && code < http.StatusMultipleChoices
+}

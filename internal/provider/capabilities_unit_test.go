@@ -116,6 +116,9 @@ func TestRequireCapability(t *testing.T) {
 		{"Core V2 on Self-Hosted is allowed", conjurapi.EnvironmentSH, CapabilityCoreV2, false},
 		{"Core V2 on OSS is allowed", conjurapi.EnvironmentOSS, CapabilityCoreV2, false},
 		{"Groups on OSS is allowed", conjurapi.EnvironmentOSS, CapabilityGroupsV2, false},
+		{"Batch secrets V2 on SaaS is allowed", conjurapi.EnvironmentSaaS, CapabilityBatchSecrets, false},
+		{"Batch secrets V2 on Self-Hosted is blocked", conjurapi.EnvironmentSH, CapabilityBatchSecrets, true},
+		{"Batch secrets V2 on OSS is blocked", conjurapi.EnvironmentOSS, CapabilityBatchSecrets, true},
 	}
 
 	for _, tt := range tests {
@@ -330,10 +333,12 @@ func gatedResources() []gatedResource {
 		resourceUnderTest("conjur_issuer", CapabilityIssuersV1, NewIssuerResource),
 
 		dataSourceUnderTest("conjur_secret", CapabilityCoreV2, NewSecretDataSource),
+		dataSourceUnderTest("conjur_secrets", CapabilityBatchSecrets, NewSecretsDataSource),
 		dataSourceUnderTest("conjur_certificate_issue", CapabilityIssuersV2, NewCertificateIssueDataSource),
 		dataSourceUnderTest("conjur_certificate_sign", CapabilityIssuersV2, NewCertificateSignDataSource),
 
 		ephemeralUnderTest("conjur_secret", CapabilityCoreV2, NewEphemeralSecretResource),
+		ephemeralUnderTest("conjur_secrets", CapabilityBatchSecrets, NewEphemeralSecretsResource),
 	}
 }
 

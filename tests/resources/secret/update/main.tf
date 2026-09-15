@@ -55,3 +55,10 @@ resource "conjur_secret" "imported_wo" {
     test_type = "write-only"
   }
 }
+
+resource "conjur_secret" "imported_secret2" {
+  name      = "${var.conjur_secret_name}-2"
+  branch    = "/data/terraform/test"
+  mime_type = "text/plain"
+  value     = "myupdatedsecretvalue2"
+}
