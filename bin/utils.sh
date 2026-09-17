@@ -1,6 +1,12 @@
 #!/bin/bash
 declare DOCKER_COMPOSE_ARGS
 
+# Optional extra `docker compose exec` flags (e.g. `--env KEY=VAL`) injected into terraform_exec.
+# Lets a single resource test run with a different provider identity than the shared container's
+# start-time environment, without affecting any other test. Callers set it around a test and reset
+# it afterwards; default empty so every other terraform_exec is unaffected.
+declare -a TERRAFORM_EXEC_ENV=()
+
 # shellcheck disable=SC2086
 # DOCKER_COMPOSE_ARGS needs to stay unquoted to work 
 function docker_compose() {
@@ -20,7 +26,7 @@ function client_exec() {
 }
 
 function terraform_exec() {
-  docker_compose exec -T terraform sh -ec "$@"
+  docker_compose exec -T "${TERRAFORM_EXEC_ENV[@]}" terraform sh -ec "$@"
 }
 
 function url_encode() {

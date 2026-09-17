@@ -17,6 +17,7 @@ The provider can also manage the following Secrets Manager resources:
 - [conjur_secret](docs/resources/secret.md) (SaaS only)
 - [conjur_membership](docs/resources/membership.md)
 - [conjur_permission](docs/resources/permission.md)
+- [conjur_issuer](docs/resources/issuer.md) (SaaS and Self-Hosted only)
 - [conjur_swa_trust_domain](docs/resources/swa_trust_domain.md) (SaaS only)
 - [conjur_swa_server_group](docs/resources/swa_server_group.md) (SaaS only)
 - [conjur_swa_server](docs/resources/swa_server.md) (SaaS only)
@@ -162,6 +163,7 @@ The privileges required to use supported resources and data sources are listed b
 | conjur_membership         | update on the parent policy of the group                  |
 | conjur_permission         | create/update on the parent policy of the resource        |
 | conjur_authenticator      | create/update on the `conjur/authn-<authn-type>` policy   |
+| conjur_issuer             | create/read/update on the parent policy                   |
 
 **Note:** The 'read' privilege is required on managed resources to allow the provider to retrieve the current state and import existing resources.
 It is usually granted implicitly assuming the above required privileges have been granted.

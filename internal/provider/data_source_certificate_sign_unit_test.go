@@ -177,20 +177,8 @@ func TestCertificateSignDataSource_Read(t *testing.T) {
 
 			d.Read(ctx, req, resp)
 
-			if tt.expectedError {
-				assert.True(t, resp.Diagnostics.HasError())
-				if tt.errorContains != "" {
-					found := false
-					for _, diag := range resp.Diagnostics.Errors() {
-						if contains(diag.Summary(), tt.errorContains) || contains(diag.Detail(), tt.errorContains) {
-							found = true
-							break
-						}
-					}
-					assert.True(t, found, "Expected error to contain: %s", tt.errorContains)
-				}
-			} else {
-				assert.False(t, resp.Diagnostics.HasError())
+			assertDiagOutcome(t, resp.Diagnostics, tt.expectedError, tt.errorContains)
+			if !tt.expectedError {
 				var result certificateSignDataSourceModel
 				resp.State.Get(ctx, &result)
 				assert.Equal(t, tt.data.IssuerName.ValueString(), result.IssuerName.ValueString())

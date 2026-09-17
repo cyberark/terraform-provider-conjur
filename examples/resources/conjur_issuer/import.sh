@@ -1,0 +1,1 @@
+terraform import conjur_issuer.my_aws_issuer my-aws-issuer

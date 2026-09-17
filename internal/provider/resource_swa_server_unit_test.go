@@ -11,17 +11,61 @@ import (
 	swaclient "github.com/cyberark/terraform-provider-conjur/internal/swa/client"
 	swamocks "github.com/cyberark/terraform-provider-conjur/internal/swa/client/mocks"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	tfresource "github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
+
+// mkServerAuth / mkServerIdentity build the types.Object values that ServerResourceModel.Auth and
+// ServerAuthenticationModel.Identity now hold, from the plain struct fixtures used throughout these
+// tests. mkServerAuth defaults an unset Identity to a typed null so ObjectValueFrom succeeds.
+func mkServerAuth(m ServerAuthenticationModel) types.Object {
+	if len(m.Identity.AttributeTypes(context.Background())) == 0 {
+		m.Identity = types.ObjectNull(serverAuthIdentityAttrTypes)
+	}
+	obj, diags := types.ObjectValueFrom(context.Background(), serverAuthAttrTypes, m)
+	if diags.HasError() {
+		panic(fmt.Sprintf("mkServerAuth: %v", diags))
+	}
+	return obj
+}
+
+func mkServerIdentity(m ServerAuthenticationIdentityModel) types.Object {
+	obj, diags := types.ObjectValueFrom(context.Background(), serverAuthIdentityAttrTypes, m)
+	if diags.HasError() {
+		panic(fmt.Sprintf("mkServerIdentity: %v", diags))
+	}
+	return obj
+}
+
+// decodeServerAuth decodes the Auth object back into ServerAuthenticationModel for assertions.
+func decodeServerAuth(t *testing.T, obj types.Object) ServerAuthenticationModel {
+	t.Helper()
+	var m ServerAuthenticationModel
+	var diags diag.Diagnostics
+	diags.Append(obj.As(context.Background(), &m, basetypes.ObjectAsOptions{})...)
+	require.False(t, diags.HasError())
+	return m
+}
+
+// decodeServerIdentity decodes the Identity object back into ServerAuthenticationIdentityModel.
+func decodeServerIdentity(t *testing.T, obj types.Object) ServerAuthenticationIdentityModel {
+	t.Helper()
+	var m ServerAuthenticationIdentityModel
+	var diags diag.Diagnostics
+	diags.Append(obj.As(context.Background(), &m, basetypes.ObjectAsOptions{})...)
+	require.False(t, diags.HasError())
+	return m
+}
 
 func makeCreateServerResponse(name, authnID string) *swaclient.CreateServerResponse {
 	return &swaclient.CreateServerResponse{
@@ -109,7 +153,7 @@ func TestServerResource_Create(t *testing.T) {
 			data: ServerResourceModel{
 				Name:          types.StringValue("my-server"),
 				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:       types.StringValue("JWT"),
 					Subject:    types.StringValue("my-workload"),
 					Issuer:     types.StringValue("https://issuer.example.org"),
@@ -117,7 +161,7 @@ func TestServerResource_Create(t *testing.T) {
 					JWKSURI:    types.StringValue("https://issuer.example.org/.well-known/jwks.json"),
 					CACert:     types.StringNull(),
 					PublicKeys: types.StringNull(),
-				},
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				resp := makeCreateServerResponse("my-server", "dHJ1c3RfZG9tYWlu")
@@ -134,7 +178,7 @@ func TestServerResource_Create(t *testing.T) {
 			data: ServerResourceModel{
 				Name:          types.StringValue("my-server"),
 				ServerGroupID: types.StringValue("invalid-no-slash"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:       types.StringValue("JWT"),
 					Subject:    types.StringValue("sub"),
 					Issuer:     types.StringValue("https://issuer.example.org"),
@@ -142,7 +186,7 @@ func TestServerResource_Create(t *testing.T) {
 					JWKSURI:    types.StringValue("https://issuer.example.org/.well-known/jwks.json"),
 					CACert:     types.StringNull(),
 					PublicKeys: types.StringNull(),
-				},
+				}),
 			},
 			setupMock:     func(m *swamocks.MockClientWithResponsesInterface) {},
 			expectedError: true,
@@ -153,7 +197,7 @@ func TestServerResource_Create(t *testing.T) {
 			data: ServerResourceModel{
 				Name:          types.StringValue("my-server"),
 				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:       types.StringValue("API_KEY"),
 					Subject:    types.StringValue("sub"),
 					Issuer:     types.StringValue("https://issuer.example.org"),
@@ -161,7 +205,7 @@ func TestServerResource_Create(t *testing.T) {
 					JWKSURI:    types.StringNull(),
 					CACert:     types.StringNull(),
 					PublicKeys: types.StringNull(),
-				},
+				}),
 			},
 			setupMock:     func(m *swamocks.MockClientWithResponsesInterface) {},
 			expectedError: true,
@@ -172,7 +216,7 @@ func TestServerResource_Create(t *testing.T) {
 			data: ServerResourceModel{
 				Name:          types.StringValue("my-server"),
 				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:       types.StringValue("JWT"),
 					Subject:    types.StringValue("sub"),
 					Issuer:     types.StringValue("https://issuer.example.org"),
@@ -180,7 +224,7 @@ func TestServerResource_Create(t *testing.T) {
 					JWKSURI:    types.StringValue("https://issuer.example.org/.well-known/jwks.json"),
 					CACert:     types.StringNull(),
 					PublicKeys: types.StringNull(),
-				},
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				m.On("PostServerWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.PostServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, mock.Anything).
@@ -194,7 +238,7 @@ func TestServerResource_Create(t *testing.T) {
 			data: ServerResourceModel{
 				Name:          types.StringValue("my-server"),
 				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:       types.StringValue("JWT"),
 					Subject:    types.StringValue("sub"),
 					Issuer:     types.StringValue("https://issuer.example.org"),
@@ -202,7 +246,7 @@ func TestServerResource_Create(t *testing.T) {
 					JWKSURI:    types.StringValue("https://issuer.example.org/.well-known/jwks.json"),
 					CACert:     types.StringNull(),
 					PublicKeys: types.StringNull(),
-				},
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				m.On("PostServerWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.PostServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, mock.Anything).
@@ -219,7 +263,7 @@ func TestServerResource_Create(t *testing.T) {
 			data: ServerResourceModel{
 				Name:          types.StringValue("my-server"),
 				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:       types.StringValue("JWT"),
 					Subject:    types.StringValue("my-workload"),
 					Issuer:     types.StringValue("https://issuer.example.org"),
@@ -227,7 +271,7 @@ func TestServerResource_Create(t *testing.T) {
 					JWKSURI:    types.StringNull(),
 					CACert:     types.StringNull(),
 					PublicKeys: types.StringValue(`{"type":"jwks","value":{"keys":[]}}`),
-				},
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				resp := makeCreateServerResponse("my-server", "dHJ1c3RfZG9tYWlu")
@@ -244,7 +288,7 @@ func TestServerResource_Create(t *testing.T) {
 			data: ServerResourceModel{
 				Name:          types.StringValue("my-server"),
 				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:       types.StringValue("JWT"),
 					Subject:    types.StringValue("my-workload"),
 					Issuer:     types.StringValue("https://issuer.example.org"),
@@ -252,18 +296,18 @@ func TestServerResource_Create(t *testing.T) {
 					JWKSURI:    types.StringValue("https://issuer.example.org/.well-known/jwks.json"),
 					CACert:     types.StringNull(),
 					PublicKeys: types.StringNull(),
-					Identity: func() *ServerAuthenticationIdentityModel {
+					Identity: func() types.Object {
 						ctx := context.Background()
 						aliases, _ := types.MapValueFrom(ctx, types.StringType, map[string]string{"sub": "subject"})
 						claims, _ := types.ListValueFrom(ctx, types.StringType, []string{"sub", "iss"})
-						return &ServerAuthenticationIdentityModel{
+						return mkServerIdentity(ServerAuthenticationIdentityModel{
 							ClaimAliases:     aliases,
 							EnforcedClaims:   claims,
 							IdentityPath:     types.StringValue("/data/my-workload"),
 							TokenAppProperty: types.StringValue("sub"),
-						}
+						})
 					}(),
-				},
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				resp := makeCreateServerResponse("my-server", "dHJ1c3RfZG9tYWlu")
@@ -280,7 +324,7 @@ func TestServerResource_Create(t *testing.T) {
 			data: ServerResourceModel{
 				Name:          types.StringValue("my-server"),
 				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:       types.StringValue("JWT"),
 					Subject:    types.StringValue("sub"),
 					Issuer:     types.StringValue("https://issuer.example.org"),
@@ -288,7 +332,7 @@ func TestServerResource_Create(t *testing.T) {
 					JWKSURI:    types.StringValue("https://issuer.example.org/.well-known/jwks.json"),
 					CACert:     types.StringNull(),
 					PublicKeys: types.StringNull(),
-				},
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				m.On("PostServerWithResponse", context.Background(), "prod.example.org", "prod-servers", &swaclient.PostServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, mock.Anything).
@@ -305,7 +349,7 @@ func TestServerResource_Create(t *testing.T) {
 			data: ServerResourceModel{
 				Name:          types.StringValue("my-server"),
 				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:       types.StringValue("JWT"),
 					Subject:    types.StringValue("sub"),
 					Issuer:     types.StringValue("https://issuer.example.org"),
@@ -313,7 +357,7 @@ func TestServerResource_Create(t *testing.T) {
 					JWKSURI:    types.StringNull(),
 					CACert:     types.StringNull(),
 					PublicKeys: types.StringNull(),
-				},
+				}),
 			},
 			setupMock:     func(m *swamocks.MockClientWithResponsesInterface) {},
 			expectedError: true,
@@ -324,7 +368,7 @@ func TestServerResource_Create(t *testing.T) {
 			data: ServerResourceModel{
 				Name:          types.StringValue("my-server"),
 				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:       types.StringValue("JWT"),
 					Subject:    types.StringValue("sub"),
 					Issuer:     types.StringValue("https://issuer.example.org"),
@@ -332,7 +376,7 @@ func TestServerResource_Create(t *testing.T) {
 					JWKSURI:    types.StringValue("https://issuer.example.org/.well-known/jwks.json"),
 					CACert:     types.StringNull(),
 					PublicKeys: types.StringValue(`{"type":"jwks","value":{"keys":[]}}`),
-				},
+				}),
 			},
 			setupMock:     func(m *swamocks.MockClientWithResponsesInterface) {},
 			expectedError: true,
@@ -343,7 +387,7 @@ func TestServerResource_Create(t *testing.T) {
 			data: ServerResourceModel{
 				Name:          types.StringValue("my-server"),
 				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:       types.StringValue("JWT"),
 					Subject:    types.StringValue("sub"),
 					Issuer:     types.StringNull(),
@@ -351,7 +395,7 @@ func TestServerResource_Create(t *testing.T) {
 					JWKSURI:    types.StringNull(),
 					CACert:     types.StringNull(),
 					PublicKeys: types.StringValue(`{"type":"jwks","value":{"keys":[]}}`),
-				},
+				}),
 			},
 			setupMock:     func(m *swamocks.MockClientWithResponsesInterface) {},
 			expectedError: true,
@@ -362,7 +406,7 @@ func TestServerResource_Create(t *testing.T) {
 			data: ServerResourceModel{
 				Name:          types.StringValue("my-server"),
 				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:       types.StringValue("JWT"),
 					Subject:    types.StringValue("sub"),
 					Issuer:     types.StringValue("https://issuer.example.org"),
@@ -370,13 +414,13 @@ func TestServerResource_Create(t *testing.T) {
 					JWKSURI:    types.StringValue("https://issuer.example.org/.well-known/jwks.json"),
 					CACert:     types.StringNull(),
 					PublicKeys: types.StringNull(),
-					Identity: &ServerAuthenticationIdentityModel{
+					Identity: mkServerIdentity(ServerAuthenticationIdentityModel{
 						ClaimAliases:     types.MapNull(types.StringType),
 						EnforcedClaims:   types.ListNull(types.StringType),
 						IdentityPath:     types.StringValue("/data/workload"),
 						TokenAppProperty: types.StringNull(),
-					},
-				},
+					}),
+				}),
 			},
 			setupMock:     func(m *swamocks.MockClientWithResponsesInterface) {},
 			expectedError: true,
@@ -387,7 +431,7 @@ func TestServerResource_Create(t *testing.T) {
 			data: ServerResourceModel{
 				Name:          types.StringValue("my-server"),
 				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:       types.StringValue("JWT"),
 					Subject:    types.StringValue("sub"),
 					Issuer:     types.StringValue("https://issuer.example.org"),
@@ -395,7 +439,7 @@ func TestServerResource_Create(t *testing.T) {
 					JWKSURI:    types.StringNull(),
 					CACert:     types.StringNull(),
 					PublicKeys: types.StringValue("not-valid-json"),
-				},
+				}),
 			},
 			setupMock:     func(m *swamocks.MockClientWithResponsesInterface) {},
 			expectedError: true,
@@ -450,7 +494,7 @@ func TestServerResource_Delete(t *testing.T) {
 				Name:          types.StringValue("my-server"),
 				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
 				AuthnID:       types.StringValue("dHJ1c3RfZG9tYWlu"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:       types.StringValue("JWT"),
 					Subject:    types.StringValue("sub"),
 					Issuer:     types.StringValue("https://issuer.example.org"),
@@ -458,7 +502,7 @@ func TestServerResource_Delete(t *testing.T) {
 					JWKSURI:    types.StringNull(),
 					CACert:     types.StringNull(),
 					PublicKeys: types.StringNull(),
-				},
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				m.On("DeleteServerWithResponse", context.Background(), "prod.example.org", "prod-servers", "my-server", &swaclient.DeleteServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
@@ -475,7 +519,7 @@ func TestServerResource_Delete(t *testing.T) {
 				Name:          types.StringValue("my-server"),
 				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
 				AuthnID:       types.StringValue("dHJ1c3RfZG9tYWlu"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:       types.StringValue("JWT"),
 					Subject:    types.StringValue("sub"),
 					Issuer:     types.StringValue("https://issuer.example.org"),
@@ -483,7 +527,7 @@ func TestServerResource_Delete(t *testing.T) {
 					JWKSURI:    types.StringNull(),
 					CACert:     types.StringNull(),
 					PublicKeys: types.StringNull(),
-				},
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				m.On("DeleteServerWithResponse", context.Background(), "prod.example.org", "prod-servers", "my-server", &swaclient.DeleteServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
@@ -500,7 +544,7 @@ func TestServerResource_Delete(t *testing.T) {
 				Name:          types.StringValue("my-server"),
 				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
 				AuthnID:       types.StringValue("dHJ1c3RfZG9tYWlu"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:       types.StringValue("JWT"),
 					Subject:    types.StringValue("sub"),
 					Issuer:     types.StringValue("https://issuer.example.org"),
@@ -508,7 +552,7 @@ func TestServerResource_Delete(t *testing.T) {
 					JWKSURI:    types.StringNull(),
 					CACert:     types.StringNull(),
 					PublicKeys: types.StringNull(),
-				},
+				}),
 			},
 			setupMock:     func(m *swamocks.MockClientWithResponsesInterface) {},
 			expectedError: true,
@@ -521,7 +565,7 @@ func TestServerResource_Delete(t *testing.T) {
 				Name:          types.StringValue("my-server"),
 				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
 				AuthnID:       types.StringValue("dHJ1c3RfZG9tYWlu"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:       types.StringValue("JWT"),
 					Subject:    types.StringValue("sub"),
 					Issuer:     types.StringValue("https://issuer.example.org"),
@@ -529,7 +573,7 @@ func TestServerResource_Delete(t *testing.T) {
 					JWKSURI:    types.StringNull(),
 					CACert:     types.StringNull(),
 					PublicKeys: types.StringNull(),
-				},
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				m.On("DeleteServerWithResponse", context.Background(), "prod.example.org", "prod-servers", "my-server", &swaclient.DeleteServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
@@ -548,7 +592,7 @@ func TestServerResource_Delete(t *testing.T) {
 				Name:          types.StringValue("my-server"),
 				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
 				AuthnID:       types.StringValue("dHJ1c3RfZG9tYWlu"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:       types.StringValue("JWT"),
 					Subject:    types.StringValue("sub"),
 					Issuer:     types.StringValue("https://issuer.example.org"),
@@ -556,7 +600,7 @@ func TestServerResource_Delete(t *testing.T) {
 					JWKSURI:    types.StringNull(),
 					CACert:     types.StringNull(),
 					PublicKeys: types.StringNull(),
-				},
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				m.On("DeleteServerWithResponse", context.Background(), "prod.example.org", "prod-servers", "my-server", &swaclient.DeleteServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
@@ -631,7 +675,7 @@ func TestServerResource_Update(t *testing.T) {
 				ID:            types.StringValue("prod.example.org/prod-servers/my-server"),
 				Name:          types.StringValue("my-server"),
 				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:       types.StringValue("JWT"),
 					Subject:    types.StringValue("my-workload"),
 					Issuer:     types.StringValue("https://issuer.example.org"),
@@ -639,7 +683,7 @@ func TestServerResource_Update(t *testing.T) {
 					JWKSURI:    types.StringValue("https://issuer.example.org/.well-known/jwks-v2.json"),
 					CACert:     types.StringNull(),
 					PublicKeys: types.StringNull(),
-				},
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				m.On("PatchServerWithResponse", context.Background(), "prod.example.org", "prod-servers", "my-server", &swaclient.PatchServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, mock.Anything).
@@ -659,7 +703,7 @@ func TestServerResource_Update(t *testing.T) {
 				ID:            types.StringValue("invalid-no-slash"),
 				Name:          types.StringValue("my-server"),
 				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:       types.StringValue("JWT"),
 					Subject:    types.StringValue("my-workload"),
 					Issuer:     types.StringValue("https://issuer.example.org"),
@@ -667,7 +711,7 @@ func TestServerResource_Update(t *testing.T) {
 					JWKSURI:    types.StringValue("https://issuer.example.org/.well-known/jwks.json"),
 					CACert:     types.StringNull(),
 					PublicKeys: types.StringNull(),
-				},
+				}),
 			},
 			setupMock:     func(m *swamocks.MockClientWithResponsesInterface) {},
 			expectedError: true,
@@ -679,7 +723,7 @@ func TestServerResource_Update(t *testing.T) {
 				ID:            types.StringValue("prod.example.org/prod-servers/my-server"),
 				Name:          types.StringValue("my-server"),
 				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:       types.StringValue("JWT"),
 					Subject:    types.StringValue("my-workload"),
 					Issuer:     types.StringValue("https://issuer.example.org"),
@@ -687,7 +731,7 @@ func TestServerResource_Update(t *testing.T) {
 					JWKSURI:    types.StringValue("https://issuer.example.org/.well-known/jwks.json"),
 					CACert:     types.StringNull(),
 					PublicKeys: types.StringNull(),
-				},
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				m.On("PatchServerWithResponse", context.Background(), "prod.example.org", "prod-servers", "my-server", &swaclient.PatchServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, mock.Anything).
@@ -702,7 +746,7 @@ func TestServerResource_Update(t *testing.T) {
 				ID:            types.StringValue("prod.example.org/prod-servers/my-server"),
 				Name:          types.StringValue("my-server"),
 				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:       types.StringValue("JWT"),
 					Subject:    types.StringValue("my-workload"),
 					Issuer:     types.StringValue("https://issuer.example.org"),
@@ -710,7 +754,7 @@ func TestServerResource_Update(t *testing.T) {
 					JWKSURI:    types.StringValue("https://issuer.example.org/.well-known/jwks.json"),
 					CACert:     types.StringNull(),
 					PublicKeys: types.StringNull(),
-				},
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				m.On("PatchServerWithResponse", context.Background(), "prod.example.org", "prod-servers", "my-server", &swaclient.PatchServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, mock.Anything).
@@ -818,7 +862,7 @@ func TestServerResource_ValidateConfig(t *testing.T) {
 			data: ServerResourceModel{
 				Name:          types.StringValue("my-server"),
 				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:       types.StringValue("JWT"),
 					Subject:    types.StringValue("sub"),
 					Issuer:     types.StringNull(),
@@ -826,7 +870,7 @@ func TestServerResource_ValidateConfig(t *testing.T) {
 					JWKSURI:    types.StringValue("https://issuer.example.org/.well-known/jwks.json"),
 					CACert:     types.StringNull(),
 					PublicKeys: types.StringNull(),
-				},
+				}),
 			},
 			expectedError: false,
 		},
@@ -835,7 +879,7 @@ func TestServerResource_ValidateConfig(t *testing.T) {
 			data: ServerResourceModel{
 				Name:          types.StringValue("my-server"),
 				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:       types.StringValue("JWT"),
 					Subject:    types.StringValue("sub"),
 					Issuer:     types.StringNull(),
@@ -843,7 +887,7 @@ func TestServerResource_ValidateConfig(t *testing.T) {
 					JWKSURI:    types.StringNull(),
 					CACert:     types.StringNull(),
 					PublicKeys: types.StringNull(),
-				},
+				}),
 			},
 			expectedError: true,
 			errorContains: "Invalid auth configuration",
@@ -855,7 +899,7 @@ func TestServerResource_ValidateConfig(t *testing.T) {
 			data: ServerResourceModel{
 				Name:          types.StringValue("my-server"),
 				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:       types.StringValue("JWT"),
 					Subject:    types.StringValue("sub"),
 					Issuer:     types.StringValue("https://issuer.example.org"),
@@ -863,7 +907,7 @@ func TestServerResource_ValidateConfig(t *testing.T) {
 					JWKSURI:    types.StringNull(),
 					CACert:     types.StringNull(),
 					PublicKeys: types.StringUnknown(),
-				},
+				}),
 			},
 			expectedError: false,
 		},
@@ -874,7 +918,7 @@ func TestServerResource_ValidateConfig(t *testing.T) {
 			data: ServerResourceModel{
 				Name:          types.StringValue("my-server"),
 				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:       types.StringValue("JWT"),
 					Subject:    types.StringValue("sub"),
 					Issuer:     types.StringUnknown(),
@@ -882,7 +926,7 @@ func TestServerResource_ValidateConfig(t *testing.T) {
 					JWKSURI:    types.StringNull(),
 					CACert:     types.StringNull(),
 					PublicKeys: types.StringValue(`{"keys":[]}`),
-				},
+				}),
 			},
 			expectedError: false,
 		},
@@ -899,7 +943,7 @@ func TestServerResource_ValidateConfig(t *testing.T) {
 			data: ServerResourceModel{
 				Name:          types.StringValue("my-server"),
 				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:       types.StringValue("JWT"),
 					Subject:    types.StringValue("sub"),
 					Issuer:     types.StringNull(),
@@ -907,7 +951,7 @@ func TestServerResource_ValidateConfig(t *testing.T) {
 					JWKSURI:    types.StringValue("https://issuer.example.org/.well-known/jwks.json"),
 					CACert:     types.StringNull(),
 					PublicKeys: types.StringNull(),
-				},
+				}),
 			},
 			mutatePlan: func(t *testing.T, plan *tfsdk.Plan) {
 				require.False(t, plan.SetAttribute(
@@ -965,7 +1009,7 @@ func TestServerResource_Read(t *testing.T) {
 				Name:          types.StringValue("my-server"),
 				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
 				AuthnID:       types.StringValue("stale-authn-id"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:       types.StringValue("JWT"),
 					Subject:    types.StringValue("stale-sub"),
 					Issuer:     types.StringValue("https://stale.example.org"),
@@ -973,7 +1017,7 @@ func TestServerResource_Read(t *testing.T) {
 					JWKSURI:    types.StringNull(),
 					CACert:     types.StringNull(),
 					PublicKeys: types.StringNull(),
-				},
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				authnID := "fresh-authn-id"
@@ -1000,11 +1044,11 @@ func TestServerResource_Read(t *testing.T) {
 				ID:            types.StringValue("prod.example.org/prod-servers/missing-server"),
 				Name:          types.StringValue("missing-server"),
 				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:    types.StringValue("JWT"),
 					Subject: types.StringValue("sub"),
 					Issuer:  types.StringValue("https://issuer.example.org"),
-				},
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				m.On("GetServerWithResponse", context.Background(), "prod.example.org", "prod-servers", "missing-server", &swaclient.GetServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
@@ -1018,11 +1062,11 @@ func TestServerResource_Read(t *testing.T) {
 			data: ServerResourceModel{
 				ID:   types.StringValue("invalid"),
 				Name: types.StringValue("my-server"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:    types.StringValue("JWT"),
 					Subject: types.StringValue("sub"),
 					Issuer:  types.StringValue("https://issuer.example.org"),
-				},
+				}),
 			},
 			setupMock:     func(m *swamocks.MockClientWithResponsesInterface) {},
 			expectedError: true,
@@ -1034,11 +1078,11 @@ func TestServerResource_Read(t *testing.T) {
 				ID:            types.StringValue("prod.example.org/prod-servers/my-server"),
 				Name:          types.StringValue("my-server"),
 				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:    types.StringValue("JWT"),
 					Subject: types.StringValue("sub"),
 					Issuer:  types.StringValue("https://issuer.example.org"),
-				},
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				m.On("GetServerWithResponse", context.Background(), "prod.example.org", "prod-servers", "my-server", &swaclient.GetServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
@@ -1056,11 +1100,11 @@ func TestServerResource_Read(t *testing.T) {
 				ID:            types.StringValue("prod.example.org/prod-servers/my-server"),
 				Name:          types.StringValue("my-server"),
 				ServerGroupID: types.StringValue("prod.example.org/prod-servers"),
-				Auth: &ServerAuthenticationModel{
+				Auth: mkServerAuth(ServerAuthenticationModel{
 					Type:    types.StringValue("JWT"),
 					Subject: types.StringValue("sub"),
 					Issuer:  types.StringValue("https://issuer.example.org"),
-				},
+				}),
 			},
 			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
 				m.On("GetServerWithResponse", context.Background(), "prod.example.org", "prod-servers", "my-server", &swaclient.GetServerParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}).
@@ -1106,9 +1150,10 @@ func TestServerResource_Read(t *testing.T) {
 					assert.Equal(t, "prod.example.org/prod-servers/my-server", result.ID.ValueString())
 					assert.Equal(t, "prod.example.org/prod-servers", result.ServerGroupID.ValueString())
 					assert.Equal(t, "fresh-authn-id", result.AuthnID.ValueString())
-					assert.NotNil(t, result.Auth)
-					assert.Equal(t, "my-workload", result.Auth.Subject.ValueString())
-					assert.Equal(t, "https://issuer.example.org", result.Auth.Issuer.ValueString())
+					require.False(t, result.Auth.IsNull())
+					resultAuth := decodeServerAuth(t, result.Auth)
+					assert.Equal(t, "my-workload", resultAuth.Subject.ValueString())
+					assert.Equal(t, "https://issuer.example.org", resultAuth.Issuer.ValueString())
 				}
 			}
 		})
@@ -1226,53 +1271,56 @@ func TestSyncServerAuthFromResponse_FullMapping(t *testing.T) {
 	err := syncServerAuthFromResponse(ctx, state, auth)
 	assert.NoError(t, err)
 
-	assert.NotNil(t, state.Auth)
-	assert.Equal(t, "JWT", state.Auth.Type.ValueString())
-	assert.Equal(t, "workload-sub", state.Auth.Subject.ValueString())
-	assert.Equal(t, "conjur", state.Auth.Audience.ValueString())
-	assert.Equal(t, "https://issuer.example.org/.well-known/jwks.json", state.Auth.JWKSURI.ValueString())
-	assert.Equal(t, "https://issuer.example.org", state.Auth.Issuer.ValueString())
-	assert.Equal(t, "-----BEGIN CERTIFICATE-----...", state.Auth.CACert.ValueString())
+	require.False(t, state.Auth.IsNull())
+	stateAuth := decodeServerAuth(t, state.Auth)
+	assert.Equal(t, "JWT", stateAuth.Type.ValueString())
+	assert.Equal(t, "workload-sub", stateAuth.Subject.ValueString())
+	assert.Equal(t, "conjur", stateAuth.Audience.ValueString())
+	assert.Equal(t, "https://issuer.example.org/.well-known/jwks.json", stateAuth.JWKSURI.ValueString())
+	assert.Equal(t, "https://issuer.example.org", stateAuth.Issuer.ValueString())
+	assert.Equal(t, "-----BEGIN CERTIFICATE-----...", stateAuth.CACert.ValueString())
 
 	var publicKeys map[string]any
-	err = json.Unmarshal([]byte(state.Auth.PublicKeys.ValueString()), &publicKeys)
+	err = json.Unmarshal([]byte(stateAuth.PublicKeys.ValueString()), &publicKeys)
 	assert.NoError(t, err)
 	assert.Equal(t, "jwks", publicKeys["type"])
 
-	assert.NotNil(t, state.Auth.Identity)
+	require.False(t, stateAuth.Identity.IsNull())
+	identity := decodeServerIdentity(t, stateAuth.Identity)
 	var claimAliases map[string]string
-	aliasDiags := state.Auth.Identity.ClaimAliases.ElementsAs(ctx, &claimAliases, false)
+	aliasDiags := identity.ClaimAliases.ElementsAs(ctx, &claimAliases, false)
 	assert.False(t, aliasDiags.HasError())
 	assert.Equal(t, map[string]string{"app": "app"}, claimAliases)
 
 	var enforcedClaims []string
-	claimsDiags := state.Auth.Identity.EnforcedClaims.ElementsAs(ctx, &enforcedClaims, false)
+	claimsDiags := identity.EnforcedClaims.ElementsAs(ctx, &enforcedClaims, false)
 	assert.False(t, claimsDiags.HasError())
 	assert.Equal(t, []string{"sub", "iss"}, enforcedClaims)
-	assert.Equal(t, "/data/workload", state.Auth.Identity.IdentityPath.ValueString())
-	assert.Equal(t, "sub", state.Auth.Identity.TokenAppProperty.ValueString())
+	assert.Equal(t, "/data/workload", identity.IdentityPath.ValueString())
+	assert.Equal(t, "sub", identity.TokenAppProperty.ValueString())
 }
 
 func TestSyncServerAuthFromResponse_MissingFieldsClearExistingValues(t *testing.T) {
 	ctx := context.Background()
 	state := &ServerResourceModel{
-		Auth: &ServerAuthenticationModel{
+		Auth: mkServerAuth(ServerAuthenticationModel{
 			PublicKeys: types.StringValue(`{"type":"jwks","value":{"keys":[{"kid":"old"}]}}`),
-			Identity: &ServerAuthenticationIdentityModel{
+			Identity: mkServerIdentity(ServerAuthenticationIdentityModel{
 				ClaimAliases:     types.MapNull(types.StringType),
 				EnforcedClaims:   types.ListNull(types.StringType),
 				IdentityPath:     types.StringValue("/old/path"),
 				TokenAppProperty: types.StringValue("old-claim"),
-			},
-		},
+			}),
+		}),
 	}
 
 	auth := newTestServerAuth("jwt", testAuthDataFields{Sub: "workload-sub"})
 
 	err := syncServerAuthFromResponse(ctx, state, auth)
 	assert.NoError(t, err)
-	assert.True(t, state.Auth.PublicKeys.IsNull())
-	assert.Nil(t, state.Auth.Identity)
+	stateAuth := decodeServerAuth(t, state.Auth)
+	assert.True(t, stateAuth.PublicKeys.IsNull())
+	assert.True(t, stateAuth.Identity.IsNull())
 }
 
 // TEMPORARY: guards the fallback that keeps the prior subject when the API
@@ -1281,16 +1329,16 @@ func TestSyncServerAuthFromResponse_MissingFieldsClearExistingValues(t *testing.
 func TestSyncServerAuthFromResponse_MissingSubjectPreservesPriorValue(t *testing.T) {
 	ctx := context.Background()
 	state := &ServerResourceModel{
-		Auth: &ServerAuthenticationModel{
-			Subject: types.StringValue("system:serviceaccount:swa-e2e:swa-server"),
-		},
+		Auth: mkServerAuth(ServerAuthenticationModel{
+			Subject: types.StringValue("system:serviceaccount:swa-e2e:swa-server")}),
 	}
 
 	auth := newTestServerAuth("jwt", testAuthDataFields{Audience: "conjur"})
 
 	err := syncServerAuthFromResponse(ctx, state, auth)
 	assert.NoError(t, err)
-	assert.Equal(t, "system:serviceaccount:swa-e2e:swa-server", state.Auth.Subject.ValueString())
+	stateAuth := decodeServerAuth(t, state.Auth)
+	assert.Equal(t, "system:serviceaccount:swa-e2e:swa-server", stateAuth.Subject.ValueString())
 }
 
 func TestSyncServerAuthFromResponse_PublicKeysMarshalError(t *testing.T) {
@@ -1405,15 +1453,15 @@ func TestJSONEquivalentPlanModifier_WiresPreferPriorJSONString(t *testing.T) {
 
 func TestSyncServerAuthFromResponse_NilAuthClearsExistingState(t *testing.T) {
 	state := &ServerResourceModel{
-		Auth: &ServerAuthenticationModel{
+		Auth: mkServerAuth(ServerAuthenticationModel{
 			Type:    types.StringValue("JWT"),
 			Subject: types.StringValue("stale-sub"),
-		},
+		}),
 	}
 
 	err := syncServerAuthFromResponse(context.Background(), state, nil)
 	assert.NoError(t, err)
-	assert.Nil(t, state.Auth)
+	assert.True(t, state.Auth.IsNull())
 }
 
 // --- Schema plan modifier tests ---

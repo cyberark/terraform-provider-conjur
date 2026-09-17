@@ -576,6 +576,7 @@ func (p *providerImpl) Resources(_ context.Context) []func() resource.Resource {
 		NewServerGroupResource,
 		NewServerResource,
 		NewNodeGroupResource,
+		NewIssuerResource,
 	}
 }
 

@@ -3,9 +3,11 @@ package provider
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/cyberark/conjur-api-go/conjurapi"
+	"github.com/cyberark/conjur-api-go/conjurapi/response"
 	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api/mocks"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -13,7 +15,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -93,21 +94,7 @@ func TestPolicyBranchResource_Create(t *testing.T) {
 			}
 			r.Create(ctx, req, resp)
 
-			if tt.expectedError {
-				assert.True(t, resp.Diagnostics.HasError())
-				if tt.errorContains != "" {
-					found := false
-					for _, diag := range resp.Diagnostics.Errors() {
-						if contains(diag.Summary(), tt.errorContains) || contains(diag.Detail(), tt.errorContains) {
-							found = true
-							break
-						}
-					}
-					assert.True(t, found, "Expected error to contain: %s", tt.errorContains)
-				}
-			} else {
-				assert.False(t, resp.Diagnostics.HasError())
-			}
+			assertDiagOutcome(t, resp.Diagnostics, tt.expectedError, tt.errorContains)
 
 			mockV2.AssertExpectations(t)
 		})
@@ -149,7 +136,7 @@ func TestPolicyBranchResource_Read(t *testing.T) {
 				Annotations: types.MapNull(types.StringType),
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
-				mockV2.On("ReadBranch", "data/test/nonexistent").Return(nil, fmt.Errorf("404 not found"))
+				mockV2.On("ReadBranch", "data/test/nonexistent").Return(nil, &response.ConjurError{Code: http.StatusNotFound})
 			},
 		},
 		{
@@ -195,21 +182,7 @@ func TestPolicyBranchResource_Read(t *testing.T) {
 			req.State.Set(ctx, &tt.data)
 			r.Read(ctx, req, resp)
 
-			if tt.expectedError {
-				assert.True(t, resp.Diagnostics.HasError())
-				if tt.errorContains != "" {
-					found := false
-					for _, diag := range resp.Diagnostics.Errors() {
-						if contains(diag.Summary(), tt.errorContains) || contains(diag.Detail(), tt.errorContains) {
-							found = true
-							break
-						}
-					}
-					assert.True(t, found, "Expected error to contain: %s", tt.errorContains)
-				}
-			} else {
-				assert.False(t, resp.Diagnostics.HasError())
-			}
+			assertDiagOutcome(t, resp.Diagnostics, tt.expectedError, tt.errorContains)
 
 			mockV2.AssertExpectations(t)
 		})
@@ -283,21 +256,7 @@ func TestPolicyBranchResource_Delete(t *testing.T) {
 			req.State.Set(ctx, &tt.data)
 			r.Delete(ctx, req, resp)
 
-			if tt.expectedError {
-				assert.True(t, resp.Diagnostics.HasError())
-				if tt.errorContains != "" {
-					found := false
-					for _, diag := range resp.Diagnostics.Errors() {
-						if contains(diag.Summary(), tt.errorContains) || contains(diag.Detail(), tt.errorContains) {
-							found = true
-							break
-						}
-					}
-					assert.True(t, found, "Expected error to contain: %s", tt.errorContains)
-				}
-			} else {
-				assert.False(t, resp.Diagnostics.HasError())
-			}
+			assertDiagOutcome(t, resp.Diagnostics, tt.expectedError, tt.errorContains)
 
 			mockV2.AssertExpectations(t)
 		})

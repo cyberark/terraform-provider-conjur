@@ -33,6 +33,22 @@ function main() {
     echo ">> Running Policy Branch CRUD test"
     test_resource_crud "tests/resources/policy_branch" "policy_branch" "full_id" "data/terraform/$TF_VAR_conjur_policy_branch_name"
     test_results+=("PolicyBranch|$?")
+
+    # Issuers are supported on Secrets Manager SaaS (cloud) and Self-Hosted (enterprise), but not on
+    # OSS. This test stays in the core (non-SWA) pass so it reports under the right CI stage. On
+    # Self-Hosted the CI host is granted issuer privileges by policy, so it runs under host auth. On
+    # Cloud, issuer management requires Secrets Manager admin group membership (which the host can't
+    # hold), so we inject the tenant-admin token into just this test's terraform exec — every other
+    # test in this pass keeps running as the host.
+    if [[ "$TARGET" != "oss" ]]; then
+      echo ">> Running Issuer CRUD test"
+      if [[ "$TARGET" == "cloud" ]]; then
+        TERRAFORM_EXEC_ENV=(--env "CONJUR_AUTHN_TOKEN=$ISSUER_ADMIN_AUTHN_TOKEN")
+      fi
+      test_resource_crud "tests/resources/issuer" "issuer" "id" "$TF_VAR_conjur_issuer_name"
+      test_results+=("Issuer|$?")
+      TERRAFORM_EXEC_ENV=()
+    fi
   fi
 
   # Host/Secret and SWA resources are only exercised against Secrets Manager SaaS (cloud).
@@ -223,6 +239,7 @@ function generate_random_values() {
   export TF_VAR_conjur_group_name="tf-group-$rand_suffix"
   export TF_VAR_conjur_secret_name="tf-secret-$rand_suffix"
   export TF_VAR_conjur_policy_branch_name="tf-branch-$rand_suffix"
+  export TF_VAR_conjur_issuer_name="tf-issuer-$rand_suffix"
   export TF_VAR_conjur_trust_domain_name="tf-td-$rand_suffix.example.org"
   export TF_VAR_conjur_server_group_name="tf-sg-$rand_suffix"
   export TF_VAR_conjur_server_name="tf-srv-$rand_suffix"

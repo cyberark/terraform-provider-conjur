@@ -307,7 +307,20 @@ function load_test_policies() {
     "api-key")
       load_policy "data" "$policy_folder/host.yml"
       load_policy "data" "$policy_folder/root.yml"
+      # Self-hosted only: grant the CI host create/read/update on the conjur/issuers policy so the
+      # issuer CRUD endpoints don't 403. Cloud is intentionally not handled here because issuer
+      # management on Cloud is gated on Secrets Manager admin group membership, not a Conjur permit
+      # (a permit loads fine but has no effect); the Cloud issuer test authenticates as the tenant
+      # admin token instead (injected per-test by run_resource_tests). OSS is skipped because issuers
+      # are unsupported there and the issuer test doesn't run.
+      if [[ "$TARGET" == "enterprise" ]]; then
+        load_policy "root" "$policy_folder/issuer-permissions-selfhosted.yml"
+      fi
       set_variable "data/terraform/target-password" "$TEST_SECRET_VAL"
+      set_variable "data/terraform/aws-access-key-id" "AKIAIOSFODNN7EXAMPLE"
+      set_variable "data/terraform/aws-secret-access-key" "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+      set_variable "data/terraform/aws-access-key-id-2" "AKIAIOSFODNN7EXAMPLE2"
+      set_variable "data/terraform/aws-secret-access-key-2" "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY2"
       ;;
     "iam")
       load_policy "conjur/authn-iam" "$policy_folder/authn-iam.yml"
@@ -462,6 +475,14 @@ function set_TF_vars() {
 
       if [[ -n "$SWA_ONLY" ]]; then
         export CONJUR_AUTHN_TOKEN="$(printf '%s' "$INFRAPOOL_CONJUR_AUTHN_TOKEN" | base64 -d)"
+      fi
+
+      # On Cloud the issuer test can't run as the data/testapp host (issuer management is gated on
+      # Secrets Manager admin group membership). It still runs in this host pass so it reports under
+      # the correct stage, but run_resource_tests injects this decoded tenant-admin token into just
+      # that one test's terraform exec. Self-hosted uses a policy permit instead and has no token.
+      if [[ "$TARGET" == "cloud" ]]; then
+        export ISSUER_ADMIN_AUTHN_TOKEN="$(printf '%s' "$INFRAPOOL_CONJUR_AUTHN_TOKEN" | base64 -d)"
       fi
       ;;
     "jwt")
