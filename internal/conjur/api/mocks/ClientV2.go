@@ -2115,6 +2115,130 @@ func (_c *MockClientV2_CreateBranchRequest_Call) RunAndReturn(run func(branch co
 	return _c
 }
 
+// CreateGroup provides a mock function for the type MockClientV2
+func (_mock *MockClientV2) CreateGroup(group conjurapi.Group) (*conjurapi.Group, error) {
+	ret := _mock.Called(group)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateGroup")
+	}
+
+	var r0 *conjurapi.Group
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(conjurapi.Group) (*conjurapi.Group, error)); ok {
+		return returnFunc(group)
+	}
+	if returnFunc, ok := ret.Get(0).(func(conjurapi.Group) *conjurapi.Group); ok {
+		r0 = returnFunc(group)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*conjurapi.Group)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(conjurapi.Group) error); ok {
+		r1 = returnFunc(group)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClientV2_CreateGroup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateGroup'
+type MockClientV2_CreateGroup_Call struct {
+	*mock.Call
+}
+
+// CreateGroup is a helper method to define mock.On call
+//   - group conjurapi.Group
+func (_e *MockClientV2_Expecter) CreateGroup(group any) *MockClientV2_CreateGroup_Call {
+	return &MockClientV2_CreateGroup_Call{Call: _e.mock.On("CreateGroup", group)}
+}
+
+func (_c *MockClientV2_CreateGroup_Call) Run(run func(group conjurapi.Group)) *MockClientV2_CreateGroup_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 conjurapi.Group
+		if args[0] != nil {
+			arg0 = args[0].(conjurapi.Group)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClientV2_CreateGroup_Call) Return(group1 *conjurapi.Group, err error) *MockClientV2_CreateGroup_Call {
+	_c.Call.Return(group1, err)
+	return _c
+}
+
+func (_c *MockClientV2_CreateGroup_Call) RunAndReturn(run func(group conjurapi.Group) (*conjurapi.Group, error)) *MockClientV2_CreateGroup_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CreateGroupRequest provides a mock function for the type MockClientV2
+func (_mock *MockClientV2) CreateGroupRequest(group conjurapi.Group) (*http.Request, error) {
+	ret := _mock.Called(group)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateGroupRequest")
+	}
+
+	var r0 *http.Request
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(conjurapi.Group) (*http.Request, error)); ok {
+		return returnFunc(group)
+	}
+	if returnFunc, ok := ret.Get(0).(func(conjurapi.Group) *http.Request); ok {
+		r0 = returnFunc(group)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*http.Request)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(conjurapi.Group) error); ok {
+		r1 = returnFunc(group)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClientV2_CreateGroupRequest_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateGroupRequest'
+type MockClientV2_CreateGroupRequest_Call struct {
+	*mock.Call
+}
+
+// CreateGroupRequest is a helper method to define mock.On call
+//   - group conjurapi.Group
+func (_e *MockClientV2_Expecter) CreateGroupRequest(group any) *MockClientV2_CreateGroupRequest_Call {
+	return &MockClientV2_CreateGroupRequest_Call{Call: _e.mock.On("CreateGroupRequest", group)}
+}
+
+func (_c *MockClientV2_CreateGroupRequest_Call) Run(run func(group conjurapi.Group)) *MockClientV2_CreateGroupRequest_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 conjurapi.Group
+		if args[0] != nil {
+			arg0 = args[0].(conjurapi.Group)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClientV2_CreateGroupRequest_Call) Return(request *http.Request, err error) *MockClientV2_CreateGroupRequest_Call {
+	_c.Call.Return(request, err)
+	return _c
+}
+
+func (_c *MockClientV2_CreateGroupRequest_Call) RunAndReturn(run func(group conjurapi.Group) (*http.Request, error)) *MockClientV2_CreateGroupRequest_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateHost provides a mock function for the type MockClientV2
 func (_mock *MockClientV2) CreateHost(s string, s1 string) (conjurapi.HostFactoryHostResponse, error) {
 	ret := _mock.Called(s, s1)
@@ -3016,6 +3140,119 @@ func (_c *MockClientV2_DeleteBranchRequest_Call) Return(request *http.Request, e
 }
 
 func (_c *MockClientV2_DeleteBranchRequest_Call) RunAndReturn(run func(s string) (*http.Request, error)) *MockClientV2_DeleteBranchRequest_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteGroup provides a mock function for the type MockClientV2
+func (_mock *MockClientV2) DeleteGroup(s string) error {
+	ret := _mock.Called(s)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteGroup")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(string) error); ok {
+		r0 = returnFunc(s)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockClientV2_DeleteGroup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteGroup'
+type MockClientV2_DeleteGroup_Call struct {
+	*mock.Call
+}
+
+// DeleteGroup is a helper method to define mock.On call
+//   - s string
+func (_e *MockClientV2_Expecter) DeleteGroup(s any) *MockClientV2_DeleteGroup_Call {
+	return &MockClientV2_DeleteGroup_Call{Call: _e.mock.On("DeleteGroup", s)}
+}
+
+func (_c *MockClientV2_DeleteGroup_Call) Run(run func(s string)) *MockClientV2_DeleteGroup_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClientV2_DeleteGroup_Call) Return(err error) *MockClientV2_DeleteGroup_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockClientV2_DeleteGroup_Call) RunAndReturn(run func(s string) error) *MockClientV2_DeleteGroup_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteGroupRequest provides a mock function for the type MockClientV2
+func (_mock *MockClientV2) DeleteGroupRequest(s string) (*http.Request, error) {
+	ret := _mock.Called(s)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteGroupRequest")
+	}
+
+	var r0 *http.Request
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(string) (*http.Request, error)); ok {
+		return returnFunc(s)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string) *http.Request); ok {
+		r0 = returnFunc(s)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*http.Request)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
+		r1 = returnFunc(s)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClientV2_DeleteGroupRequest_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteGroupRequest'
+type MockClientV2_DeleteGroupRequest_Call struct {
+	*mock.Call
+}
+
+// DeleteGroupRequest is a helper method to define mock.On call
+//   - s string
+func (_e *MockClientV2_Expecter) DeleteGroupRequest(s any) *MockClientV2_DeleteGroupRequest_Call {
+	return &MockClientV2_DeleteGroupRequest_Call{Call: _e.mock.On("DeleteGroupRequest", s)}
+}
+
+func (_c *MockClientV2_DeleteGroupRequest_Call) Run(run func(s string)) *MockClientV2_DeleteGroupRequest_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClientV2_DeleteGroupRequest_Call) Return(request *http.Request, err error) *MockClientV2_DeleteGroupRequest_Call {
+	_c.Call.Return(request, err)
+	return _c
+}
+
+func (_c *MockClientV2_DeleteGroupRequest_Call) RunAndReturn(run func(s string) (*http.Request, error)) *MockClientV2_DeleteGroupRequest_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -6175,6 +6412,140 @@ func (_c *MockClientV2_ListAuthenticatorsRequest_Call) RunAndReturn(run func() (
 	return _c
 }
 
+// ListGroupMembers provides a mock function for the type MockClientV2
+func (_mock *MockClientV2) ListGroupMembers(s string, groupFilter *conjurapi.GroupFilter) (conjurapi.GroupMembersResponse, error) {
+	ret := _mock.Called(s, groupFilter)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListGroupMembers")
+	}
+
+	var r0 conjurapi.GroupMembersResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(string, *conjurapi.GroupFilter) (conjurapi.GroupMembersResponse, error)); ok {
+		return returnFunc(s, groupFilter)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string, *conjurapi.GroupFilter) conjurapi.GroupMembersResponse); ok {
+		r0 = returnFunc(s, groupFilter)
+	} else {
+		r0 = ret.Get(0).(conjurapi.GroupMembersResponse)
+	}
+	if returnFunc, ok := ret.Get(1).(func(string, *conjurapi.GroupFilter) error); ok {
+		r1 = returnFunc(s, groupFilter)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClientV2_ListGroupMembers_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListGroupMembers'
+type MockClientV2_ListGroupMembers_Call struct {
+	*mock.Call
+}
+
+// ListGroupMembers is a helper method to define mock.On call
+//   - s string
+//   - groupFilter *conjurapi.GroupFilter
+func (_e *MockClientV2_Expecter) ListGroupMembers(s any, groupFilter any) *MockClientV2_ListGroupMembers_Call {
+	return &MockClientV2_ListGroupMembers_Call{Call: _e.mock.On("ListGroupMembers", s, groupFilter)}
+}
+
+func (_c *MockClientV2_ListGroupMembers_Call) Run(run func(s string, groupFilter *conjurapi.GroupFilter)) *MockClientV2_ListGroupMembers_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 *conjurapi.GroupFilter
+		if args[1] != nil {
+			arg1 = args[1].(*conjurapi.GroupFilter)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClientV2_ListGroupMembers_Call) Return(groupMembersResponse conjurapi.GroupMembersResponse, err error) *MockClientV2_ListGroupMembers_Call {
+	_c.Call.Return(groupMembersResponse, err)
+	return _c
+}
+
+func (_c *MockClientV2_ListGroupMembers_Call) RunAndReturn(run func(s string, groupFilter *conjurapi.GroupFilter) (conjurapi.GroupMembersResponse, error)) *MockClientV2_ListGroupMembers_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListGroupMembersRequest provides a mock function for the type MockClientV2
+func (_mock *MockClientV2) ListGroupMembersRequest(s string, groupFilter *conjurapi.GroupFilter) (*http.Request, error) {
+	ret := _mock.Called(s, groupFilter)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListGroupMembersRequest")
+	}
+
+	var r0 *http.Request
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(string, *conjurapi.GroupFilter) (*http.Request, error)); ok {
+		return returnFunc(s, groupFilter)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string, *conjurapi.GroupFilter) *http.Request); ok {
+		r0 = returnFunc(s, groupFilter)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*http.Request)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(string, *conjurapi.GroupFilter) error); ok {
+		r1 = returnFunc(s, groupFilter)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClientV2_ListGroupMembersRequest_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListGroupMembersRequest'
+type MockClientV2_ListGroupMembersRequest_Call struct {
+	*mock.Call
+}
+
+// ListGroupMembersRequest is a helper method to define mock.On call
+//   - s string
+//   - groupFilter *conjurapi.GroupFilter
+func (_e *MockClientV2_Expecter) ListGroupMembersRequest(s any, groupFilter any) *MockClientV2_ListGroupMembersRequest_Call {
+	return &MockClientV2_ListGroupMembersRequest_Call{Call: _e.mock.On("ListGroupMembersRequest", s, groupFilter)}
+}
+
+func (_c *MockClientV2_ListGroupMembersRequest_Call) Run(run func(s string, groupFilter *conjurapi.GroupFilter)) *MockClientV2_ListGroupMembersRequest_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 *conjurapi.GroupFilter
+		if args[1] != nil {
+			arg1 = args[1].(*conjurapi.GroupFilter)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClientV2_ListGroupMembersRequest_Call) Return(request *http.Request, err error) *MockClientV2_ListGroupMembersRequest_Call {
+	_c.Call.Return(request, err)
+	return _c
+}
+
+func (_c *MockClientV2_ListGroupMembersRequest_Call) RunAndReturn(run func(s string, groupFilter *conjurapi.GroupFilter) (*http.Request, error)) *MockClientV2_ListGroupMembersRequest_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListOidcProviders provides a mock function for the type MockClientV2
 func (_mock *MockClientV2) ListOidcProviders() ([]conjurapi.OidcProvider, error) {
 	ret := _mock.Called()
@@ -7449,6 +7820,252 @@ func (_c *MockClientV2_ReadBranchesRequest_Call) Return(request *http.Request, e
 }
 
 func (_c *MockClientV2_ReadBranchesRequest_Call) RunAndReturn(run func(branchFilter *conjurapi.BranchFilter) (*http.Request, error)) *MockClientV2_ReadBranchesRequest_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ReadGroup provides a mock function for the type MockClientV2
+func (_mock *MockClientV2) ReadGroup(s string) (*conjurapi.Group, error) {
+	ret := _mock.Called(s)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ReadGroup")
+	}
+
+	var r0 *conjurapi.Group
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(string) (*conjurapi.Group, error)); ok {
+		return returnFunc(s)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string) *conjurapi.Group); ok {
+		r0 = returnFunc(s)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*conjurapi.Group)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
+		r1 = returnFunc(s)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClientV2_ReadGroup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ReadGroup'
+type MockClientV2_ReadGroup_Call struct {
+	*mock.Call
+}
+
+// ReadGroup is a helper method to define mock.On call
+//   - s string
+func (_e *MockClientV2_Expecter) ReadGroup(s any) *MockClientV2_ReadGroup_Call {
+	return &MockClientV2_ReadGroup_Call{Call: _e.mock.On("ReadGroup", s)}
+}
+
+func (_c *MockClientV2_ReadGroup_Call) Run(run func(s string)) *MockClientV2_ReadGroup_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClientV2_ReadGroup_Call) Return(group *conjurapi.Group, err error) *MockClientV2_ReadGroup_Call {
+	_c.Call.Return(group, err)
+	return _c
+}
+
+func (_c *MockClientV2_ReadGroup_Call) RunAndReturn(run func(s string) (*conjurapi.Group, error)) *MockClientV2_ReadGroup_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ReadGroupRequest provides a mock function for the type MockClientV2
+func (_mock *MockClientV2) ReadGroupRequest(s string) (*http.Request, error) {
+	ret := _mock.Called(s)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ReadGroupRequest")
+	}
+
+	var r0 *http.Request
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(string) (*http.Request, error)); ok {
+		return returnFunc(s)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string) *http.Request); ok {
+		r0 = returnFunc(s)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*http.Request)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
+		r1 = returnFunc(s)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClientV2_ReadGroupRequest_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ReadGroupRequest'
+type MockClientV2_ReadGroupRequest_Call struct {
+	*mock.Call
+}
+
+// ReadGroupRequest is a helper method to define mock.On call
+//   - s string
+func (_e *MockClientV2_Expecter) ReadGroupRequest(s any) *MockClientV2_ReadGroupRequest_Call {
+	return &MockClientV2_ReadGroupRequest_Call{Call: _e.mock.On("ReadGroupRequest", s)}
+}
+
+func (_c *MockClientV2_ReadGroupRequest_Call) Run(run func(s string)) *MockClientV2_ReadGroupRequest_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClientV2_ReadGroupRequest_Call) Return(request *http.Request, err error) *MockClientV2_ReadGroupRequest_Call {
+	_c.Call.Return(request, err)
+	return _c
+}
+
+func (_c *MockClientV2_ReadGroupRequest_Call) RunAndReturn(run func(s string) (*http.Request, error)) *MockClientV2_ReadGroupRequest_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ReadGroups provides a mock function for the type MockClientV2
+func (_mock *MockClientV2) ReadGroups(groupFilter *conjurapi.GroupFilter) (conjurapi.GroupsResponse, error) {
+	ret := _mock.Called(groupFilter)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ReadGroups")
+	}
+
+	var r0 conjurapi.GroupsResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*conjurapi.GroupFilter) (conjurapi.GroupsResponse, error)); ok {
+		return returnFunc(groupFilter)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*conjurapi.GroupFilter) conjurapi.GroupsResponse); ok {
+		r0 = returnFunc(groupFilter)
+	} else {
+		r0 = ret.Get(0).(conjurapi.GroupsResponse)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*conjurapi.GroupFilter) error); ok {
+		r1 = returnFunc(groupFilter)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClientV2_ReadGroups_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ReadGroups'
+type MockClientV2_ReadGroups_Call struct {
+	*mock.Call
+}
+
+// ReadGroups is a helper method to define mock.On call
+//   - groupFilter *conjurapi.GroupFilter
+func (_e *MockClientV2_Expecter) ReadGroups(groupFilter any) *MockClientV2_ReadGroups_Call {
+	return &MockClientV2_ReadGroups_Call{Call: _e.mock.On("ReadGroups", groupFilter)}
+}
+
+func (_c *MockClientV2_ReadGroups_Call) Run(run func(groupFilter *conjurapi.GroupFilter)) *MockClientV2_ReadGroups_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *conjurapi.GroupFilter
+		if args[0] != nil {
+			arg0 = args[0].(*conjurapi.GroupFilter)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClientV2_ReadGroups_Call) Return(groupsResponse conjurapi.GroupsResponse, err error) *MockClientV2_ReadGroups_Call {
+	_c.Call.Return(groupsResponse, err)
+	return _c
+}
+
+func (_c *MockClientV2_ReadGroups_Call) RunAndReturn(run func(groupFilter *conjurapi.GroupFilter) (conjurapi.GroupsResponse, error)) *MockClientV2_ReadGroups_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ReadGroupsRequest provides a mock function for the type MockClientV2
+func (_mock *MockClientV2) ReadGroupsRequest(groupFilter *conjurapi.GroupFilter) (*http.Request, error) {
+	ret := _mock.Called(groupFilter)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ReadGroupsRequest")
+	}
+
+	var r0 *http.Request
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*conjurapi.GroupFilter) (*http.Request, error)); ok {
+		return returnFunc(groupFilter)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*conjurapi.GroupFilter) *http.Request); ok {
+		r0 = returnFunc(groupFilter)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*http.Request)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(*conjurapi.GroupFilter) error); ok {
+		r1 = returnFunc(groupFilter)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClientV2_ReadGroupsRequest_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ReadGroupsRequest'
+type MockClientV2_ReadGroupsRequest_Call struct {
+	*mock.Call
+}
+
+// ReadGroupsRequest is a helper method to define mock.On call
+//   - groupFilter *conjurapi.GroupFilter
+func (_e *MockClientV2_Expecter) ReadGroupsRequest(groupFilter any) *MockClientV2_ReadGroupsRequest_Call {
+	return &MockClientV2_ReadGroupsRequest_Call{Call: _e.mock.On("ReadGroupsRequest", groupFilter)}
+}
+
+func (_c *MockClientV2_ReadGroupsRequest_Call) Run(run func(groupFilter *conjurapi.GroupFilter)) *MockClientV2_ReadGroupsRequest_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *conjurapi.GroupFilter
+		if args[0] != nil {
+			arg0 = args[0].(*conjurapi.GroupFilter)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClientV2_ReadGroupsRequest_Call) Return(request *http.Request, err error) *MockClientV2_ReadGroupsRequest_Call {
+	_c.Call.Return(request, err)
+	return _c
+}
+
+func (_c *MockClientV2_ReadGroupsRequest_Call) RunAndReturn(run func(groupFilter *conjurapi.GroupFilter) (*http.Request, error)) *MockClientV2_ReadGroupsRequest_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -10601,6 +11218,136 @@ func (_c *MockClientV2_UpdateBranchRequest_Call) Return(request *http.Request, e
 }
 
 func (_c *MockClientV2_UpdateBranchRequest_Call) RunAndReturn(run func(s string, owner *conjurapi.Owner, stringToString map[string]string) (*http.Request, error)) *MockClientV2_UpdateBranchRequest_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateGroup provides a mock function for the type MockClientV2
+func (_mock *MockClientV2) UpdateGroup(group conjurapi.Group) (*conjurapi.Group, error) {
+	ret := _mock.Called(group)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateGroup")
+	}
+
+	var r0 *conjurapi.Group
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(conjurapi.Group) (*conjurapi.Group, error)); ok {
+		return returnFunc(group)
+	}
+	if returnFunc, ok := ret.Get(0).(func(conjurapi.Group) *conjurapi.Group); ok {
+		r0 = returnFunc(group)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*conjurapi.Group)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(conjurapi.Group) error); ok {
+		r1 = returnFunc(group)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClientV2_UpdateGroup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateGroup'
+type MockClientV2_UpdateGroup_Call struct {
+	*mock.Call
+}
+
+// UpdateGroup is a helper method to define mock.On call
+//   - group conjurapi.Group
+func (_e *MockClientV2_Expecter) UpdateGroup(group any) *MockClientV2_UpdateGroup_Call {
+	return &MockClientV2_UpdateGroup_Call{Call: _e.mock.On("UpdateGroup", group)}
+}
+
+func (_c *MockClientV2_UpdateGroup_Call) Run(run func(group conjurapi.Group)) *MockClientV2_UpdateGroup_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 conjurapi.Group
+		if args[0] != nil {
+			arg0 = args[0].(conjurapi.Group)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClientV2_UpdateGroup_Call) Return(group1 *conjurapi.Group, err error) *MockClientV2_UpdateGroup_Call {
+	_c.Call.Return(group1, err)
+	return _c
+}
+
+func (_c *MockClientV2_UpdateGroup_Call) RunAndReturn(run func(group conjurapi.Group) (*conjurapi.Group, error)) *MockClientV2_UpdateGroup_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateGroupRequest provides a mock function for the type MockClientV2
+func (_mock *MockClientV2) UpdateGroupRequest(s string, stringToString map[string]string) (*http.Request, error) {
+	ret := _mock.Called(s, stringToString)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateGroupRequest")
+	}
+
+	var r0 *http.Request
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(string, map[string]string) (*http.Request, error)); ok {
+		return returnFunc(s, stringToString)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string, map[string]string) *http.Request); ok {
+		r0 = returnFunc(s, stringToString)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*http.Request)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(string, map[string]string) error); ok {
+		r1 = returnFunc(s, stringToString)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClientV2_UpdateGroupRequest_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateGroupRequest'
+type MockClientV2_UpdateGroupRequest_Call struct {
+	*mock.Call
+}
+
+// UpdateGroupRequest is a helper method to define mock.On call
+//   - s string
+//   - stringToString map[string]string
+func (_e *MockClientV2_Expecter) UpdateGroupRequest(s any, stringToString any) *MockClientV2_UpdateGroupRequest_Call {
+	return &MockClientV2_UpdateGroupRequest_Call{Call: _e.mock.On("UpdateGroupRequest", s, stringToString)}
+}
+
+func (_c *MockClientV2_UpdateGroupRequest_Call) Run(run func(s string, stringToString map[string]string)) *MockClientV2_UpdateGroupRequest_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 map[string]string
+		if args[1] != nil {
+			arg1 = args[1].(map[string]string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClientV2_UpdateGroupRequest_Call) Return(request *http.Request, err error) *MockClientV2_UpdateGroupRequest_Call {
+	_c.Call.Return(request, err)
+	return _c
+}
+
+func (_c *MockClientV2_UpdateGroupRequest_Call) RunAndReturn(run func(s string, stringToString map[string]string) (*http.Request, error)) *MockClientV2_UpdateGroupRequest_Call {
 	_c.Call.Return(run)
 	return _c
 }

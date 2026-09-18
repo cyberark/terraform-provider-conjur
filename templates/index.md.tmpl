@@ -6,6 +6,7 @@ This provider manages authentication with CyberArk Secrets Manager, allowing Ter
 
 The provider can access the following Secrets Manager resources as data sources:
 - [conjur_secret](docs/data-sources/secret.md) (also available as [ephemeral resource](docs/ephemeral-resources/secret.md))
+- [conjur_secrets](docs/data-sources/secrets.md) (also available as [ephemeral resource](docs/ephemeral-resources/secrets.md))
 - [conjur_certificate_issue](docs/data-sources/certificate_issue.md) (requires Secrets Manager Saas with Certificate Manager integration)
 - [conjur_certificate_sign](docs/data-sources/certificate_sign.md) (requires Secrets Manager Saas with Certificate Manager integration)
 
@@ -115,6 +116,7 @@ It is usually granted implicitly assuming the above required privileges have bee
 | Data Source               | Required Privileges                  |
 |---------------------------|--------------------------------------|
 | conjur_secret             | execute on the secret                |
+| conjur_secrets            | execute on the secret                |
 | conjur_certificate_issue  | execute on the certificate issuer    |
 | conjur_certificate_sign   | execute on the certificate issuer    |
 

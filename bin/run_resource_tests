@@ -178,6 +178,13 @@ function test_resource_crud() {
         echo "FAILED: ${resource_name} write-only import command failed"
         return 1
       fi
+
+      echo "Step 2: Importing ${resource_name} resource test_secret2"
+      if ! terraform_exec "cd $test_dir/update && \
+        terraform import conjur_${resource_name}.imported_secret2 $import_id-2"; then
+        echo "FAILED: ${resource_name} test_secret2 import command failed"
+        return 1
+      fi
       
       # Verify that value_wo and value is NOT retrieved/stored in TF state when import succeeds
       echo "Verifying write-only attribute is not stored in state"

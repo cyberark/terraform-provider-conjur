@@ -550,6 +550,7 @@ func (p *providerImpl) createAPIKeyClient(config *conjurapi.Config, data *provid
 func (p *providerImpl) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		NewSecretDataSource,
+		NewSecretsDataSource,
 		NewCertificateIssueDataSource,
 		NewCertificateSignDataSource,
 	}
@@ -559,6 +560,7 @@ func (p *providerImpl) DataSources(_ context.Context) []func() datasource.DataSo
 func (p *providerImpl) EphemeralResources(_ context.Context) []func() ephemeral.EphemeralResource {
 	return []func() ephemeral.EphemeralResource{
 		NewEphemeralSecretResource,
+		NewEphemeralSecretsResource,
 	}
 }
 
