@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/cyberark/conjur-api-go/conjurapi"
@@ -49,7 +50,9 @@ type secretsModel struct {
 // avoid the two schemas silently diverging on accepted input.
 var namesListValidators = []validator.List{
 	listvalidator.SizeBetween(1, conjurapi.MaxSecretsInSingleBatch),
-	listvalidator.ValueStringsAre(stringvalidator.LengthAtLeast(1)),
+	listvalidator.ValueStringsAre(
+		stringvalidator.LengthAtLeast(1),
+		stringvalidator.RegexMatches(regexp.MustCompile(`\S`), "must not be empty or contain only whitespace")),
 	listvalidator.UniqueValues(),
 }
 
@@ -130,30 +133,40 @@ func batchRetrieveSecretsToMap(ctx context.Context, client api.ClientV2, config 
 
 	response, err := client.BatchRetrieveSecrets(names)
 	if err != nil {
-		diags.AddError("Failed to retrieve secrets", err.Error())
+		diags.AddError("Failed to retrieve secrets", serverErrorDetail(err))
+		return data, false
+	}
+	if response == nil {
+		diags.AddError("Failed to retrieve secrets", "empty response from server")
 		return data, false
 	}
 
-	// Default to hard-fail when unset, for parity with the single-secret conjur_secret data source.
-	failOnError := data.FailOnError.IsNull() || data.FailOnError.ValueBool()
+	failOnError := data.FailOnError.IsNull() || data.FailOnError.IsUnknown() || data.FailOnError.ValueBool()
 
 	if ok := checkForMismatch(names, response.Secrets, failOnError, diags); !ok {
 		return data, false
 	}
 
-	values := make(map[string]string, len(response.Secrets))
+	requested := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		requested[name] = struct{}{}
+	}
+
+	values := make(map[string]string, len(names))
 	for _, secret := range response.Secrets {
+		// values is keyed by the requested names, so callers can look up values[<name they requested>].
+		// IDs that don't match a requested name verbatim (e.g. normalized or qualified IDs) are
+		// dropped here; checkForMismatch reports them as unexpected and the requested names as missing.
+		if _, ok := requested[secret.ID]; !ok {
+			continue
+		}
 		if isSuccessStatus(secret.Status) {
-			// We rely on the batch API echoing each requested identifier back verbatim as
-			// secret.ID, so callers can look up values[<name they requested>]. If the server
-			// ever returns normalized/qualified IDs, these map keys would diverge from the
-			// requested names.
 			values[secret.ID] = secret.Value
 			continue
 		}
 
 		summary := fmt.Sprintf("Failed to retrieve secret %q (status %d)", secret.ID, secret.Status)
-		detail := secret.Description
+		detail := sanitizeServerText(secret.Description)
 		if detail == "" {
 			detail = fmt.Sprintf("Secret %q returned status %d", secret.ID, secret.Status)
 		}
@@ -177,22 +190,47 @@ func batchRetrieveSecretsToMap(ctx context.Context, client api.ClientV2, config 
 	return data, true
 }
 
-// checkForMismatch takes a list of requested names and the received ones from the response, and checks for any
-// requested secrets that are missing from the response. Depending on the failOnError value, either a warning (false)
-// or an error (true) will be added to the provided diagnostics if there is a mismatch. The message gives a short
-// summary of the issue and which secrets are missing from the response. Any extra secrets in the response are ignored.
-// The function returns false only if failOnError is true and a mismatch was found (resulting in an error added to the diagnostics).
-// In all other cases it returns true.
+// maxListedServerIDs caps how many server-supplied IDs are listed in a single diagnostic.
+const maxListedServerIDs = 10
+
+// checkForMismatch compares the requested names with the IDs in the response and adds diagnostics for:
+//   - duplicate IDs in the response: always an error, since it is ambiguous which entry to use;
+//   - requested secrets missing from the response: an error if failOnError is true, a warning otherwise;
+//   - IDs in the response that weren't requested: a warning (these secrets are never added to values).
+//
+// The function returns false if an error was added to the diagnostics, and true otherwise.
 func checkForMismatch(requestedNames []string, response []conjurapi.SecretValue, failOnError bool, diags *diag.Diagnostics) bool {
+	requested := make(map[string]struct{}, len(requestedNames))
+	for _, name := range requestedNames {
+		requested[name] = struct{}{}
+	}
+
 	responseSet := make(map[string]struct{}, len(response))
+	var duplicates, unexpected []string
 	for _, secret := range response {
+		if _, ok := responseSet[secret.ID]; ok {
+			duplicates = append(duplicates, secret.ID)
+			continue
+		}
 		responseSet[secret.ID] = struct{}{}
+		if _, ok := requested[secret.ID]; !ok {
+			unexpected = append(unexpected, secret.ID)
+		}
+	}
+
+	if len(duplicates) > 0 {
+		diags.AddError("Duplicate secrets in response", fmt.Sprintf("The response contains %d duplicate secret ID(s): %s", len(duplicates), formatServerIDs(duplicates)))
+		return false
+	}
+
+	if len(unexpected) > 0 {
+		diags.AddWarning("Unexpected secrets in response", fmt.Sprintf("The response contains %d secret(s) that weren't requested and were ignored: %s", len(unexpected), formatServerIDs(unexpected)))
 	}
 
 	var missing []string
 	for _, name := range requestedNames {
 		if _, ok := responseSet[name]; !ok {
-			missing = append(missing, name)
+			missing = append(missing, fmt.Sprintf("%q", name))
 		}
 	}
 
@@ -209,4 +247,18 @@ func checkForMismatch(requestedNames []string, response []conjurapi.SecretValue,
 	diags.AddWarning(summary, detail)
 
 	return true
+}
+
+// formatServerIDs formats server-supplied secret IDs for a diagnostic: each ID is sanitized and quoted, and
+// at most maxListedServerIDs are listed.
+func formatServerIDs(ids []string) string {
+	quoted := make([]string, 0, min(len(ids), maxListedServerIDs))
+	for _, id := range ids[:min(len(ids), maxListedServerIDs)] {
+		quoted = append(quoted, fmt.Sprintf("%q", sanitizeServerText(id)))
+	}
+	list := strings.Join(quoted, ", ")
+	if len(ids) > maxListedServerIDs {
+		list += fmt.Sprintf(" and %d more", len(ids)-maxListedServerIDs)
+	}
+	return list
 }

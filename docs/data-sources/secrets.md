@@ -10,6 +10,8 @@ description: |-
 
 Secrets from CyberArk Secrets Manager. Read using batch secret retrieval capabilities.
 
+~> **Note:** The retrieved secret values are stored **in plaintext** in the Terraform state (and in saved plan files). Marking `values` as sensitive only redacts it from CLI output. Unless you need the values to be persisted, use the [`conjur_secrets` ephemeral resource](../ephemeral-resources/secrets.md) (`ephemeral "conjur_secrets"`) instead, which never stores the values in state or plan files.
+
 ## Example Usage
 
 ```terraform
@@ -19,16 +21,6 @@ data "conjur_secrets" "batch" {
     "data/test/var-2",
     "data/test/var-3"
   ]
-  fail_on_error = false
-}
-
-ephemeral "conjur_secrets" "ephemeral_batch" {
-  names = [
-    "data/test/var-4",
-    "data/test/var-5",
-    "data/test/var-6"
-  ]
-  fail_on_error = true
 }
 ```
 

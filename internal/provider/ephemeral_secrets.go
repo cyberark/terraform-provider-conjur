@@ -6,7 +6,9 @@ import (
 	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api"
 	"github.com/hashicorp/terraform-plugin-framework/ephemeral"
 	"github.com/hashicorp/terraform-plugin-framework/ephemeral/schema"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
@@ -70,6 +72,19 @@ func (e *EphemeralSecretsResource) Configure(_ context.Context, req ephemeral.Co
 // Terraform operation and the values are NOT stored in state - they exist only
 // during the operation.
 func (e *EphemeralSecretsResource) Open(ctx context.Context, req ephemeral.OpenRequest, resp *ephemeral.OpenResponse) {
+	// When the client is not configured (e.g. provider credentials are unknown during plan), values
+	// must be unknown rather than null so that dependents are planned against an unknown map.
+	if e.client == nil {
+		if req.ClientCapabilities.DeferralAllowed {
+			resp.Result.Raw = tftypes.NewValue(resp.Result.Schema.Type().TerraformType(ctx), tftypes.UnknownValue)
+			resp.Deferred = &ephemeral.Deferred{Reason: ephemeral.DeferredReasonProviderConfigUnknown}
+			return
+		}
+		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
+		resp.Diagnostics.Append(resp.Result.SetAttribute(ctx, path.Root("values"), types.MapUnknown(types.StringType))...)
+		return
+	}
+
 	data, ok := batchRetrieveSecretsToMap(ctx, e.client, req.Config, &resp.Diagnostics)
 	if !ok {
 		return

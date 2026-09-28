@@ -3,9 +3,11 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/cyberark/conjur-api-go/conjurapi"
+	"github.com/cyberark/conjur-api-go/conjurapi/response"
 	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api/mocks"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -17,6 +19,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestSecretsDataSource_Read_NilClient verifies that when the provider is not configured
@@ -82,11 +85,15 @@ func TestSecretsDataSource_Read(t *testing.T) {
 			if tt.expectedWarning != "" {
 				assertWarningContains(t, resp.Diagnostics, tt.expectedWarning)
 			}
-			if !tt.expectedError {
+			if tt.expectedError {
+				assert.True(t, resp.State.Raw.IsNull(), "expected state to not be populated on error")
+			} else {
 				var result secretsModel
-				resp.State.Get(ctx, &result)
+				diags := resp.State.Get(ctx, &result)
+				require.False(t, diags.HasError(), diags)
 				gotValues := map[string]string{}
-				result.Values.ElementsAs(ctx, &gotValues, false)
+				diags = result.Values.ElementsAs(ctx, &gotValues, false)
+				require.False(t, diags.HasError(), diags)
 				assert.Equal(t, tt.expectedValues, gotValues)
 			}
 
@@ -190,6 +197,110 @@ func batchSecretsReadTestCases() []batchSecretsReadTestCase {
 			errorContains: "Failed to retrieve secrets",
 		},
 		{
+			name:  "nil response without error is surfaced",
+			names: []string{"db/user"},
+			setupMock: func(mockV2 *mocks.MockClientV2) {
+				mockV2.On("BatchRetrieveSecrets", []string{"db/user"}).Return(nil, nil)
+			},
+			expectedError: true,
+			errorContains: "empty response from server",
+		},
+		{
+			name:        "partial failure with fail_on_error unknown defaults to hard-fail",
+			names:       []string{"db/ok", "db/denied"},
+			failOnError: types.BoolUnknown(),
+			setupMock: func(mockV2 *mocks.MockClientV2) {
+				mockV2.On("BatchRetrieveSecrets", []string{"db/ok", "db/denied"}).Return(&conjurapi.BatchSecretResponse{
+					Secrets: []conjurapi.SecretValue{
+						{ID: "db/ok", Value: "v", Status: 200},
+						{ID: "db/denied", Status: 403, Description: "Forbidden"},
+					},
+				}, nil)
+			},
+			expectedError: true,
+			errorContains: "Failed to retrieve secret",
+		},
+		{
+			name:  "unrequested IDs in the response are not added to values",
+			names: []string{"db/user"},
+			setupMock: func(mockV2 *mocks.MockClientV2) {
+				mockV2.On("BatchRetrieveSecrets", []string{"db/user"}).Return(&conjurapi.BatchSecretResponse{
+					Secrets: []conjurapi.SecretValue{
+						{ID: "db/user", Value: "admin", Status: 200},
+						{ID: "db/extra", Value: "extra", Status: 200},
+					},
+				}, nil)
+			},
+			expectedWarning: "Unexpected secrets in response",
+			expectedValues:  map[string]string{"db/user": "admin"},
+		},
+		{
+			name:        "duplicate IDs in the response error even with fail_on_error false",
+			names:       []string{"db/user"},
+			failOnError: types.BoolValue(false),
+			setupMock: func(mockV2 *mocks.MockClientV2) {
+				mockV2.On("BatchRetrieveSecrets", []string{"db/user"}).Return(&conjurapi.BatchSecretResponse{
+					Secrets: []conjurapi.SecretValue{
+						{ID: "db/user", Value: "admin", Status: 200},
+						{ID: "db/user", Value: "injected", Status: 200},
+					},
+				}, nil)
+			},
+			expectedError: true,
+			errorContains: "Duplicate secrets in response",
+		},
+		{
+			name:        "success and failure for the same ID error even with fail_on_error false",
+			names:       []string{"db/user"},
+			failOnError: types.BoolValue(false),
+			setupMock: func(mockV2 *mocks.MockClientV2) {
+				mockV2.On("BatchRetrieveSecrets", []string{"db/user"}).Return(&conjurapi.BatchSecretResponse{
+					Secrets: []conjurapi.SecretValue{
+						{ID: "db/user", Value: "admin", Status: 200},
+						{ID: "db/user", Status: 403, Description: "Forbidden"},
+					},
+				}, nil)
+			},
+			expectedError: true,
+			errorContains: "Duplicate secrets in response",
+		},
+		{
+			name:  "top-level Conjur error includes the status and a sanitized, truncated message",
+			names: []string{"db/user"},
+			setupMock: func(mockV2 *mocks.MockClientV2) {
+				mockV2.On("BatchRetrieveSecrets", []string{"db/user"}).Return(nil, &response.ConjurError{Code: 502, Message: "<html>\x1b[31mBad Gateway\n" + strings.Repeat("x", 4096)})
+			},
+			expectedError: true,
+			errorContains: "status 502: <html> [31mBad Gateway " + strings.Repeat("x", maxServerTextLength-len("<html>\x1b[31mBad Gateway\n")) + "... (truncated)",
+		},
+		{
+			name:  "qualified IDs in the response with fail_on_error unset are a mismatch",
+			names: []string{"db/user"},
+			setupMock: func(mockV2 *mocks.MockClientV2) {
+				mockV2.On("BatchRetrieveSecrets", []string{"db/user"}).Return(&conjurapi.BatchSecretResponse{
+					Secrets: []conjurapi.SecretValue{
+						{ID: "conjur:variable:db/user", Value: "admin", Status: 200},
+					},
+				}, nil)
+			},
+			expectedError: true,
+			errorContains: "Mismatch between requested and retrieved secrets",
+		},
+		{
+			name:        "qualified IDs in the response with fail_on_error false warn and are not added to values",
+			names:       []string{"db/user"},
+			failOnError: types.BoolValue(false),
+			setupMock: func(mockV2 *mocks.MockClientV2) {
+				mockV2.On("BatchRetrieveSecrets", []string{"db/user"}).Return(&conjurapi.BatchSecretResponse{
+					Secrets: []conjurapi.SecretValue{
+						{ID: "conjur:variable:db/user", Value: "admin", Status: 200},
+					},
+				}, nil)
+			},
+			expectedWarning: "Mismatch between requested and retrieved secrets",
+			expectedValues:  map[string]string{},
+		},
+		{
 			name:        "count mismatch with fail_on_error false only warns",
 			names:       []string{"db/user", "db/password"},
 			failOnError: types.BoolValue(false),
@@ -270,23 +381,44 @@ func TestCheckForMismatch(t *testing.T) {
 			failOnError:     true,
 			expectedResult:  false,
 			expectedError:   true,
-			messageContains: "db/password",
+			messageContains: `"db/password"`,
 		},
 		{
-			name:            "fail_on_error true, same length with a mismatch adds an error",
+			name:            "fail_on_error true, same length with a mismatch adds an error and an unexpected-secret warning",
 			requestedNames:  []string{"db/user", "db/password"},
 			response:        response("db/user", "db/other"),
 			failOnError:     true,
 			expectedResult:  false,
 			expectedError:   true,
-			messageContains: "db/password",
+			expectedWarning: true,
+			messageContains: `"db/password"`,
 		},
 		{
-			name:           "fail_on_error true, more secrets than requested adds nothing",
-			requestedNames: []string{"db/user"},
-			response:       response("db/user", "db/extra"),
-			failOnError:    true,
-			expectedResult: true,
+			name:            "fail_on_error true, more secrets than requested adds a warning",
+			requestedNames:  []string{"db/user"},
+			response:        response("db/user", "db/extra"),
+			failOnError:     true,
+			expectedResult:  true,
+			expectedWarning: true,
+			messageContains: `"db/extra"`,
+		},
+		{
+			name:            "fail_on_error true, duplicate secrets add an error",
+			requestedNames:  []string{"db/user"},
+			response:        response("db/user", "db/user"),
+			failOnError:     true,
+			expectedResult:  false,
+			expectedError:   true,
+			messageContains: "Duplicate secrets in response",
+		},
+		{
+			name:            "unexpected secret IDs are sanitized and capped",
+			requestedNames:  []string{"db/user"},
+			response:        response("db/user", "a\x1b[31m\nb", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "e10", "e11"),
+			failOnError:     true,
+			expectedResult:  true,
+			expectedWarning: true,
+			messageContains: `12 secret(s) that weren't requested and were ignored: "a [31m b", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9" and 2 more`,
 		},
 		{
 			name:            "fail_on_error false, missing secret adds a warning",
@@ -295,7 +427,7 @@ func TestCheckForMismatch(t *testing.T) {
 			failOnError:     false,
 			expectedResult:  true,
 			expectedWarning: true,
-			messageContains: "db/password",
+			messageContains: `"db/password"`,
 		},
 		{
 			name:            "fail_on_error false, same length with a mismatch adds a warning",
@@ -304,14 +436,25 @@ func TestCheckForMismatch(t *testing.T) {
 			failOnError:     false,
 			expectedResult:  true,
 			expectedWarning: true,
-			messageContains: "db/password",
+			messageContains: `"db/password"`,
 		},
 		{
-			name:           "fail_on_error false, more secrets than requested adds nothing",
-			requestedNames: []string{"db/user"},
-			response:       response("db/user", "db/extra"),
-			failOnError:    false,
-			expectedResult: true,
+			name:            "fail_on_error false, more secrets than requested adds a warning",
+			requestedNames:  []string{"db/user"},
+			response:        response("db/user", "db/extra"),
+			failOnError:     false,
+			expectedResult:  true,
+			expectedWarning: true,
+			messageContains: `"db/extra"`,
+		},
+		{
+			name:            "fail_on_error false, duplicate secrets add an error",
+			requestedNames:  []string{"db/user"},
+			response:        response("db/user", "db/user"),
+			failOnError:     false,
+			expectedResult:  false,
+			expectedError:   true,
+			messageContains: "Duplicate secrets in response",
 		},
 	}
 
@@ -335,6 +478,71 @@ func TestCheckForMismatch(t *testing.T) {
 	}
 }
 
+// TestBatchRetrieveSecretsToMap_FailedEntryValueNeverLeaks verifies that the value carried by a failed
+// (non-2xx) entry never reaches the diagnostics or values, for both fail_on_error values.
+func TestBatchRetrieveSecretsToMap_FailedEntryValueNeverLeaks(t *testing.T) {
+	const canary = "leak-canary"
+
+	for _, failOnError := range []bool{true, false} {
+		t.Run(fmt.Sprintf("fail_on_error %t", failOnError), func(t *testing.T) {
+			mockV2 := mocks.NewMockClientV2(t)
+			mockV2.On("BatchRetrieveSecrets", []string{"db/ok", "db/denied"}).Return(&conjurapi.BatchSecretResponse{
+				Secrets: []conjurapi.SecretValue{
+					{ID: "db/ok", Value: "v", Status: 200},
+					{ID: "db/denied", Value: canary, Status: 403, Description: "Forbidden"},
+				},
+			}, nil)
+
+			ctx := context.Background()
+			config := tfsdk.Config{
+				Raw:    secretsBatchConfigValue([]string{"db/ok", "db/denied"}, types.BoolValue(failOnError)),
+				Schema: getSecretsDataSourceTestSchema(),
+			}
+			var diags diag.Diagnostics
+
+			data, ok := batchRetrieveSecretsToMap(ctx, mockV2, config, &diags)
+
+			assert.Equal(t, !failOnError, ok)
+			require.NotEmpty(t, diags)
+			for _, d := range diags {
+				assert.NotContains(t, d.Summary(), canary)
+				assert.NotContains(t, d.Detail(), canary)
+			}
+			if ok {
+				gotValues := map[string]string{}
+				require.False(t, data.Values.ElementsAs(ctx, &gotValues, false).HasError())
+				assert.Equal(t, map[string]string{"db/ok": "v"}, gotValues)
+			}
+		})
+	}
+}
+
+// TestBatchRetrieveSecretsToMap_DescriptionIsSanitized verifies that a server-supplied per-secret
+// description is stripped of control characters and truncated before it is placed into a diagnostic.
+func TestBatchRetrieveSecretsToMap_DescriptionIsSanitized(t *testing.T) {
+	mockV2 := mocks.NewMockClientV2(t)
+	mockV2.On("BatchRetrieveSecrets", []string{"db/denied"}).Return(&conjurapi.BatchSecretResponse{
+		Secrets: []conjurapi.SecretValue{
+			{ID: "db/denied", Status: 403, Description: "Forbidden\r\n\x1b[2J" + strings.Repeat("x", 4096)},
+		},
+	}, nil)
+
+	config := tfsdk.Config{
+		Raw:    secretsBatchConfigValue([]string{"db/denied"}, types.BoolNull()),
+		Schema: getSecretsDataSourceTestSchema(),
+	}
+	var diags diag.Diagnostics
+
+	_, ok := batchRetrieveSecretsToMap(context.Background(), mockV2, config, &diags)
+
+	assert.False(t, ok)
+	require.Len(t, diags.Errors(), 1)
+	detail := diags.Errors()[0].Detail()
+	assert.True(t, strings.HasPrefix(detail, "Forbidden   [2J"), detail)
+	assert.True(t, strings.HasSuffix(detail, "... (truncated)"), detail)
+	assert.Len(t, detail, maxServerTextLength+len("... (truncated)"))
+}
+
 // secretsBatchConfigValue builds a tftypes config value matching the shared batch secrets
 // schema (names/values/fail_on_error). values is computed, so it is null in config. It is
 // shared by the data source Read and ephemeral Open unit tests.
@@ -345,7 +553,9 @@ func secretsBatchConfigValue(names []string, failOnError types.Bool) tftypes.Val
 	}
 
 	failOnErrorVal := tftypes.NewValue(tftypes.Bool, nil)
-	if !failOnError.IsNull() {
+	if failOnError.IsUnknown() {
+		failOnErrorVal = tftypes.NewValue(tftypes.Bool, tftypes.UnknownValue)
+	} else if !failOnError.IsNull() {
 		failOnErrorVal = tftypes.NewValue(tftypes.Bool, failOnError.ValueBool())
 	}
 
@@ -387,6 +597,8 @@ func runNamesListValidators(t *testing.T, validators []validator.List) {
 		{name: "empty list", configValue: namesList(), expectError: true},
 		{name: "exceeds max batch size", configValue: namesListN(conjurapi.MaxSecretsInSingleBatch + 1), expectError: true},
 		{name: "empty string element", configValue: namesList("data/a", ""), expectError: true},
+		{name: "whitespace-only element", configValue: namesList("data/a", " \t\n"), expectError: true},
+		{name: "element with inner whitespace", configValue: namesList("data/my secret"), expectError: false},
 		{name: "duplicate elements", configValue: namesList("data/a", "data/a"), expectError: true},
 	}
 

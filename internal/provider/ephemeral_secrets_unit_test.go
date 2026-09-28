@@ -11,24 +11,60 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestEphemeralSecretsResource_Open_NilClient verifies that when the provider is not configured
-// (nil client) Open emits the "Provider client not configured" warning, does not error, and does
-// not populate the result - it returns before any BatchRetrieveSecrets call.
+// (nil client) Open emits the "Provider client not configured" warning, does not error, and returns
+// an unknown (not null) values map so dependents are planned as unknown - it returns before any
+// BatchRetrieveSecrets call.
 func TestEphemeralSecretsResource_Open_NilClient(t *testing.T) {
 	e := &EphemeralSecretsResource{}
 
 	testSchema := getEphemeralSecretsResourceTestSchema()
+	config := secretsBatchConfigValue([]string{"data/a"}, types.BoolNull())
 	req := ephemeral.OpenRequest{
 		Config: tfsdk.Config{
-			Raw:    secretsBatchConfigValue([]string{"data/a"}, types.BoolNull()),
+			Raw:    config,
 			Schema: testSchema,
 		},
 	}
 	resp := &ephemeral.OpenResponse{
 		Result: tfsdk.EphemeralResultData{
-			Raw:    tftypes.NewValue(tftypes.Object{}, nil),
+			Raw:    config.Copy(),
+			Schema: testSchema,
+		},
+	}
+
+	ctx := context.Background()
+	e.Open(ctx, req, resp)
+
+	assert.False(t, resp.Diagnostics.HasError(), "expected no error diagnostics, got: %v", resp.Diagnostics.Errors())
+	assertWarningContains(t, resp.Diagnostics, "Provider client not configured")
+	assert.Nil(t, resp.Deferred)
+	var result secretsModel
+	diags := resp.Result.Get(ctx, &result)
+	require.False(t, diags.HasError(), diags)
+	assert.True(t, result.Values.IsUnknown(), "expected values to be unknown")
+}
+
+// TestEphemeralSecretsResource_Open_NilClient_DeferralAllowed verifies that when the provider is not
+// configured and the client supports deferred actions, Open defers with an unknown result.
+func TestEphemeralSecretsResource_Open_NilClient_DeferralAllowed(t *testing.T) {
+	e := &EphemeralSecretsResource{}
+
+	testSchema := getEphemeralSecretsResourceTestSchema()
+	config := secretsBatchConfigValue([]string{"data/a"}, types.BoolNull())
+	req := ephemeral.OpenRequest{
+		Config: tfsdk.Config{
+			Raw:    config,
+			Schema: testSchema,
+		},
+		ClientCapabilities: ephemeral.OpenClientCapabilities{DeferralAllowed: true},
+	}
+	resp := &ephemeral.OpenResponse{
+		Result: tfsdk.EphemeralResultData{
+			Raw:    config.Copy(),
 			Schema: testSchema,
 		},
 	}
@@ -36,8 +72,9 @@ func TestEphemeralSecretsResource_Open_NilClient(t *testing.T) {
 	e.Open(context.Background(), req, resp)
 
 	assert.False(t, resp.Diagnostics.HasError(), "expected no error diagnostics, got: %v", resp.Diagnostics.Errors())
-	assertWarningContains(t, resp.Diagnostics, "Provider client not configured")
-	assert.True(t, resp.Result.Raw.IsNull(), "expected result to not be populated")
+	require.NotNil(t, resp.Deferred)
+	assert.Equal(t, ephemeral.DeferredReasonProviderConfigUnknown, resp.Deferred.Reason)
+	assert.False(t, resp.Result.Raw.IsKnown(), "expected result to be unknown")
 }
 
 // TestEphemeralSecretsResource_NamesValidators exercises the validators declared on the ephemeral
@@ -78,11 +115,15 @@ func TestEphemeralSecretsResource_Open(t *testing.T) {
 			if tt.expectedWarning != "" {
 				assertWarningContains(t, resp.Diagnostics, tt.expectedWarning)
 			}
-			if !tt.expectedError {
+			if tt.expectedError {
+				assert.True(t, resp.Result.Raw.IsNull(), "expected result to not be populated on error")
+			} else {
 				var result secretsModel
-				resp.Result.Get(ctx, &result)
+				diags := resp.Result.Get(ctx, &result)
+				require.False(t, diags.HasError(), diags)
 				gotValues := map[string]string{}
-				result.Values.ElementsAs(ctx, &gotValues, false)
+				diags = result.Values.ElementsAs(ctx, &gotValues, false)
+				require.False(t, diags.HasError(), diags)
 				assert.Equal(t, tt.expectedValues, gotValues)
 			}
 
