@@ -7,7 +7,6 @@ import (
 
 	"github.com/cyberark/conjur-api-go/conjurapi"
 	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api"
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -150,12 +149,7 @@ func (r *PolicyBranchResource) Create(ctx context.Context, req resource.CreateRe
 		Name:   leaf,
 	}
 
-	if !data.Owner.IsNull() && !data.Owner.IsUnknown() {
-		payload.Owner = &conjurapi.Owner{
-			Kind: data.Owner.Attributes()["kind"].(types.String).ValueString(),
-			Id:   data.Owner.Attributes()["id"].(types.String).ValueString(),
-		}
-	}
+	payload.Owner = ownerFromObject(data.Owner)
 
 	if anns := mapAsStringMap(ctx, data.Annotations, &resp.Diagnostics); len(anns) > 0 {
 		payload.Annotations = anns
@@ -296,24 +290,4 @@ func splitParentAndName(id string) (string, string) {
 		return "", id
 	}
 	return id[:idx], id[idx+1:]
-}
-
-func ownerToObject(owner *conjurapi.Owner) types.Object {
-	if owner == nil {
-		return types.ObjectNull(map[string]attr.Type{
-			"kind": types.StringType,
-			"id":   types.StringType,
-		})
-	}
-	obj, _ := types.ObjectValue(
-		map[string]attr.Type{
-			"kind": types.StringType,
-			"id":   types.StringType,
-		},
-		map[string]attr.Value{
-			"kind": types.StringValue(owner.Kind),
-			"id":   types.StringValue(owner.Id),
-		},
-	)
-	return obj
 }

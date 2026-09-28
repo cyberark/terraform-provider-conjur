@@ -3195,6 +3195,131 @@ func (_c *MockClientV2_DeleteGroup_Call) RunAndReturn(run func(s string) error) 
 	return _c
 }
 
+// DeleteGroupAnnotation provides a mock function for the type MockClientV2
+func (_mock *MockClientV2) DeleteGroupAnnotation(s string, s1 string) error {
+	ret := _mock.Called(s, s1)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteGroupAnnotation")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(string, string) error); ok {
+		r0 = returnFunc(s, s1)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockClientV2_DeleteGroupAnnotation_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteGroupAnnotation'
+type MockClientV2_DeleteGroupAnnotation_Call struct {
+	*mock.Call
+}
+
+// DeleteGroupAnnotation is a helper method to define mock.On call
+//   - s string
+//   - s1 string
+func (_e *MockClientV2_Expecter) DeleteGroupAnnotation(s any, s1 any) *MockClientV2_DeleteGroupAnnotation_Call {
+	return &MockClientV2_DeleteGroupAnnotation_Call{Call: _e.mock.On("DeleteGroupAnnotation", s, s1)}
+}
+
+func (_c *MockClientV2_DeleteGroupAnnotation_Call) Run(run func(s string, s1 string)) *MockClientV2_DeleteGroupAnnotation_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClientV2_DeleteGroupAnnotation_Call) Return(err error) *MockClientV2_DeleteGroupAnnotation_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockClientV2_DeleteGroupAnnotation_Call) RunAndReturn(run func(s string, s1 string) error) *MockClientV2_DeleteGroupAnnotation_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteGroupAnnotationRequest provides a mock function for the type MockClientV2
+func (_mock *MockClientV2) DeleteGroupAnnotationRequest(s string, s1 string) (*http.Request, error) {
+	ret := _mock.Called(s, s1)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteGroupAnnotationRequest")
+	}
+
+	var r0 *http.Request
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(string, string) (*http.Request, error)); ok {
+		return returnFunc(s, s1)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string, string) *http.Request); ok {
+		r0 = returnFunc(s, s1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*http.Request)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(string, string) error); ok {
+		r1 = returnFunc(s, s1)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClientV2_DeleteGroupAnnotationRequest_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteGroupAnnotationRequest'
+type MockClientV2_DeleteGroupAnnotationRequest_Call struct {
+	*mock.Call
+}
+
+// DeleteGroupAnnotationRequest is a helper method to define mock.On call
+//   - s string
+//   - s1 string
+func (_e *MockClientV2_Expecter) DeleteGroupAnnotationRequest(s any, s1 any) *MockClientV2_DeleteGroupAnnotationRequest_Call {
+	return &MockClientV2_DeleteGroupAnnotationRequest_Call{Call: _e.mock.On("DeleteGroupAnnotationRequest", s, s1)}
+}
+
+func (_c *MockClientV2_DeleteGroupAnnotationRequest_Call) Run(run func(s string, s1 string)) *MockClientV2_DeleteGroupAnnotationRequest_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClientV2_DeleteGroupAnnotationRequest_Call) Return(request *http.Request, err error) *MockClientV2_DeleteGroupAnnotationRequest_Call {
+	_c.Call.Return(request, err)
+	return _c
+}
+
+func (_c *MockClientV2_DeleteGroupAnnotationRequest_Call) RunAndReturn(run func(s string, s1 string) (*http.Request, error)) *MockClientV2_DeleteGroupAnnotationRequest_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteGroupRequest provides a mock function for the type MockClientV2
 func (_mock *MockClientV2) DeleteGroupRequest(s string) (*http.Request, error) {
 	ret := _mock.Called(s)

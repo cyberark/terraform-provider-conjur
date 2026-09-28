@@ -10,7 +10,17 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   (AWS issuer type).
 - Support for V2 batch secret retrieval via the `conjur_secrets` data source and ephemeral resource (SaaS only).
 ### Changed
-- Updated conjur-api-go to v0.15.9.
+- Updated conjur-api-go to v0.15.10.
+- `conjur_group` now updates `annotations` in place on Secrets Manager, SaaS instead of
+  replacing the group, so its role memberships and permission grants are preserved. Added and
+  changed keys are applied via a merging update and removed keys are deleted individually; a key
+  already absent on the server produces a warning instead of an error. On Self-Hosted and OSS any
+  `annotations` change still replaces the group.
+- `conjur_group` now rejects empty `annotations` keys at validation time.
+### Fixed
+- `conjur_group` no longer fails `terraform validate`/`plan` with "Value Conversion Error:
+  Received unknown value, however the target type cannot handle unknown values" when
+  `annotations` (or one of its values) can't be resolved until apply.
 
 ## [0.9.12] - 2026-09-10
 ### Fixed

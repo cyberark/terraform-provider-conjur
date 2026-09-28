@@ -15,7 +15,7 @@ terraform {
 }
 
 provider "conjur" {
-  # Login and api_key are passed thorugh environmental variables
+  # Login and api_key are passed through environmental variables
   appliance_url = var.conjur_appliance_url
   account       = var.conjur_account
   authn_type    = var.conjur_authn_type
@@ -27,10 +27,10 @@ resource "conjur_group" "test_group" {
   branch = "data/terraform/test"
   annotations = {
     note = "UPDATED Group provisioned by Terraform",
-    key2 = "value2"
+    key3 = "value3"
   }
 }
 
 output "update_status" {
-  value = conjur_group.test_group.annotations.note == "UPDATED Group provisioned by Terraform" ? "success" : "fail"
+  value = conjur_group.test_group.annotations.note == "UPDATED Group provisioned by Terraform" && !contains(keys(conjur_group.test_group.annotations), "key2") && lookup(conjur_group.test_group.annotations, "key3", "") == "value3" ? "success" : "fail"
 }

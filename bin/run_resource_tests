@@ -3,6 +3,12 @@ set -eo pipefail
 
 source "$(git rev-parse --show-toplevel)/bin/utils.sh"
 
+# Optional Step 3 plan assertion: when EXPECTED_UPDATE_ADDRESS is set, the update plan's actions for that
+# resource address must equal EXPECTED_UPDATE_ACTIONS (compact JSON, e.g. '["update"]'), and a follow-up
+# plan after apply must report no changes. Callers set both around a single test and reset them afterwards.
+EXPECTED_UPDATE_ADDRESS=""
+EXPECTED_UPDATE_ACTIONS=""
+
 # Note - this script must be executed from the main script (bin/test) so the environment is pre-configured
 function main() {
   generate_random_values
@@ -18,9 +24,18 @@ function main() {
     test_resource_crud "tests/resources/authenticator" "authenticator" "name" "jwt:$TF_VAR_conjur_authenticator_name"
     test_results+=("Authenticator|$?")
 
+    # Secrets Manager SaaS updates group annotations in place; Self-Hosted/OSS must replace the group.
     echo ">> Running Group CRUD test"
+    EXPECTED_UPDATE_ADDRESS="conjur_group.test_group"
+    if [[ "$TARGET" == "cloud" ]]; then
+      EXPECTED_UPDATE_ACTIONS='["update"]'
+    else
+      EXPECTED_UPDATE_ACTIONS='["delete","create"]'
+    fi
     test_resource_crud "tests/resources/group" "group" "name"
     test_results+=("Group|$?")
+    EXPECTED_UPDATE_ADDRESS=""
+    EXPECTED_UPDATE_ACTIONS=""
 
     echo ">> Running Group Membership CRUD test"
     test_resource_crud "tests/resources/membership" "membership" "id" "data/terraform/consumers:host:data/terraform/test/test-workload"
@@ -210,7 +225,37 @@ function test_resource_crud() {
   fi
 
   # Step 3: Update the Resource
-  if ! terraform_exec "cd $test_dir/update && \
+  if [[ -n "$EXPECTED_UPDATE_ADDRESS" ]]; then
+    if ! terraform_exec "cd $test_dir/update && \
+      terraform validate && \
+      terraform plan -out=tfplan"; then
+      echo "FAILED: ${resource_name} update plan failed"
+      return 1
+    fi
+
+    if ! planned_actions=$(terraform_exec "cd $test_dir/update && \
+      terraform show -json tfplan | jq -c '.resource_changes[] | select(.address == \"$EXPECTED_UPDATE_ADDRESS\") | .change.actions'"); then
+      echo "FAILED: ${resource_name} could not read planned actions for $EXPECTED_UPDATE_ADDRESS"
+      return 1
+    fi
+    if [[ "$planned_actions" != "$EXPECTED_UPDATE_ACTIONS" ]]; then
+      echo "FAILED: ${resource_name} update planned actions for $EXPECTED_UPDATE_ADDRESS were '$planned_actions', expected '$EXPECTED_UPDATE_ACTIONS'"
+      return 1
+    fi
+    echo "${resource_name} update planned actions for $EXPECTED_UPDATE_ADDRESS: $planned_actions"
+
+    if ! terraform_exec "cd $test_dir/update && terraform apply -auto-approve tfplan"; then
+      echo "FAILED: ${resource_name} update command failed"
+      return 1
+    fi
+
+    local replan_exit_code=0
+    terraform_exec "cd $test_dir/update && terraform plan -detailed-exitcode" || replan_exit_code=$?
+    if [[ "$replan_exit_code" -ne 0 ]]; then
+      echo "FAILED: ${resource_name} plan after update was not empty (terraform plan -detailed-exitcode returned $replan_exit_code)"
+      return 1
+    fi
+  elif ! terraform_exec "cd $test_dir/update && \
     terraform validate && \
     terraform plan && \
     terraform apply -auto-approve"; then
@@ -256,7 +301,7 @@ function generate_random_values() {
 function cleanup_terraform() {
   local test_dir="$1"
   terraform_exec "cd $test_dir/create && rm -rf .terraform* terraform.tfstate*"
-  terraform_exec "cd $test_dir/update && rm -rf .terraform* terraform.tfstate*"
+  terraform_exec "cd $test_dir/update && rm -rf .terraform* terraform.tfstate* tfplan"
 }
 
 function report_test_results() {

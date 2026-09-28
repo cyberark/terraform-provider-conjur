@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/cyberark/conjur-api-go/conjurapi"
 	"github.com/doodlesbykumbi/conjur-policy-go/pkg/conjurpolicy"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -39,7 +40,7 @@ func TestGroupResource_generateGroupPolicy(t *testing.T) {
 		data := &GroupResourceModel{
 			Name:        types.StringValue("test-group"),
 			Branch:      types.StringValue("data"),
-			Owner:       nil,
+			Owner:       types.ObjectNull(groupOwnerAttrTypes),
 			Annotations: nil,
 		}
 
@@ -55,10 +56,10 @@ func TestGroupResource_generateGroupPolicy(t *testing.T) {
 		data := &GroupResourceModel{
 			Name:   types.StringValue("test-group"),
 			Branch: types.StringValue("data/production"),
-			Owner: &OwnerModel{
-				Kind: types.StringValue("group"),
-				ID:   types.StringValue("jenkins-admins"),
-			},
+			Owner: ownerToObject(&conjurapi.Owner{
+				Kind: "group",
+				Id:   "jenkins-admins",
+			}),
 			Annotations: map[string]string{
 				"environment": "production",
 				"team":        "security",
@@ -172,10 +173,10 @@ func TestGenerateGroupPolicy_YAMLInjection(t *testing.T) {
 			}
 
 			if tc.ownerKind != "" || tc.ownerID != "" {
-				data.Owner = &OwnerModel{
-					Kind: types.StringValue(tc.ownerKind),
-					ID:   types.StringValue(tc.ownerID),
-				}
+				data.Owner = ownerToObject(&conjurapi.Owner{
+					Kind: tc.ownerKind,
+					Id:   tc.ownerID,
+				})
 			}
 
 			if tc.annotations != nil {

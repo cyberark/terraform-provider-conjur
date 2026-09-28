@@ -46,6 +46,18 @@ func TestValidateBranch(t *testing.T) {
 			fieldName: "branch",
 			wantError: true,
 		},
+		{
+			name:      "only slash",
+			branch:    "/",
+			fieldName: "branch",
+			wantError: true,
+		},
+		{
+			name:      "whitespace only",
+			branch:    "   ",
+			fieldName: "branch",
+			wantError: true,
+		},
 	}
 
 	for _, tt := range tests {

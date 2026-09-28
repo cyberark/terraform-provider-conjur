@@ -9,6 +9,14 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
+// normalizeBranch is the single source of truth for turning a configured
+// branch into the form sent to Conjur APIs: stray whitespace (e.g. from an
+// interpolated variable) and leading/trailing slashes are stripped so the
+// value actually sent always matches what ValidateBranch accepted.
+func normalizeBranch(branch string) string {
+	return strings.Trim(strings.TrimSpace(branch), "/")
+}
+
 // ValidateBranch validates that a branch path is properly formatted with no empty segments.
 func ValidateBranch(branch types.String, diagnostics *diag.Diagnostics, fieldName string) {
 	if diagnostics == nil {
@@ -17,7 +25,7 @@ func ValidateBranch(branch types.String, diagnostics *diag.Diagnostics, fieldNam
 
 	branchValue := branch.ValueString()
 
-	normalized := strings.Trim(branchValue, "/")
+	normalized := normalizeBranch(branchValue)
 	if normalized != "" {
 		parts := strings.Split(normalized, "/")
 		if slices.Contains(parts, "") {
