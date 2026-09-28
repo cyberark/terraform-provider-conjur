@@ -2,17 +2,23 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
+	"strings"
 	"testing"
+	"unicode"
 
 	"github.com/cyberark/conjur-api-go/conjurapi"
 	"github.com/cyberark/conjur-api-go/conjurapi/response"
 	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api/mocks"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -115,11 +121,16 @@ func TestAWSIssuerDataFromMap(t *testing.T) {
 }
 
 // TestParseIssuerResponse verifies that parseIssuerResponse maps the ID, MaxTTL and the
-// created_at/modified_at timestamps onto the model, and populates data.AWS only for aws-type
-// issuers (setting it to nil otherwise).
+// created_at/modified_at timestamps onto the model, populates data.AWS for aws-type issuers, and
+// rejects responses that are for another issuer, out of range, incomplete or of an unsupported type.
 func TestParseIssuerResponse(t *testing.T) {
+	validAWSData := map[string]any{
+		"access_key_id_secret_ref":     map[string]any{"id": "data/aws/key"},
+		"secret_access_key_secret_ref": map[string]any{"id": "data/aws/secret"},
+	}
 	tests := []struct {
 		name          string
+		requestedID   string // defaults to issuer.ID
 		issuer        conjurapi.Issuer
 		expectAWS     bool
 		expectedKeyID string
@@ -162,12 +173,59 @@ func TestParseIssuerResponse(t *testing.T) {
 			expectError:   true,
 			errorContains: "unsupported issuer type",
 		},
+		{
+			name:          "response for another issuer ID is rejected",
+			requestedID:   "my-issuer",
+			issuer:        conjurapi.Issuer{ID: "other-issuer", MaxTTL: 3600, Type: "aws", Data: validAWSData},
+			expectError:   true,
+			errorContains: `the response is for issuer ID "other-issuer" instead of the requested "my-issuer"`,
+		},
+		{
+			name:          "response with an empty issuer ID is rejected",
+			requestedID:   "my-issuer",
+			issuer:        conjurapi.Issuer{ID: "", MaxTTL: 3600, Type: "aws", Data: validAWSData},
+			expectError:   true,
+			errorContains: `the response is for issuer ID "" instead of the requested "my-issuer"`,
+		},
+		{
+			name:          "max_ttl above the int32 range is rejected",
+			issuer:        conjurapi.Issuer{ID: "my-issuer", MaxTTL: math.MaxInt32 + 1, Type: "aws", Data: validAWSData},
+			expectError:   true,
+			errorContains: "out of range",
+		},
+		{
+			name:          "max_ttl below the int32 range is rejected",
+			issuer:        conjurapi.Issuer{ID: "my-issuer", MaxTTL: math.MinInt32 - 1, Type: "aws", Data: validAWSData},
+			expectError:   true,
+			errorContains: "out of range",
+		},
+		{
+			name: "empty access key ID secret ref is rejected",
+			issuer: conjurapi.Issuer{ID: "my-issuer", MaxTTL: 3600, Type: "aws", Data: map[string]any{
+				"access_key_id_secret_ref":     map[string]any{"id": ""},
+				"secret_access_key_secret_ref": map[string]any{"id": "data/aws/secret"},
+			}},
+			expectError:   true,
+			errorContains: "missing the AWS secret refs",
+		},
+		{
+			name: "missing secret access key secret ref is rejected",
+			issuer: conjurapi.Issuer{ID: "my-issuer", MaxTTL: 3600, Type: "aws", Data: map[string]any{
+				"access_key_id_secret_ref": map[string]any{"id": "data/aws/key"},
+			}},
+			expectError:   true,
+			errorContains: "missing the AWS secret refs",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &IssuerResource{}
-			var data IssuerResourceModel
+			requestedID := tt.requestedID
+			if requestedID == "" {
+				requestedID = tt.issuer.ID
+			}
+			data := IssuerResourceModel{Id: types.StringValue(requestedID)}
 
 			err := r.parseIssuerResponse(context.Background(), tt.issuer, &data)
 			if tt.expectError {
@@ -276,12 +334,13 @@ func TestIssuerResource_Create(t *testing.T) {
 func TestIssuerResource_Read(t *testing.T) {
 	maxTTL := 3600
 	tests := []struct {
-		name          string
-		data          IssuerResourceModel
-		setupMock     func(*mocks.MockClientV2)
-		expectError   bool
-		errorContains string
-		expectRemoved bool
+		name            string
+		data            IssuerResourceModel
+		setupMock       func(*mocks.MockClientV2)
+		expectError     bool
+		errorContains   string
+		expectRemoved   bool
+		warningContains string
 	}{
 		{
 			name: "successful read",
@@ -311,7 +370,61 @@ func TestIssuerResource_Read(t *testing.T) {
 			setupMock: func(m *mocks.MockClientV2) {
 				m.On("Issuer", "gone").Return(conjurapi.Issuer{}, &response.ConjurError{Code: http.StatusNotFound})
 			},
-			expectRemoved: true,
+			expectRemoved:   true,
+			warningContains: "Issuer Not Found",
+		},
+		{
+			name: "wrapped not found error - removes from state",
+			data: IssuerResourceModel{Id: types.StringValue("gone"), MaxTTL: types.Int32Value(int32(maxTTL)), AWS: awsTestObject("x", "y")},
+			setupMock: func(m *mocks.MockClientV2) {
+				m.On("Issuer", "gone").Return(conjurapi.Issuer{}, fmt.Errorf("reading issuer: %w", &response.ConjurError{Code: http.StatusNotFound}))
+			},
+			expectRemoved:   true,
+			warningContains: "Issuer Not Found",
+		},
+		{
+			name: "unauthorized is a hard error",
+			data: IssuerResourceModel{Id: types.StringValue("my-issuer"), MaxTTL: types.Int32Value(int32(maxTTL)), AWS: awsTestObject("x", "y")},
+			setupMock: func(m *mocks.MockClientV2) {
+				m.On("Issuer", "my-issuer").Return(conjurapi.Issuer{}, &response.ConjurError{Code: http.StatusUnauthorized, Message: "Unauthorized"})
+			},
+			expectError:   true,
+			errorContains: "status 401: Unauthorized",
+		},
+		{
+			name: "forbidden is a hard error",
+			data: IssuerResourceModel{Id: types.StringValue("my-issuer"), MaxTTL: types.Int32Value(int32(maxTTL)), AWS: awsTestObject("x", "y")},
+			setupMock: func(m *mocks.MockClientV2) {
+				m.On("Issuer", "my-issuer").Return(conjurapi.Issuer{}, &response.ConjurError{Code: http.StatusForbidden, Message: "Forbidden"})
+			},
+			expectError:   true,
+			errorContains: "status 403: Forbidden",
+		},
+		{
+			name: "internal server error is a hard error",
+			data: IssuerResourceModel{Id: types.StringValue("my-issuer"), MaxTTL: types.Int32Value(int32(maxTTL)), AWS: awsTestObject("x", "y")},
+			setupMock: func(m *mocks.MockClientV2) {
+				m.On("Issuer", "my-issuer").Return(conjurapi.Issuer{}, &response.ConjurError{Code: http.StatusInternalServerError, Message: "Internal Server Error"})
+			},
+			expectError:   true,
+			errorContains: "status 500: Internal Server Error",
+		},
+		{
+			// The state must keep the requested ID: writing the server's ID would make a later
+			// replacement delete an issuer the configuration never referenced.
+			name: "response for another issuer ID does not overwrite the state",
+			data: IssuerResourceModel{Id: types.StringValue("my-issuer"), MaxTTL: types.Int32Value(int32(maxTTL)), AWS: awsTestObject("data/aws/key", "data/aws/secret")},
+			setupMock: func(m *mocks.MockClientV2) {
+				m.On("Issuer", "my-issuer").Return(conjurapi.Issuer{
+					ID: "other-issuer", MaxTTL: maxTTL, Type: "aws",
+					Data: map[string]any{
+						"access_key_id_secret_ref":     map[string]any{"id": "data/aws/key"},
+						"secret_access_key_secret_ref": map[string]any{"id": "data/aws/secret"},
+					},
+				}, nil)
+			},
+			expectError:   true,
+			errorContains: "Unable to parse read issuer response",
 		},
 	}
 
@@ -322,14 +435,21 @@ func TestIssuerResource_Read(t *testing.T) {
 			r := &IssuerResource{client: mockV2}
 
 			req := resource.ReadRequest{State: tfsdk.State{Raw: tftypes.NewValue(tftypes.Object{}, nil), Schema: getIssuerTestSchema()}}
-			resp := &resource.ReadResponse{State: tfsdk.State{Raw: tftypes.NewValue(tftypes.Object{}, nil), Schema: getIssuerTestSchema()}}
 			req.State.Set(context.Background(), &tt.data)
+			// The framework seeds the response state with the prior state.
+			resp := &resource.ReadResponse{State: tfsdk.State{Raw: req.State.Raw.Copy(), Schema: getIssuerTestSchema()}}
 
 			r.Read(context.Background(), req, resp)
 
 			assertDiagOutcome(t, resp.Diagnostics, tt.expectError, tt.errorContains)
-			if tt.expectRemoved {
-				assert.True(t, resp.State.Raw.IsNull())
+			assert.Equal(t, tt.expectRemoved, resp.State.Raw.IsNull())
+			if tt.warningContains != "" {
+				assertWarningContains(t, resp.Diagnostics, tt.warningContains)
+			}
+			if tt.expectError {
+				var state IssuerResourceModel
+				require.False(t, resp.State.Get(context.Background(), &state).HasError())
+				assert.Equal(t, tt.data, state, "state must be left untouched on error")
 			}
 			mockV2.AssertExpectations(t)
 		})
@@ -392,6 +512,15 @@ func TestIssuerResource_Update(t *testing.T) {
 			expectError:   true,
 			errorContains: "Exactly one issuer type block must be specified",
 		},
+		{
+			// max_ttl was unknown at plan time (so ModifyPlan skipped the check) and resolved to a
+			// lower value than the current one by apply.
+			name:          "max_ttl resolving to a decrease is rejected",
+			data:          IssuerResourceModel{Id: types.StringValue("my-issuer"), MaxTTL: types.Int32Value(1800), AWS: awsTestObject("data/aws/key", "data/aws/secret")},
+			setupMock:     func(m *mocks.MockClientV2) {},
+			expectError:   true,
+			errorContains: "max_ttl cannot be decreased (current: 3600, new: 1800)",
+		},
 	}
 
 	for _, tt := range tests {
@@ -400,9 +529,10 @@ func TestIssuerResource_Update(t *testing.T) {
 			tt.setupMock(mockV2)
 			r := &IssuerResource{client: mockV2}
 
-			req := resource.UpdateRequest{Plan: tfsdk.Plan{Raw: tftypes.NewValue(tftypes.Object{}, nil), Schema: getIssuerTestSchema()}}
+			req := resource.UpdateRequest{Plan: tfsdk.Plan{Raw: tftypes.NewValue(tftypes.Object{}, nil), Schema: getIssuerTestSchema()}, State: tfsdk.State{Raw: tftypes.NewValue(tftypes.Object{}, nil), Schema: getIssuerTestSchema()}}
 			resp := &resource.UpdateResponse{State: tfsdk.State{Raw: tftypes.NewValue(tftypes.Object{}, nil), Schema: getIssuerTestSchema()}}
 			req.Plan.Set(context.Background(), &tt.data)
+			req.State.Set(context.Background(), &IssuerResourceModel{Id: tt.data.Id, MaxTTL: types.Int32Value(3600), AWS: awsTestObject("data/aws/key", "data/aws/secret")})
 
 			r.Update(context.Background(), req, resp)
 
@@ -444,6 +574,42 @@ func TestIssuerResource_Delete(t *testing.T) {
 			expectWarning:   true,
 			warningContains: "Issuer Not Found",
 		},
+		{
+			name: "wrapped not found error only raises a warning",
+			data: IssuerResourceModel{Id: types.StringValue("gone-issuer"), MaxTTL: types.Int32Value(int32(maxTTL)), AWS: awsTestObject("x", "y")},
+			setupMock: func(m *mocks.MockClientV2) {
+				m.On("DeleteIssuer", "gone-issuer", true).Return(fmt.Errorf("deleting issuer: %w", &response.ConjurError{Code: http.StatusNotFound}))
+			},
+			expectWarning:   true,
+			warningContains: "Issuer Not Found",
+		},
+		{
+			name: "unauthorized is a hard error",
+			data: IssuerResourceModel{Id: types.StringValue("my-issuer"), MaxTTL: types.Int32Value(int32(maxTTL)), AWS: awsTestObject("x", "y")},
+			setupMock: func(m *mocks.MockClientV2) {
+				m.On("DeleteIssuer", "my-issuer", true).Return(&response.ConjurError{Code: http.StatusUnauthorized, Message: "Unauthorized"})
+			},
+			expectError:   true,
+			errorContains: "status 401: Unauthorized",
+		},
+		{
+			name: "forbidden is a hard error",
+			data: IssuerResourceModel{Id: types.StringValue("my-issuer"), MaxTTL: types.Int32Value(int32(maxTTL)), AWS: awsTestObject("x", "y")},
+			setupMock: func(m *mocks.MockClientV2) {
+				m.On("DeleteIssuer", "my-issuer", true).Return(&response.ConjurError{Code: http.StatusForbidden, Message: "Forbidden"})
+			},
+			expectError:   true,
+			errorContains: "status 403: Forbidden",
+		},
+		{
+			name: "internal server error is a hard error",
+			data: IssuerResourceModel{Id: types.StringValue("my-issuer"), MaxTTL: types.Int32Value(int32(maxTTL)), AWS: awsTestObject("x", "y")},
+			setupMock: func(m *mocks.MockClientV2) {
+				m.On("DeleteIssuer", "my-issuer", true).Return(&response.ConjurError{Code: http.StatusInternalServerError, Message: "Internal Server Error"})
+			},
+			expectError:   true,
+			errorContains: "status 500: Internal Server Error",
+		},
 	}
 
 	for _, tt := range tests {
@@ -477,6 +643,7 @@ func TestIssuerResource_ModifyPlan(t *testing.T) {
 		planMaxTTL        int32
 		stateMaxTTL       int32
 		planMaxTTLUnknown bool
+		stateMaxTTLNull   bool
 		isCreate          bool
 		isDestroy         bool
 		expectError       bool
@@ -488,6 +655,7 @@ func TestIssuerResource_ModifyPlan(t *testing.T) {
 		{name: "rename with lower max_ttl is allowed (replacement)", planId: "renamed-issuer", stateId: "my-issuer", planMaxTTL: 900, stateMaxTTL: 7200},
 		{name: "rename with higher max_ttl is allowed", planId: "renamed-issuer", stateId: "my-issuer", planMaxTTL: 9000, stateMaxTTL: 3600},
 		{name: "unknown max_ttl is deferred to apply", planMaxTTLUnknown: true, stateMaxTTL: 7200},
+		{name: "null state max_ttl (imported, not yet refreshed) is allowed", planMaxTTL: 900, stateMaxTTLNull: true},
 		{name: "create (null state) is skipped", planMaxTTL: 900, isCreate: true},
 		{name: "destroy (null plan) is skipped", stateMaxTTL: 3600, isDestroy: true},
 	}
@@ -507,6 +675,9 @@ func TestIssuerResource_ModifyPlan(t *testing.T) {
 					stateModel.Id = types.StringValue(tt.stateId)
 				}
 				stateModel.MaxTTL = types.Int32Value(tt.stateMaxTTL)
+				if tt.stateMaxTTLNull {
+					stateModel = IssuerResourceModel{Id: stateModel.Id, MaxTTL: types.Int32Null(), AWS: types.ObjectNull(awsIssuerAttrTypes)}
+				}
 				req.State.Set(context.Background(), &stateModel)
 			}
 			if !tt.isDestroy {
@@ -599,6 +770,291 @@ func TestIssuerResource_ValidateConfig(t *testing.T) {
 			assertDiagOutcome(t, resp.Diagnostics, tt.expectError, tt.errorContains)
 		})
 	}
+}
+
+// TestIssuerResource_IDValidator verifies that the id schema validators reject IDs that would be
+// unsafe in the API path (dot segments, slashes, query strings, whitespace) or empty.
+func TestIssuerResource_IDValidator(t *testing.T) {
+	tests := []struct {
+		name        string
+		id          string
+		expectError bool
+	}{
+		{name: "letters, digits, +, - and _ are accepted", id: "my-issuer_1+x"},
+		{name: "dot segment is rejected", id: ".", expectError: true},
+		{name: "parent dot segment is rejected", id: "..", expectError: true},
+		{name: "slash is rejected", id: "a/b", expectError: true},
+		{name: "space is rejected", id: "a b", expectError: true},
+		{name: "query string is rejected", id: "a?x=1", expectError: true},
+		{name: "empty ID is rejected", id: "", expectError: true},
+	}
+
+	idAttr, ok := getIssuerTestSchema().Attributes["id"].(schema.StringAttribute)
+	require.True(t, ok)
+	require.NotEmpty(t, idAttr.Validators)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := validator.StringRequest{Path: path.Root("id"), ConfigValue: types.StringValue(tt.id)}
+			var diags diag.Diagnostics
+			for _, v := range idAttr.Validators {
+				resp := &validator.StringResponse{}
+				v.ValidateString(context.Background(), req, resp)
+				diags.Append(resp.Diagnostics...)
+			}
+
+			assertDiagOutcome(t, diags, tt.expectError, issuerIDPatternDescription)
+		})
+	}
+}
+
+func TestIssuerResource_ImportState(t *testing.T) {
+	tests := []struct {
+		name        string
+		id          string
+		expectError bool
+	}{
+		{name: "valid ID is imported", id: "my-issuer_1+x"},
+		{name: "dot segment is rejected", id: ".", expectError: true},
+		{name: "parent dot segment is rejected", id: "..", expectError: true},
+		{name: "slash is rejected", id: "a/b", expectError: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &IssuerResource{}
+			req := resource.ImportStateRequest{ID: tt.id}
+			resp := &resource.ImportStateResponse{State: tfsdk.State{Raw: tftypes.NewValue(getIssuerTestSchema().Type().TerraformType(context.Background()), nil), Schema: getIssuerTestSchema()}}
+
+			r.ImportState(context.Background(), req, resp)
+
+			assertDiagOutcome(t, resp.Diagnostics, tt.expectError, "Invalid import ID")
+			if tt.expectError {
+				assert.True(t, resp.State.Raw.IsNull(), "state must not be set for a rejected import ID")
+				return
+			}
+			var id types.String
+			require.False(t, resp.State.GetAttribute(context.Background(), path.Root("id"), &id).HasError())
+			assert.Equal(t, tt.id, id.ValueString())
+		})
+	}
+}
+
+// TestIssuerResource_Create_ParseFailureAddsReconcileHint verifies that when CreateIssuer succeeds
+// but its response can't be used, no state is saved and the error tells the user to reconcile the
+// untracked issuer in Secrets Manager.
+func TestIssuerResource_Create_ParseFailureAddsReconcileHint(t *testing.T) {
+	var decoded conjurapi.Issuer
+	syntaxErr := json.Unmarshal([]byte("<html>"), &decoded)
+	typeErr := json.Unmarshal([]byte(`{"max_ttl":"x"}`), &decoded)
+	tests := []struct {
+		name          string
+		created       conjurapi.Issuer
+		createErr     error
+		errorContains string
+	}{
+		{
+			name:          "response body is not JSON",
+			createErr:     syntaxErr,
+			errorContains: syntaxErr.Error(),
+		},
+		{
+			name:          "response body has the wrong JSON types",
+			createErr:     typeErr,
+			errorContains: typeErr.Error(),
+		},
+		{
+			name: "response for another issuer ID",
+			created: conjurapi.Issuer{
+				ID: "server-chosen", MaxTTL: 3600, Type: "aws", CreatedAt: "2024-01-02T03:04:05Z", ModifiedAt: "2024-01-02T03:04:05Z",
+				Data: map[string]any{
+					"access_key_id_secret_ref":     map[string]any{"id": "data/aws/key"},
+					"secret_access_key_secret_ref": map[string]any{"id": "data/aws/secret"},
+				},
+			},
+			errorContains: `the response is for issuer ID "server-chosen" instead of the requested "my-issuer"`,
+		},
+		{
+			name:          "unsupported issuer type",
+			created:       conjurapi.Issuer{ID: "my-issuer", MaxTTL: 3600, Type: "gcp", CreatedAt: "2024-01-02T03:04:05Z", ModifiedAt: "2024-01-02T03:04:05Z"},
+			errorContains: `unsupported issuer type "gcp"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			planned := IssuerResourceModel{Id: types.StringValue("my-issuer"), MaxTTL: types.Int32Value(3600), AWS: awsTestObject("data/aws/key", "data/aws/secret"), CreatedAt: types.StringUnknown(), ModifiedAt: types.StringUnknown()}
+			mockV2 := mocks.NewMockClientV2(t)
+			mockV2.On("CreateIssuer", mock.Anything).Return(tt.created, tt.createErr)
+
+			resp := runIssuerCreate(&IssuerResource{client: mockV2}, planned)
+
+			assertDiagOutcome(t, resp.Diagnostics, true, `The create request for issuer "my-issuer" succeeded`)
+			assertDiagContains(t, resp.Diagnostics, "check Secrets Manager and import or delete it")
+			assertDiagContains(t, resp.Diagnostics, tt.errorContains)
+			assert.True(t, resp.State.Raw.IsNull())
+			mockV2.AssertExpectations(t)
+		})
+	}
+}
+
+// TestIssuerResource_ApplyRevalidatesIDAndMaxTTL verifies that id and max_ttl values that were unknown
+// at plan time (so the plan-time validators skipped them) are re-checked before any API call.
+func TestIssuerResource_ApplyRevalidatesIDAndMaxTTL(t *testing.T) {
+	tests := []struct {
+		name          string
+		id            string
+		maxTTL        int32
+		errorContains string
+	}{
+		{name: "id with path traversal", id: "../admin", maxTTL: 3600, errorContains: issuerIDPatternDescription},
+		{name: "id with slash", id: "a/b", maxTTL: 3600, errorContains: issuerIDPatternDescription},
+		{name: "empty id", id: "", maxTTL: 3600, errorContains: issuerIDPatternDescription},
+		{name: "max_ttl below range", id: "my-issuer", maxTTL: 899, errorContains: "Max TTL must be between 900 and 43200"},
+		{name: "max_ttl above range", id: "my-issuer", maxTTL: 43_201, errorContains: "Max TTL must be between 900 and 43200"},
+	}
+
+	for _, tt := range tests {
+		data := IssuerResourceModel{Id: types.StringValue(tt.id), MaxTTL: types.Int32Value(tt.maxTTL), AWS: awsTestObject("data/aws/key", "data/aws/secret")}
+		t.Run("create/"+tt.name, func(t *testing.T) {
+			mockV2 := mocks.NewMockClientV2(t)
+			resp := runIssuerCreate(&IssuerResource{client: mockV2}, data)
+			assertDiagOutcome(t, resp.Diagnostics, true, tt.errorContains)
+			mockV2.AssertNotCalled(t, "CreateIssuer", mock.Anything)
+		})
+		t.Run("update/"+tt.name, func(t *testing.T) {
+			mockV2 := mocks.NewMockClientV2(t)
+			req := resource.UpdateRequest{Plan: tfsdk.Plan{Raw: tftypes.NewValue(tftypes.Object{}, nil), Schema: getIssuerTestSchema()}, State: tfsdk.State{Raw: tftypes.NewValue(tftypes.Object{}, nil), Schema: getIssuerTestSchema()}}
+			req.Plan.Set(context.Background(), &data)
+			req.State.Set(context.Background(), &IssuerResourceModel{Id: data.Id, MaxTTL: types.Int32Value(900), AWS: data.AWS})
+			resp := &resource.UpdateResponse{State: tfsdk.State{Raw: tftypes.NewValue(tftypes.Object{}, nil), Schema: getIssuerTestSchema()}}
+			(&IssuerResource{client: mockV2}).Update(context.Background(), req, resp)
+			assertDiagOutcome(t, resp.Diagnostics, true, tt.errorContains)
+			mockV2.AssertNotCalled(t, "UpdateIssuer", mock.Anything, mock.Anything)
+		})
+	}
+}
+
+// TestIssuerResource_Update_ParseFailureAddsRefreshHint verifies that when UpdateIssuer is applied
+// server-side but its response can't be used, the prior state is left untouched and the error tells
+// the user how to reconcile it.
+func TestIssuerResource_Update_ParseFailureAddsRefreshHint(t *testing.T) {
+	var decoded conjurapi.Issuer
+	syntaxErr := json.Unmarshal([]byte("<html>"), &decoded)
+	typeErr := json.Unmarshal([]byte(`{"max_ttl":"x"}`), &decoded)
+	awsData := map[string]any{"access_key_id_secret_ref": map[string]any{"id": "data/aws/key2"}, "secret_access_key_secret_ref": map[string]any{"id": "data/aws/secret2"}}
+	tests := []struct {
+		name          string
+		updated       conjurapi.Issuer
+		updateErr     error
+		errorContains string
+	}{
+		{name: "response body is not JSON", updateErr: syntaxErr, errorContains: syntaxErr.Error()},
+		{name: "response body has the wrong JSON types", updateErr: typeErr, errorContains: typeErr.Error()},
+		{name: "response for another issuer ID", updated: conjurapi.Issuer{ID: "server-chosen", MaxTTL: 7200, Type: "aws", Data: awsData}, errorContains: `the response is for issuer ID "server-chosen" instead of the requested "my-issuer"`},
+		{name: "response is missing the secret refs", updated: conjurapi.Issuer{ID: "my-issuer", MaxTTL: 7200, Type: "aws"}, errorContains: "the response is missing the AWS secret refs"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			prior := IssuerResourceModel{Id: types.StringValue("my-issuer"), MaxTTL: types.Int32Value(3600), AWS: awsTestObject("data/aws/key", "data/aws/secret"), CreatedAt: types.StringValue("2024-01-02T03:04:05Z"), ModifiedAt: types.StringValue("2024-01-02T03:04:05Z")}
+			planned := IssuerResourceModel{Id: types.StringValue("my-issuer"), MaxTTL: types.Int32Value(7200), AWS: awsTestObject("data/aws/key2", "data/aws/secret2"), CreatedAt: prior.CreatedAt, ModifiedAt: types.StringUnknown()}
+			mockV2 := mocks.NewMockClientV2(t)
+			mockV2.On("UpdateIssuer", "my-issuer", mock.Anything).Return(tt.updated, tt.updateErr)
+
+			req := resource.UpdateRequest{Plan: tfsdk.Plan{Raw: tftypes.NewValue(tftypes.Object{}, nil), Schema: getIssuerTestSchema()}, State: tfsdk.State{Raw: tftypes.NewValue(tftypes.Object{}, nil), Schema: getIssuerTestSchema()}}
+			req.Plan.Set(context.Background(), &planned)
+			req.State.Set(context.Background(), &prior)
+			resp := &resource.UpdateResponse{State: tfsdk.State{Raw: tftypes.NewValue(tftypes.Object{}, nil), Schema: getIssuerTestSchema()}}
+			resp.State.Set(context.Background(), &prior)
+
+			(&IssuerResource{client: mockV2}).Update(context.Background(), req, resp)
+
+			assertDiagOutcome(t, resp.Diagnostics, true, `The update request for issuer "my-issuer" succeeded`)
+			assertDiagContains(t, resp.Diagnostics, "terraform apply -refresh-only")
+			assertDiagContains(t, resp.Diagnostics, tt.errorContains)
+			var got IssuerResourceModel
+			require.False(t, resp.State.Get(context.Background(), &got).HasError())
+			assert.Equal(t, prior, got)
+			mockV2.AssertExpectations(t)
+		})
+	}
+}
+
+// TestIssuerResource_ErrorDetailIsSanitized verifies that server-supplied text (API error messages
+// and values echoed in parse errors) is stripped of control and bidi characters and truncated before
+// it is placed into a diagnostic.
+func TestIssuerResource_ErrorDetailIsSanitized(t *testing.T) {
+	data := IssuerResourceModel{Id: types.StringValue("my-issuer"), MaxTTL: types.Int32Value(3600), AWS: awsTestObject("data/aws/key", "data/aws/secret")}
+	serverErr := &response.ConjurError{Code: http.StatusInternalServerError, Message: "boom\x1b[31m\r\n\u202edcba" + strings.Repeat("x", 1024)}
+	tests := []struct {
+		name           string
+		setupMock      func(*mocks.MockClientV2)
+		run            func(*IssuerResource) diag.Diagnostics
+		detailContains []string
+	}{
+		{
+			name:           "create API error",
+			setupMock:      func(m *mocks.MockClientV2) { m.On("CreateIssuer", mock.Anything).Return(conjurapi.Issuer{}, serverErr) },
+			run:            func(r *IssuerResource) diag.Diagnostics { return runIssuerCreate(r, data).Diagnostics },
+			detailContains: []string{"Unable to create issuer, got error: status 500: boom [31m   dcba", "... (truncated)"},
+		},
+		{
+			name:           "read API error",
+			setupMock:      func(m *mocks.MockClientV2) { m.On("Issuer", "my-issuer").Return(conjurapi.Issuer{}, serverErr) },
+			run:            func(r *IssuerResource) diag.Diagnostics { return runIssuerRead(r, data).Diagnostics },
+			detailContains: []string{"Unable to read issuer, got error: status 500: boom [31m   dcba", "... (truncated)"},
+		},
+		{
+			name: "read response with an unsupported issuer type",
+			setupMock: func(m *mocks.MockClientV2) {
+				m.On("Issuer", "my-issuer").Return(conjurapi.Issuer{ID: "my-issuer", MaxTTL: 3600, Type: "gcp\x1b[2J\n\u202e" + strings.Repeat("y", 1024)}, nil)
+			},
+			run:            func(r *IssuerResource) diag.Diagnostics { return runIssuerRead(r, data).Diagnostics },
+			detailContains: []string{"Unable to parse read issuer response, got error: unsupported issuer type", "... (truncated)"},
+		},
+		{
+			name: "read response for another issuer ID",
+			setupMock: func(m *mocks.MockClientV2) {
+				m.On("Issuer", "my-issuer").Return(conjurapi.Issuer{ID: "evil\u202e\x1b[2J\nid", MaxTTL: 3600, Type: "aws"}, nil)
+			},
+			run:            func(r *IssuerResource) diag.Diagnostics { return runIssuerRead(r, data).Diagnostics },
+			detailContains: []string{`the response is for issuer ID "evil  [2J id" instead of the requested "my-issuer"`},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockV2 := mocks.NewMockClientV2(t)
+			tt.setupMock(mockV2)
+
+			diags := tt.run(&IssuerResource{client: mockV2})
+
+			require.Len(t, diags.Errors(), 1)
+			detail := diags.Errors()[0].Detail()
+			assert.False(t, strings.ContainsFunc(detail, func(r rune) bool { return unicode.IsControl(r) || unicode.Is(unicode.Bidi_Control, r) }), "detail contains control characters: %q", detail)
+			for _, s := range tt.detailContains {
+				assert.Contains(t, detail, s)
+			}
+			mockV2.AssertExpectations(t)
+		})
+	}
+}
+
+func runIssuerCreate(r *IssuerResource, data IssuerResourceModel) *resource.CreateResponse {
+	req := resource.CreateRequest{Plan: tfsdk.Plan{Raw: tftypes.NewValue(tftypes.Object{}, nil), Schema: getIssuerTestSchema()}}
+	resp := &resource.CreateResponse{State: tfsdk.State{Raw: tftypes.NewValue(tftypes.Object{}, nil), Schema: getIssuerTestSchema()}}
+	req.Plan.Set(context.Background(), &data)
+	r.Create(context.Background(), req, resp)
+	return resp
+}
+
+func runIssuerRead(r *IssuerResource, data IssuerResourceModel) *resource.ReadResponse {
+	req := resource.ReadRequest{State: tfsdk.State{Raw: tftypes.NewValue(tftypes.Object{}, nil), Schema: getIssuerTestSchema()}}
+	req.State.Set(context.Background(), &data)
+	resp := &resource.ReadResponse{State: tfsdk.State{Raw: req.State.Raw.Copy(), Schema: getIssuerTestSchema()}}
+	r.Read(context.Background(), req, resp)
+	return resp
 }
 
 func buildIssuerConfigFromModel(data IssuerResourceModel) tfsdk.Config {

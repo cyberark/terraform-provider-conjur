@@ -3,10 +3,14 @@ package provider
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"math"
+	"regexp"
 
 	"github.com/cyberark/conjur-api-go/conjurapi"
 	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -14,6 +18,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
@@ -60,6 +66,13 @@ var awsIssuerAttrTypes = map[string]attr.Type{
 	"secret_access_key_secret_ref": types.StringType,
 }
 
+// issuerIDPattern is the set of characters the Conjur API accepts in an issuer ID. The SDK escapes the
+// ID with url.QueryEscape rather than path escaping, so restricting it also rules out dot segments
+// ("." / "..") that a normalizing proxy would resolve to the issuers collection or its parent.
+var issuerIDPattern = regexp.MustCompile(`^[A-Za-z0-9+_-]+$`)
+
+const issuerIDPatternDescription = "must contain only the characters A-Z, a-z, 0-9, +, - and _"
+
 type SecretRef struct {
 	Id string `json:"id"`
 }
@@ -78,8 +91,11 @@ func (r *IssuerResource) Schema(ctx context.Context, req resource.SchemaRequest,
 		MarkdownDescription: "CyberArk Secrets Manager issuer resource. Destroying this resource deletes only the issuer itself and leaves the referenced Secrets Manager secrets intact.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				MarkdownDescription: "The issuer's name. Changing it forces a new issuer to be created.",
+				MarkdownDescription: "The issuer's name. May contain only the characters `A-Z`, `a-z`, `0-9`, `+`, `-` and `_`. Changing it forces a new issuer to be created.",
 				Required:            true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(issuerIDPattern, issuerIDPatternDescription),
+				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -132,7 +148,6 @@ func (r *IssuerResource) ValidateConfig(ctx context.Context, req resource.Valida
 		return
 	}
 
-	ValidateNonBlank(data.Id, &resp.Diagnostics, "Issuer ID")
 	ValidateIntInRange(data.MaxTTL, &resp.Diagnostics, "Max TTL", 900, 43_200)
 
 	configured := 0
@@ -180,35 +195,23 @@ func (r *IssuerResource) ModifyPlan(ctx context.Context, req resource.ModifyPlan
 }
 
 func (r *IssuerResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	if r.client == nil {
-		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
-		return
-	}
-	var data IssuerResourceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	aws := modelFromObject[AWSIssuerModel](ctx, data.AWS, &resp.Diagnostics)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	// ValidateConfig skips inspecting aws when it's unknown at plan time; re-check here in case it
-	// resolved to null (type-less payload -> opaque API error) or to blank secret refs (which would
-	// surface as a generic API error instead of the friendly validation message) by apply.
-	if !r.validateIssuerType(aws, &resp.Diagnostics) {
+	data, aws, ok := r.planForApply(ctx, req.Plan, &resp.Diagnostics)
+	if !ok {
 		return
 	}
 
 	created, err := r.client.CreateIssuer(r.buildIssuerPayload(&data, aws))
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create issuer, got error: %s", err))
+		if isResponseDecodeErr(err) {
+			addIssuerCreatedButUnparsedError(&resp.Diagnostics, data.Id.ValueString(), err)
+			return
+		}
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create issuer, got error: %s", serverErrorDetail(err)))
 		return
 	}
 
 	if err := r.parseIssuerResponse(ctx, created, &data); err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to parse create issuer response, got error: %s", err))
+		addIssuerCreatedButUnparsedError(&resp.Diagnostics, data.Id.ValueString(), err)
 		return
 	}
 	tflog.Trace(ctx, "created issuer resource")
@@ -233,12 +236,12 @@ func (r *IssuerResource) Read(ctx context.Context, req resource.ReadRequest, res
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read issuer, got error: %s", err))
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read issuer, got error: %s", serverErrorDetail(err)))
 		return
 	}
 
 	if err := r.parseIssuerResponse(ctx, issuer, &data); err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to parse read issuer response, got error: %s", err))
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to parse read issuer response, got error: %s", sanitizeServerText(err.Error())))
 		return
 	}
 	tflog.Trace(ctx, "read issuer resource")
@@ -246,37 +249,33 @@ func (r *IssuerResource) Read(ctx context.Context, req resource.ReadRequest, res
 }
 
 func (r *IssuerResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	if r.client == nil {
-		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
+	data, aws, ok := r.planForApply(ctx, req.Plan, &resp.Diagnostics)
+	if !ok {
 		return
 	}
-	var data IssuerResourceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	var state IssuerResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	aws := modelFromObject[AWSIssuerModel](ctx, data.AWS, &resp.Diagnostics)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	// ValidateConfig skips inspecting aws when it's unknown at plan time; re-check here in case it
-	// resolved to null or to blank secret refs by apply. If aws resolved to null the PATCH would omit
-	// Data, leaving stale credentials attached server-side while state drops them, which Terraform
-	// reports as an "inconsistent result after apply" error; blank refs would surface as a generic
-	// API error instead of the friendly validation message.
-	if !r.validateIssuerType(aws, &resp.Diagnostics) {
+	// ModifyPlan skips this check when max_ttl is unknown at plan time.
+	if data.MaxTTL.ValueInt32() < state.MaxTTL.ValueInt32() {
+		resp.Diagnostics.AddAttributeError(path.Root("max_ttl"), "Invalid max_ttl", fmt.Sprintf("max_ttl cannot be decreased (current: %d, new: %d).", state.MaxTTL.ValueInt32(), data.MaxTTL.ValueInt32()))
 		return
 	}
 
 	updated, err := r.client.UpdateIssuer(data.Id.ValueString(), r.buildIssuerUpdatePayload(&data, aws))
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update issuer, got error: %s", err))
+		if isResponseDecodeErr(err) {
+			addIssuerUpdatedButUnparsedError(&resp.Diagnostics, data.Id.ValueString(), err)
+			return
+		}
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update issuer, got error: %s", serverErrorDetail(err)))
 		return
 	}
 
 	if err := r.parseIssuerResponse(ctx, updated, &data); err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to parse update issuer response, got error: %s", err))
+		addIssuerUpdatedButUnparsedError(&resp.Diagnostics, data.Id.ValueString(), err)
 		return
 	}
 	tflog.Trace(ctx, "updated issuer resource")
@@ -301,7 +300,7 @@ func (r *IssuerResource) Delete(ctx context.Context, req resource.DeleteRequest,
 			resp.Diagnostics.AddWarning("Issuer Not Found", fmt.Sprintf("The issuer %q was not found in Conjur anymore, likely because it was already deleted out-of-band, and will be removed from the state.", data.Id.ValueString()))
 			return
 		}
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete issuer, got error: %s", err))
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete issuer, got error: %s", serverErrorDetail(err)))
 		return
 	}
 
@@ -309,7 +308,72 @@ func (r *IssuerResource) Delete(ctx context.Context, req resource.DeleteRequest,
 }
 
 func (r *IssuerResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	if !issuerIDPattern.MatchString(req.ID) {
+		resp.Diagnostics.AddError("Invalid import ID", fmt.Sprintf("The issuer ID %q %s.", req.ID, issuerIDPatternDescription))
+		return
+	}
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), req.ID)...)
+}
+
+// planForApply performs the steps shared by Create and Update: it checks that the client is
+// configured, reads the plan, and re-validates id, max_ttl and the aws block. It reports false (with a diagnostic
+// added) when the apply must not proceed.
+func (r *IssuerResource) planForApply(ctx context.Context, plan tfsdk.Plan, diags *diag.Diagnostics) (IssuerResourceModel, *AWSIssuerModel, bool) {
+	var data IssuerResourceModel
+	if r.client == nil {
+		AddProviderClientNotConfiguredWarning(diags)
+		return data, nil, false
+	}
+	diags.Append(plan.Get(ctx, &data)...)
+	if diags.HasError() {
+		return data, nil, false
+	}
+
+	// The id and max_ttl validators skip unknown values at plan time, so values that only resolved at
+	// apply (e.g., references to not-yet-created resources) must be re-checked before reaching the API.
+	if !issuerIDPattern.MatchString(data.Id.ValueString()) {
+		diags.AddAttributeError(path.Root("id"), "Invalid issuer ID", fmt.Sprintf("The issuer ID %q %s.", data.Id.ValueString(), issuerIDPatternDescription))
+	}
+	ValidateIntInRange(data.MaxTTL, diags, "Max TTL", 900, 43_200)
+	if diags.HasError() {
+		return data, nil, false
+	}
+
+	aws := modelFromObject[AWSIssuerModel](ctx, data.AWS, diags)
+	if diags.HasError() {
+		return data, nil, false
+	}
+	// ValidateConfig skips inspecting aws when it's unknown at plan time; re-check here in case it
+	// resolved to null or to blank secret refs by apply. A null aws would send a type-less payload on
+	// create (an opaque API error) and, on update, omit Data from the PATCH, leaving stale credentials
+	// attached server-side while state drops them ("inconsistent result after apply"); blank refs would
+	// surface as a generic API error instead of the friendly validation message.
+	if !r.validateIssuerType(aws, diags) {
+		return data, nil, false
+	}
+	return data, aws, true
+}
+
+// addIssuerCreatedButUnparsedError reports a create that succeeded server-side but whose response
+// couldn't be used. No state is saved, so the error tells the user to reconcile Secrets Manager
+// instead of leaving the issuer silently untracked.
+func addIssuerCreatedButUnparsedError(diags *diag.Diagnostics, id string, err error) {
+	diags.AddError("Client Error", fmt.Sprintf("The create request for issuer %q succeeded, but the response could not be parsed: %s. The created issuer is not tracked in the Terraform state; check Secrets Manager and import or delete it before applying again.", id, sanitizeServerText(err.Error())))
+}
+
+// addIssuerUpdatedButUnparsedError reports an update that was applied server-side but whose response
+// couldn't be used. The state keeps the prior values, so the error tells the user how to reconcile it
+// instead of leaving it silently out of sync with Secrets Manager.
+func addIssuerUpdatedButUnparsedError(diags *diag.Diagnostics, id string, err error) {
+	diags.AddError("Client Error", fmt.Sprintf("The update request for issuer %q succeeded, but the response could not be parsed: %s. The Terraform state still holds the previous values; run `terraform apply -refresh-only` to reconcile it with Secrets Manager before applying again.", id, sanitizeServerText(err.Error())))
+}
+
+// isResponseDecodeErr reports whether err is a JSON decoding error. The SDK only decodes the body of a
+// 2xx response, so such an error means the request was applied server-side.
+func isResponseDecodeErr(err error) bool {
+	var syntaxErr *json.SyntaxError
+	var typeErr *json.UnmarshalTypeError
+	return errors.As(err, &syntaxErr) || errors.As(err, &typeErr)
 }
 
 // validateIssuerType re-runs the apply-time invariants that ValidateConfig skips when aws is unknown
@@ -365,30 +429,38 @@ func awsIssuerDataFromMap(m map[string]any) (AWSIssuerData, error) {
 	return d, nil
 }
 
+// parseIssuerResponse copies the server response into data. The response is validated first: data.Id
+// must already hold the requested ID, and a response for a different (or empty) ID is rejected so it
+// can't be written to state, where a later replacement would delete the server-chosen ID. data is
+// left untouched when an error is returned.
 func (r *IssuerResource) parseIssuerResponse(ctx context.Context, issuer conjurapi.Issuer, data *IssuerResourceModel) error {
+	if issuer.ID != data.Id.ValueString() {
+		return fmt.Errorf("the response is for issuer ID %s instead of the requested %q", formatServerIDs([]string{issuer.ID}), data.Id.ValueString())
+	}
+	if issuer.MaxTTL < math.MinInt32 || issuer.MaxTTL > math.MaxInt32 {
+		return fmt.Errorf("max_ttl %d in the response is out of range", issuer.MaxTTL)
+	}
+	if issuer.Type != "aws" {
+		return fmt.Errorf("unsupported issuer type %q: this provider version only supports \"aws\" issuers", issuer.Type)
+	}
+	awsData, err := awsIssuerDataFromMap(issuer.Data)
+	if err != nil {
+		return err
+	}
+	if awsData.AccessKeyIdSecretRef.Id == "" || awsData.SecretAccessKeySecretRef.Id == "" {
+		return fmt.Errorf("the response is missing the AWS secret refs")
+	}
+	obj, diags := types.ObjectValueFrom(ctx, awsIssuerAttrTypes, AWSIssuerModel{
+		AccessKeyIdSecretRef:     types.StringValue(awsData.AccessKeyIdSecretRef.Id),
+		SecretAccessKeySecretRef: types.StringValue(awsData.SecretAccessKeySecretRef.Id),
+	})
+	if diags.HasError() {
+		return fmt.Errorf("building aws object value: %v", diags)
+	}
 	data.Id = types.StringValue(issuer.ID)
 	data.MaxTTL = types.Int32Value(int32(issuer.MaxTTL))
 	data.CreatedAt = types.StringValue(issuer.CreatedAt)
 	data.ModifiedAt = types.StringValue(issuer.ModifiedAt)
-	if issuer.Type == "aws" {
-		awsData, err := awsIssuerDataFromMap(issuer.Data)
-		if err != nil {
-			return err
-		}
-		obj, diags := types.ObjectValueFrom(ctx, awsIssuerAttrTypes, AWSIssuerModel{
-			AccessKeyIdSecretRef:     types.StringValue(awsData.AccessKeyIdSecretRef.Id),
-			SecretAccessKeySecretRef: types.StringValue(awsData.SecretAccessKeySecretRef.Id),
-		})
-		if diags.HasError() {
-			return fmt.Errorf("building aws object value: %v", diags)
-		}
-		data.AWS = obj
-	} else {
-		// Only "aws" issuers are supported today. Rather than silently nulling data.AWS (which would
-		// masquerade as a plan to convert the issuer), reject the unsupported type outright. The
-		// capability is named IssuersV1 because more kinds are expected; this keeps behavior explicit
-		// until they're added.
-		return fmt.Errorf("unsupported issuer type %q: this provider version only supports \"aws\" issuers", issuer.Type)
-	}
+	data.AWS = obj
 	return nil
 }
