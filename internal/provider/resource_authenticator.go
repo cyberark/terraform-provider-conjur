@@ -384,11 +384,8 @@ func (r *AuthenticatorResource) buildAuthenticatorPayload(data *AuthenticatorRes
 		authenticator.Enabled = boolPtr
 	}
 
-	if !data.Owner.IsNull() && !data.Owner.IsUnknown() {
-		authenticator.Owner = &conjurapi.AuthOwner{
-			Kind: data.Owner.Attributes()["kind"].(types.String).ValueString(),
-			ID:   data.Owner.Attributes()["id"].(types.String).ValueString(),
-		}
+	if owner := ownerFromObject(data.Owner); owner != nil {
+		authenticator.Owner = &conjurapi.AuthOwner{Kind: owner.Kind, ID: owner.Id}
 	}
 
 	if authenticatorData, err := buildDataPayload(data.Data); err != nil {
@@ -410,14 +407,14 @@ func buildDataPayload(d *AuthenticatorDataModel) (map[string]interface{}, error)
 		return nil, nil
 	}
 
-	payload := map[string]interface{}{}
+	payload := map[string]any{}
 	addIfNotNull(payload, "audience", d.Audience)
 	addIfNotNull(payload, "jwks_uri", d.JwksURI)
 	addIfNotNull(payload, "issuer", d.Issuer)
 	addIfNotNull(payload, "ca_cert", d.CACert)
 
 	if !d.PublicKeys.IsNull() && !d.PublicKeys.IsUnknown() {
-		var obj interface{}
+		var obj any
 		if err := json.Unmarshal([]byte(d.PublicKeys.ValueString()), &obj); err != nil {
 			return nil, fmt.Errorf("invalid JSON in public_keys: %w", err)
 		}

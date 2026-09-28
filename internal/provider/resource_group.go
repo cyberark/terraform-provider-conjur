@@ -296,13 +296,7 @@ func (r *GroupResource) Create(ctx context.Context, req resource.CreateRequest, 
 // model has no owner field - ValidateConfig already rejects owner on this
 // backend, so there is nothing to send here even if it somehow reached this far.
 func (r *GroupResource) createV2(data *GroupResourceModel, resp *resource.CreateResponse) {
-	group := conjurapi.Group{
-		Name:        data.Name.ValueString(),
-		Branch:      strings.Trim(data.Branch.ValueString(), "/"),
-		Annotations: data.Annotations,
-	}
-
-	if _, err := r.client.CreateGroup(group); err != nil {
+	if _, err := r.client.CreateGroup(toV2Group(data)); err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create group: %s", err))
 	}
 }
@@ -375,12 +369,7 @@ func (r *GroupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	}
 
 	if failure == "" && annotationsNeedPatch(state.Annotations, plan.Annotations) {
-		group := conjurapi.Group{
-			Name:        plan.Name.ValueString(),
-			Branch:      strings.Trim(plan.Branch.ValueString(), "/"),
-			Annotations: plan.Annotations,
-		}
-		if _, err := r.client.UpdateGroup(group); err != nil {
+		if _, err := r.client.UpdateGroup(toV2Group(&plan)); err != nil {
 			failure = fmt.Sprintf("Unable to update annotations of group %q: %s", identifier, err)
 		}
 	}
@@ -510,26 +499,38 @@ func (r *GroupResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 	}
 
 	if r.isSaaS() {
-		identifier := groupIdentifier(data.Branch.ValueString(), data.Name.ValueString())
-		if err := r.client.DeleteGroup(identifier); err != nil {
-			resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete group %q: %s", identifier, err))
-			return
-		}
+		r.deleteV2(&data, resp)
 	} else {
-		groupPolicy, err := r.generateGroupDeletionPolicy(&data)
-		if err != nil {
-			resp.Diagnostics.AddError("Error Generating Deletion Policy", fmt.Sprintf("Could not generate group deletion policy: %s", err))
-			return
-		}
-
-		if err := policy.ApplyPolicy(r.client, groupPolicy, data.Branch.ValueString()); err != nil {
-			resp.Diagnostics.AddError("Error Applying Deletion Policy", fmt.Sprintf("Could not apply group deletion policy: %s", err))
-			return
-		}
+		r.deleteViaPolicy(&data, resp)
+	}
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	tflog.Trace(ctx, "deleted group resource")
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
+// deleteV2 deletes the group through the V2 Groups API.
+func (r *GroupResource) deleteV2(data *GroupResourceModel, resp *resource.DeleteResponse) {
+	identifier := groupIdentifier(data.Branch.ValueString(), data.Name.ValueString())
+	if err := r.client.DeleteGroup(identifier); err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete group %q: %s", identifier, err))
+	}
+}
+
+// deleteViaPolicy deletes the group by generating and applying Conjur policy
+// YAML, the provider's pre-V2 behavior.
+func (r *GroupResource) deleteViaPolicy(data *GroupResourceModel, resp *resource.DeleteResponse) {
+	groupPolicy, err := r.generateGroupDeletionPolicy(data)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Generating Deletion Policy", fmt.Sprintf("Could not generate group deletion policy: %s", err))
+		return
+	}
+
+	if err := policy.ApplyPolicy(r.client, groupPolicy, data.Branch.ValueString()); err != nil {
+		resp.Diagnostics.AddError("Error Applying Deletion Policy", fmt.Sprintf("Could not apply group deletion policy: %s", err))
+	}
 }
 
 func (r *GroupResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
@@ -578,27 +579,25 @@ func (r *GroupResource) applyGroupResponse(g *conjurapi.Group, data *GroupResour
 	data.Annotations = g.Annotations
 }
 
-// groupIdentifier builds the "<branch>/<name>" identifier the V2 Groups API
-// expects, trimming stray slashes so a leading or trailing "/" in the
-// configured branch can't produce a malformed path segment.
-func groupIdentifier(branch, name string) string {
-	return branchQualifiedID(strings.Trim(branch, "/"), name)
+// toV2Group builds the conjurapi.Group payload sent to the V2 Groups API on
+// both create and update, normalizing name/branch the same way as
+// groupIdentifier so the two call sites can't drift out of sync.
+func toV2Group(data *GroupResourceModel) conjurapi.Group {
+	return conjurapi.Group{
+		Name:        strings.TrimSpace(data.Name.ValueString()),
+		Branch:      normalizeBranch(data.Branch.ValueString()),
+		Annotations: data.Annotations,
+	}
 }
 
-// ownerFromObject extracts a *conjurapi.Owner from the "owner" nested
-// attribute, or nil when it's null or unknown (the block was omitted from
-// config entirely). An empty-but-present block (owner = {}) is deliberately
-// not "no owner": it's passed through so conjurpolicy.KindString rejects the
-// blank kind in generateGroupPolicy, matching this resource's pre-V2
-// validation of an explicit but incomplete owner. Only used by the
-// policy-YAML backend - the V2 Group model has no owner field.
-func ownerFromObject(obj types.Object) *conjurapi.Owner {
-	if obj.IsNull() || obj.IsUnknown() {
-		return nil
-	}
-	kind, _ := obj.Attributes()["kind"].(types.String)
-	id, _ := obj.Attributes()["id"].(types.String)
-	return &conjurapi.Owner{Kind: kind.ValueString(), Id: id.ValueString()}
+// groupIdentifier builds the "<branch>/<name>" identifier the V2 Groups API
+// expects, normalizing branch and trimming stray whitespace from name so a
+// leading/trailing "/" or space in either can't produce a malformed path
+// segment or a mismatched identifier. Unlike branchQualifiedID (shared with
+// conjur_host and conjur_secret, which have their own, different leading-slash
+// conventions), the V2 Groups API always wants a fully normalized identifier.
+func groupIdentifier(branch, name string) string {
+	return branchQualifiedID(normalizeBranch(branch), strings.TrimSpace(name))
 }
 
 func (r *GroupResource) generateGroupPolicy(data *GroupResourceModel) (string, error) {
