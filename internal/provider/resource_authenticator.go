@@ -384,7 +384,11 @@ func (r *AuthenticatorResource) buildAuthenticatorPayload(data *AuthenticatorRes
 		authenticator.Enabled = boolPtr
 	}
 
-	if owner := ownerFromObject(data.Owner); owner != nil {
+	owner, ownerDiags := ownerFromObject(data.Owner)
+	if err := diagsToError(ownerDiags); err != nil {
+		return nil, err
+	}
+	if owner != nil {
 		authenticator.Owner = &conjurapi.AuthOwner{Kind: owner.Kind, ID: owner.Id}
 	}
 

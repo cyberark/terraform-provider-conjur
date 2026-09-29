@@ -242,3 +242,12 @@ func TestValidateIntInRange(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateGroupBranch_SkipsUnknownAndNull(t *testing.T) {
+	for _, v := range []types.String{types.StringUnknown(), types.StringNull()} {
+		var diags diag.Diagnostics
+		ValidateGroupBranch(v, &diags, "branch")
+		ValidateNoSurroundingWhitespace(v, &diags, "branch")
+		assert.False(t, diags.HasError(), "%+v", diags)
+	}
+}

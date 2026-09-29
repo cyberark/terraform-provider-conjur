@@ -1,11 +1,14 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -60,6 +63,112 @@ func ValidateNonBlank(val types.String, diagnostics *diag.Diagnostics, fieldName
 			"Invalid value",
 			fmt.Sprintf("%s cannot be empty.", fieldName),
 		)
+	}
+}
+
+// ValidateNoSurroundingWhitespace validates that a string value which is present has no leading or
+// trailing whitespace. Unknown and null values are skipped for the same reasons as in ValidateNonBlank,
+// and blank values are left to ValidateNonBlank so they aren't reported twice.
+func ValidateNoSurroundingWhitespace(val types.String, diagnostics *diag.Diagnostics, fieldName string) {
+	if diagnostics == nil || val.IsUnknown() || val.IsNull() {
+		return
+	}
+	s := val.ValueString()
+	if trimmed := strings.TrimSpace(s); trimmed != "" && trimmed != s {
+		diagnostics.AddError("Invalid value", fmt.Sprintf("%s must not have leading or trailing whitespace. Got: %q", fieldName, s))
+	}
+}
+
+// hasDotSegment reports whether any "/"-separated segment of s is "." or "..".
+func hasDotSegment(s string) bool {
+	return slices.ContainsFunc(strings.Split(s, "/"), func(seg string) bool { return seg == "." || seg == ".." })
+}
+
+// groupBranchProblem returns why a normalized branch can't be used by conjur_group, or "" if it can.
+// ':' separates account, kind and id in a Conjur resource ID, so a branch containing it resolves to a
+// different policy than the one the group is loaded into.
+func groupBranchProblem(branch string) string {
+	switch {
+	case strings.Contains(branch, ":"):
+		return "must not contain ':'"
+	case hasDotSegment(branch):
+		return "must not contain '.' or '..' path segments"
+	}
+	return ""
+}
+
+// ValidateGroupBranch applies conjur_group's branch rules on top of ValidateBranch. Unknown and null
+// values are skipped.
+func ValidateGroupBranch(branch types.String, diagnostics *diag.Diagnostics, fieldName string) {
+	if diagnostics == nil || branch.IsUnknown() || branch.IsNull() {
+		return
+	}
+	if problem := groupBranchProblem(normalizeBranch(branch.ValueString())); problem != "" {
+		diagnostics.AddError("Invalid branch", fmt.Sprintf("%s %s. Got: %q", fieldName, problem, branch.ValueString()))
+	}
+}
+
+// groupImportIDProblem returns why the branch and name split from a conjur_group import ID can't be
+// imported, or "" if they can. It enforces the same rules ValidateConfig applies to the configured
+// values, so an imported group can't end up in state under an identifier its config would reject.
+func groupImportIDProblem(branch, name string) string {
+	switch {
+	case branch == "" || name == "":
+		return "branch and name must not be empty"
+	case branch != strings.TrimSpace(branch) || name != strings.TrimSpace(name):
+		return "branch and name must not have leading or trailing whitespace"
+	case slices.Contains(strings.Split(branch, "/"), ""):
+		return "branch must not contain empty segments"
+	case hasDotSegment(name):
+		return "name must not be '.' or '..'"
+	}
+	if problem := groupBranchProblem(branch); problem != "" {
+		return "branch " + problem
+	}
+	return ""
+}
+
+// ownerRoleKinds are the kinds that can own a Conjur resource, matched case-insensitively like conjurpolicy.KindString.
+var ownerRoleKinds = []string{"user", "host", "group", "layer", "policy"}
+
+// ValidateOwner validates that an owner which is present has a non-blank id and a role kind.
+// Unknown sub-values are skipped because they may not be resolved during ValidateConfig.
+func ValidateOwner(owner types.Object, diagnostics *diag.Diagnostics, attrPath path.Path) {
+	if diagnostics == nil || owner.IsNull() || owner.IsUnknown() {
+		return
+	}
+	kind, _ := owner.Attributes()["kind"].(types.String)
+	id, _ := owner.Attributes()["id"].(types.String)
+
+	if !kind.IsUnknown() {
+		if strings.TrimSpace(kind.ValueString()) == "" {
+			diagnostics.AddAttributeError(attrPath.AtName("kind"), "Invalid owner", "owner.kind is required when owner is set.")
+		} else if !slices.Contains(ownerRoleKinds, strings.ToLower(kind.ValueString())) {
+			diagnostics.AddAttributeError(attrPath.AtName("kind"), "Invalid owner", fmt.Sprintf("owner.kind must be one of: %s. Got: %q", strings.Join(ownerRoleKinds, ", "), kind.ValueString()))
+		}
+	}
+	if !id.IsUnknown() && strings.TrimSpace(id.ValueString()) == "" {
+		diagnostics.AddAttributeError(attrPath.AtName("id"), "Invalid owner", "owner.id is required when owner is set.")
+	}
+}
+
+// noDotSegmentsValidator rejects a string that has a "." or ".." segment when split on "/".
+type noDotSegmentsValidator struct{}
+
+func (v noDotSegmentsValidator) Description(_ context.Context) string {
+	return "must not contain '.' or '..' path segments"
+}
+
+func (v noDotSegmentsValidator) MarkdownDescription(ctx context.Context) string {
+	return v.Description(ctx)
+}
+
+func (v noDotSegmentsValidator) ValidateString(_ context.Context, req validator.StringRequest, resp *validator.StringResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+	if hasDotSegment(req.ConfigValue.ValueString()) {
+		resp.Diagnostics.AddAttributeError(req.Path, "Invalid value", fmt.Sprintf("%q must not contain '.' or '..' path segments.", req.ConfigValue.ValueString()))
 	}
 }
 

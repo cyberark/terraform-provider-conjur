@@ -7,6 +7,7 @@ import (
 
 	"github.com/cyberark/conjur-api-go/conjurapi"
 	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -138,9 +139,7 @@ func (r *PolicyBranchResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	parent := strings.Trim(data.Branch.ValueString(), "/")
-	leaf := strings.Trim(data.Name.ValueString(), "/")
-	fullID := joinPath(parent, leaf)
+	parent, leaf, fullID := branchPath(&data)
 
 	tflog.Debug(ctx, fmt.Sprintf("Creating policy branch: parent=%q, leaf=%q", parent, leaf))
 
@@ -149,7 +148,12 @@ func (r *PolicyBranchResource) Create(ctx context.Context, req resource.CreateRe
 		Name:   leaf,
 	}
 
-	payload.Owner = ownerFromObject(data.Owner)
+	owner, ownerDiags := ownerFromObject(data.Owner)
+	resp.Diagnostics.Append(ownerDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	payload.Owner = owner
 
 	if anns := mapAsStringMap(ctx, data.Annotations, &resp.Diagnostics); len(anns) > 0 {
 		payload.Annotations = anns
@@ -162,18 +166,7 @@ func (r *PolicyBranchResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	data.Name = types.StringValue(created.Name)
-	data.Branch = types.StringValue(parent)
-	data.FullID = types.StringValue(fullID)
-	data.Owner = ownerToObject(created.Owner)
-
-	if created.Annotations != nil {
-		mv, diags := types.MapValueFrom(ctx, types.StringType, created.Annotations)
-		resp.Diagnostics.Append(diags...)
-		data.Annotations = mv
-	} else {
-		data.Annotations = types.MapNull(types.StringType)
-	}
+	applyBranchResponse(ctx, created, parent, fullID, &data, &resp.Diagnostics)
 
 	tflog.Trace(ctx, "Created policy branch resource")
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -190,9 +183,7 @@ func (r *PolicyBranchResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	parent := strings.Trim(data.Branch.ValueString(), "/")
-	leaf := strings.Trim(data.Name.ValueString(), "/")
-	fullID := joinPath(parent, leaf)
+	parent, leaf, fullID := branchPath(&data)
 
 	tflog.Debug(ctx, fmt.Sprintf("Reading branch: parent=%q, leaf=%q, fullID=%q", parent, leaf, fullID))
 
@@ -206,19 +197,7 @@ func (r *PolicyBranchResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	data.Name = types.StringValue(br.Name)
-	data.Branch = types.StringValue(parent)
-	data.FullID = types.StringValue(fullID)
-
-	data.Owner = ownerToObject(br.Owner)
-
-	if br.Annotations != nil {
-		mv, diags := types.MapValueFrom(ctx, types.StringType, br.Annotations)
-		resp.Diagnostics.Append(diags...)
-		data.Annotations = mv
-	} else {
-		data.Annotations = types.MapNull(types.StringType)
-	}
+	applyBranchResponse(ctx, br, parent, fullID, &data, &resp.Diagnostics)
 
 	tflog.Trace(ctx, "Read policy branch resource")
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -247,9 +226,7 @@ func (r *PolicyBranchResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	parent := strings.Trim(data.Branch.ValueString(), "/")
-	leaf := strings.Trim(data.Name.ValueString(), "/")
-	fullID := joinPath(parent, leaf)
+	parent, leaf, fullID := branchPath(&data)
 
 	tflog.Debug(ctx, fmt.Sprintf("Deleting branch: parent=%q, leaf=%q, fullID=%q", parent, leaf, fullID))
 
@@ -274,6 +251,31 @@ func (r *PolicyBranchResource) ImportState(ctx context.Context, req resource.Imp
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), name)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("full_id"), id)...)
 }
+
+// branchPath returns the parent branch, leaf name and full ID of the policy branch described by data.
+func branchPath(data *PolicyBranchResourceModel) (parent, leaf, fullID string) {
+	parent = strings.Trim(data.Branch.ValueString(), "/")
+	leaf = strings.Trim(data.Name.ValueString(), "/")
+	return parent, leaf, joinPath(parent, leaf)
+}
+
+// applyBranchResponse copies a policy branch returned by the API into data. branch and full_id come from the
+// configured path rather than the response, which only carries the leaf name.
+func applyBranchResponse(ctx context.Context, br *conjurapi.Branch, parent, fullID string, data *PolicyBranchResourceModel, diags *diag.Diagnostics) {
+	data.Name = types.StringValue(br.Name)
+	data.Branch = types.StringValue(parent)
+	data.FullID = types.StringValue(fullID)
+	data.Owner = ownerToObject(br.Owner)
+
+	if br.Annotations != nil {
+		mv, d := types.MapValueFrom(ctx, types.StringType, br.Annotations)
+		diags.Append(d...)
+		data.Annotations = mv
+	} else {
+		data.Annotations = types.MapNull(types.StringType)
+	}
+}
+
 func joinPath(parent, leaf string) string {
 	parent = strings.Trim(parent, "/")
 	leaf = strings.Trim(leaf, "/")

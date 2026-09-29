@@ -3,12 +3,12 @@
 page_title: "conjur_group Resource - CyberArk Secrets Manager"
 subcategory: ""
 description: |-
-  CyberArk Secrets Manager Group resource. On Secrets Manager, SaaS terraform import is supported, but owner is not: setting it produces a warning rather than an error, so pre-existing configurations keep working. On Self-Hosted and OSS deployments owner is fully supported but write-only (import is not supported), and any change to it replaces the resource. annotations is updated in place on Secrets Manager, SaaS; on Self-Hosted and OSS any change to it replaces the resource. name and branch replace the resource on any change, on both deployment types.
+  CyberArk Secrets Manager Group resource. On Secrets Manager, SaaS terraform import is supported, but owner is not: setting it produces a warning rather than an error, so pre-existing configurations keep working. On Self-Hosted and OSS deployments owner is fully supported but write-only (import is not supported), and any change to it replaces the resource. annotations is updated in place on Secrets Manager, SaaS; on Self-Hosted and OSS any change to it replaces the resource. name and branch replace the resource on any change, on both deployment types. Replacing the resource deletes and recreates the group, which drops its memberships and any permissions granted to it. The provider identity needs policy load privileges on branch on Self-Hosted and OSS, and the corresponding group-management permissions on Secrets Manager, SaaS. The import ID format is <branch>/<name> (import is supported on Secrets Manager, SaaS only).
 ---
 
 # conjur_group (Resource)
 
-CyberArk Secrets Manager Group resource. On Secrets Manager, SaaS `terraform import` is supported, but `owner` is not: setting it produces a warning rather than an error, so pre-existing configurations keep working. On Self-Hosted and OSS deployments `owner` is fully supported but write-only (import is not supported), and any change to it replaces the resource. `annotations` is updated in place on Secrets Manager, SaaS; on Self-Hosted and OSS any change to it replaces the resource. `name` and `branch` replace the resource on any change, on both deployment types.
+CyberArk Secrets Manager Group resource. On Secrets Manager, SaaS `terraform import` is supported, but `owner` is not: setting it produces a warning rather than an error, so pre-existing configurations keep working. On Self-Hosted and OSS deployments `owner` is fully supported but write-only (import is not supported), and any change to it replaces the resource. `annotations` is updated in place on Secrets Manager, SaaS; on Self-Hosted and OSS any change to it replaces the resource. `name` and `branch` replace the resource on any change, on both deployment types. Replacing the resource deletes and recreates the group, which drops its memberships and any permissions granted to it. The provider identity needs policy load privileges on `branch` on Self-Hosted and OSS, and the corresponding group-management permissions on Secrets Manager, SaaS. The import ID format is `<branch>/<name>` (import is supported on Secrets Manager, SaaS only).
 
 ## Example Usage
 
@@ -29,11 +29,11 @@ resource "conjur_group" "my_group" {
 ### Required
 
 - `branch` (String) The policy branch of the group
-- `name` (String) The name of the group
+- `name` (String) The name of the group. Must not contain `/` or be `.` or `..`.
 
 ### Optional
 
-- `annotations` (Map of String) Key-value annotations for the group. Keys must not be empty. On Secrets Manager, SaaS, changes are applied in place: added and changed keys via a merging update, and removed keys by deleting each one individually. On Self-Hosted and OSS deployments any change to this attribute replaces the resource.
+- `annotations` (Map of String) Key-value annotations for the group. Keys must not be empty or contain a `.` or `..` path segment. On Secrets Manager, SaaS, changes are applied in place: added and changed keys via a merging update, and removed keys by deleting each one individually. On Self-Hosted and OSS deployments any change to this attribute replaces the resource.
 - `owner` (Attributes) Owner of the group. Fully supported on Self-Hosted and OSS: any change to it replaces the resource there. Not supported on Secrets Manager, SaaS: setting this attribute produces a warning, not an error, and has no effect there, and changing it does not replace the resource. (see [below for nested schema](#nestedatt--owner))
 
 <a id="nestedatt--owner"></a>
@@ -43,3 +43,13 @@ Optional:
 
 - `id` (String) Owner identifier
 - `kind` (String) Owner kind (user, group, etc.)
+
+## Import
+
+Import is supported using the following syntax:
+
+The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
+
+```shell
+terraform import conjur_group.my_group data/teams/admins
+```
