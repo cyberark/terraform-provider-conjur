@@ -10,16 +10,60 @@ description: |-
 
 CyberArk Secrets Manager issuer resource. Destroying this resource deletes only the issuer itself and leaves the referenced Secrets Manager secrets intact.
 
+-> **Availability:** This resource is only supported on Secrets Manager SaaS (Conjur Cloud) and Secrets Manager Self-Hosted (Conjur Enterprise). It is not available on Conjur Open Source. When targeting Conjur Open Source, set `CONJUR_ENVIRONMENT=oss` (or `environment: oss` in `~/.conjurrc`): without an explicit environment the SDK assumes Self-Hosted for non-SaaS URLs, so the provider cannot reject this resource up front and the request instead fails server-side with a less clear error.
+
+## Credential Handling
+
+The issuer only stores *references* to Secrets Manager secrets (`access_key_id_secret_ref` and `secret_access_key_secret_ref`), never the AWS credentials themselves. The referenced secrets must already exist and hold the AWS access key ID and secret access key before the issuer is created or used.
+
+~> **Note:** Do not pass the AWS keys through regular resource attributes or non-ephemeral variables, which are persisted in the Terraform state and plan files. On SaaS, set the secret values with the `conjur_secret` resource's write-only `value_wo` attribute (Terraform 1.11 and later), fed from an ephemeral variable or ephemeral resource, and bump `value_wo_version` to rotate them, as shown below. On Self-Hosted, where `conjur_secret` is not available, declare the secrets in policy and set their values outside Terraform (for example, with `conjur variable set`).
+
+Destroying the issuer never deletes the referenced secrets.
+
+## Required Privileges
+
+The provider's identity must be a Secrets Manager admin, and it needs `read` on both variables referenced by `access_key_id_secret_ref` and `secret_access_key_secret_ref`.
+
+When an issuer is created, Secrets Manager creates the `conjur/issuers/<issuer-name>/delegation/consumers` group. Roles that create dynamic secrets with the issuer must be added to that group; this is not managed by this resource.
+
 ## Example Usage
 
 ```terraform
+variable "aws_access_key_id" {
+  type      = string
+  sensitive = true
+  ephemeral = true
+}
+
+variable "aws_secret_access_key" {
+  type      = string
+  sensitive = true
+  ephemeral = true
+}
+
+# The AWS credentials are written with the write-only value_wo attribute so they are never stored in
+# the Terraform state or plan. Bump value_wo_version to push a rotated value.
+resource "conjur_secret" "aws_access_key_id" {
+  name             = "aws-access-key-id"
+  branch           = "/data/terraform"
+  value_wo         = var.aws_access_key_id
+  value_wo_version = 1
+}
+
+resource "conjur_secret" "aws_secret_access_key" {
+  name             = "aws-secret-access-key"
+  branch           = "/data/terraform"
+  value_wo         = var.aws_secret_access_key
+  value_wo_version = 1
+}
+
 resource "conjur_issuer" "my_aws_issuer" {
   id      = "my-aws-issuer"
   max_ttl = 3600
 
   aws = {
-    access_key_id_secret_ref     = "data/terraform/aws-access-key-id"
-    secret_access_key_secret_ref = "data/terraform/aws-secret-access-key"
+    access_key_id_secret_ref     = "${trimprefix(conjur_secret.aws_access_key_id.branch, "/")}/${conjur_secret.aws_access_key_id.name}"
+    secret_access_key_secret_ref = "${trimprefix(conjur_secret.aws_secret_access_key.branch, "/")}/${conjur_secret.aws_secret_access_key.name}"
   }
 }
 ```
@@ -29,7 +73,7 @@ resource "conjur_issuer" "my_aws_issuer" {
 
 ### Required
 
-- `id` (String) The issuer's name. Changing it forces a new issuer to be created.
+- `id` (String) The issuer's name. May contain only the characters `A-Z`, `a-z`, `0-9`, `+`, `-` and `_`. Changing it forces a new issuer to be created.
 - `max_ttl` (Number) The maximum time-to-live, in seconds, of dynamic secrets created with this issuer. Must be between `900` and `43200`, and cannot be decreased once the issuer exists.
 
 ### Optional

@@ -64,6 +64,23 @@ func sanitizeServerText(s string) string {
 	return s
 }
 
+// maxListedServerIDs caps how many server-supplied IDs are listed in a single diagnostic.
+const maxListedServerIDs = 10
+
+// formatServerIDs formats server-supplied IDs for a diagnostic: each ID is sanitized and quoted, and
+// at most maxListedServerIDs are listed.
+func formatServerIDs(ids []string) string {
+	quoted := make([]string, 0, min(len(ids), maxListedServerIDs))
+	for _, id := range ids[:min(len(ids), maxListedServerIDs)] {
+		quoted = append(quoted, fmt.Sprintf("%q", sanitizeServerText(id)))
+	}
+	list := strings.Join(quoted, ", ")
+	if len(ids) > maxListedServerIDs {
+		list += fmt.Sprintf(" and %d more", len(ids)-maxListedServerIDs)
+	}
+	return list
+}
+
 // serverErrorDetail formats an error returned by the Conjur API for a diagnostic. The message is
 // sanitized with sanitizeServerText, and the HTTP status code is included when available.
 func serverErrorDetail(err error) string {

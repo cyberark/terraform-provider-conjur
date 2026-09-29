@@ -190,9 +190,6 @@ func batchRetrieveSecretsToMap(ctx context.Context, client api.ClientV2, config 
 	return data, true
 }
 
-// maxListedServerIDs caps how many server-supplied IDs are listed in a single diagnostic.
-const maxListedServerIDs = 10
-
 // checkForMismatch compares the requested names with the IDs in the response and adds diagnostics for:
 //   - duplicate IDs in the response: always an error, since it is ambiguous which entry to use;
 //   - requested secrets missing from the response: an error if failOnError is true, a warning otherwise;
@@ -247,18 +244,4 @@ func checkForMismatch(requestedNames []string, response []conjurapi.SecretValue,
 	diags.AddWarning(summary, detail)
 
 	return true
-}
-
-// formatServerIDs formats server-supplied secret IDs for a diagnostic: each ID is sanitized and quoted, and
-// at most maxListedServerIDs are listed.
-func formatServerIDs(ids []string) string {
-	quoted := make([]string, 0, min(len(ids), maxListedServerIDs))
-	for _, id := range ids[:min(len(ids), maxListedServerIDs)] {
-		quoted = append(quoted, fmt.Sprintf("%q", sanitizeServerText(id)))
-	}
-	list := strings.Join(quoted, ", ")
-	if len(ids) > maxListedServerIDs {
-		list += fmt.Sprintf(" and %d more", len(ids)-maxListedServerIDs)
-	}
-	return list
 }

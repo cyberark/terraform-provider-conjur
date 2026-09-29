@@ -164,7 +164,9 @@ The privileges required to use supported resources and data sources are listed b
 | conjur_membership         | update on the parent policy of the group                  |
 | conjur_permission         | create/update on the parent policy of the resource        |
 | conjur_authenticator      | create/update on the `conjur/authn-<authn-type>` policy   |
-| conjur_issuer             | create/read/update on the parent policy                   |
+| conjur_issuer             | Secrets Manager admin, plus read on the referenced secrets |
+
+**Note:** See the [conjur_issuer](docs/resources/issuer.md) page for details on the privileges required to manage issuers.
 
 **Note:** The 'read' privilege is required on managed resources to allow the provider to retrieve the current state and import existing resources.
 It is usually granted implicitly assuming the above required privileges have been granted.
