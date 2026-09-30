@@ -357,11 +357,12 @@ func (r *GroupResource) createViaPolicy(data *GroupResourceModel, resp *resource
 // On Self-Hosted/OSS name, branch, owner and annotations all force replace,
 // so Update is only reached there when the change was planned without a
 // configured client (see ModifyPlan). It must then fail without making any
-// changes: with a client it errors below, and without one it sets no state,
-// which the framework rejects.
+// changes, so both cases return an error. The framework pre-seeds the
+// response state with the prior state, so leaving it untouched without an
+// error would surface as "inconsistent result after apply" instead.
 func (r *GroupResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	if r.client == nil {
-		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
+		resp.Diagnostics.AddError("Provider Client Not Configured", "The Conjur provider client is not available during apply (e.g. the JWT token is still unknown), so the group can't be updated. No changes were made. Re-run the plan and apply once the provider credentials are available.")
 		return
 	}
 

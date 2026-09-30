@@ -636,9 +636,9 @@ func TestGroupResource_Update_PolicyBackend(t *testing.T) {
 }
 
 // TestGroupResource_Update_NilClient covers an in-place update planned without
-// a configured client (see ModifyPlan). Update must leave the response state
-// unset, which the framework rejects as "Missing Resource State After Update",
-// so a Self-Hosted/OSS apply fails without recording the planned values.
+// a configured client (see ModifyPlan). The response state is seeded with the
+// prior state, as the framework does, so Update must return an error and leave
+// it untouched rather than record the planned values.
 func TestGroupResource_Update_NilClient(t *testing.T) {
 	r := &GroupResource{}
 
@@ -648,11 +648,14 @@ func TestGroupResource_Update_NilClient(t *testing.T) {
 	req := resource.UpdateRequest{Plan: newPlanWithSchema(getGroupTestSchema()), State: newStateWithSchema(getGroupTestSchema())}
 	require.False(t, req.Plan.Set(ctx, &planned).HasError())
 	require.False(t, req.State.Set(ctx, &prior).HasError())
-	resp := &resource.UpdateResponse{State: newStateWithSchema(getGroupTestSchema())}
+	resp := &resource.UpdateResponse{State: req.State}
 
 	r.Update(ctx, req, resp)
 
-	assert.True(t, resp.State.Raw.IsNull(), "state must not be set: %v", resp.State.Raw)
+	assertDiagOutcome(t, resp.Diagnostics, true, "Provider Client Not Configured")
+	var result GroupResourceModel
+	require.False(t, resp.State.Get(ctx, &result).HasError())
+	assert.Equal(t, prior.Annotations, result.Annotations)
 }
 
 // TestGroupResource_ServerErrorSanitized covers server-supplied error text in
