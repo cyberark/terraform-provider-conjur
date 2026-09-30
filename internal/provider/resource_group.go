@@ -320,6 +320,9 @@ func (r *GroupResource) createV2(data *GroupResourceModel, resp *resource.Create
 // createViaPolicy creates the group by generating and applying Conjur policy YAML, the provider's pre-V2 behavior.
 // The PATCH load is an upsert, so a group that already exists is adopted rather than rejected; that is only
 // warned about, since Self-Hosted/OSS has no import to bring an existing group under management otherwise.
+// The warning is best-effort: the existence check and the PATCH are not atomic, and Conjur has no create-if-absent
+// policy load, so a group created by another writer (e.g. a concurrent apply from a separate state) in between is
+// adopted without the warning.
 func (r *GroupResource) createViaPolicy(data *GroupResourceModel, resp *resource.CreateResponse) {
 	groupPolicy, err := r.generateGroupPolicy(data)
 	if err != nil {
