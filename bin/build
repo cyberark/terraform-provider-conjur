@@ -37,12 +37,15 @@ build_and_package_binaries() {
   #git fetch --tags  # jenkins does not do this automatically yet
 
   echo "> Building goreleaser"
-  docker compose build goreleaser
+  docker build -f Dockerfile.goreleaser -t terraform-provider-conjur-goreleaser "$(repo_root)"
 
   echo "> Building and packaging binaries"
-  docker compose run --rm \
+  docker run --rm \
+    -e CONJUR_PLUGIN_VERSION \
+    -v "$(repo_root)":/terraform-provider-conjur \
+    -w /terraform-provider-conjur \
     --entrypoint goreleaser \
-    goreleaser release --clean --skip=validate
+    terraform-provider-conjur-goreleaser release --clean --skip=validate
 
   # Needed for testing stages
   goos='linux'  # uname -s | tr '[:upper:]' '[:lower:]'
