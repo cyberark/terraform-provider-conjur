@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/cyberark/conjur-api-go/conjurapi/response"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 )
 
 // isNotFoundErr reports whether err represents a "not found" condition from the Conjur API.
@@ -89,4 +90,17 @@ func serverErrorDetail(err error) string {
 		return fmt.Sprintf("status %d: %s", conjurErr.Code, sanitizeServerText(conjurErr.Error()))
 	}
 	return sanitizeServerText(err.Error())
+}
+
+// diagsToError flattens error diagnostics into a single error for helpers that
+// return error instead of diag.Diagnostics, or nil when there are none.
+func diagsToError(diags diag.Diagnostics) error {
+	if !diags.HasError() {
+		return nil
+	}
+	msgs := make([]string, 0, len(diags.Errors()))
+	for _, d := range diags.Errors() {
+		msgs = append(msgs, fmt.Sprintf("%s: %s", d.Summary(), d.Detail()))
+	}
+	return errors.New(strings.Join(msgs, "; "))
 }

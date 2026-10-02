@@ -35,7 +35,7 @@ var (
 )
 
 // groupOwnerAttrTypes is the attr.Type map for the "owner" nested attribute.
-// Derived from ownerToObject (resource_policy_branch.go) instead of a second
+// Derived from ownerToObject (owner.go) instead of a second
 // literal, so the two can't drift apart if the owner shape ever changes.
 var groupOwnerAttrTypes = ownerToObject(nil).AttributeTypes(context.Background())
 
@@ -101,17 +101,22 @@ func (r *GroupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 			"configurations keep working. On Self-Hosted and OSS deployments `owner` is fully supported but " +
 			"write-only (import is not supported), and any change to it replaces the resource. `annotations` is " +
 			"updated in place on Secrets Manager, SaaS; on Self-Hosted and OSS any change to it replaces the " +
-			"resource. `name` and `branch` replace the resource on any change, on both deployment types.",
+			"resource. `name` and `branch` replace the resource on any change, on both deployment types. " +
+			"Replacing the resource deletes and recreates the group, which drops its memberships and any " +
+			"permissions granted to it. The provider identity needs policy load privileges on `branch` on " +
+			"Self-Hosted and OSS, and the corresponding group-management permissions on Secrets Manager, SaaS. " +
+			"The import ID format is `<branch>/<name>` (import is supported on Secrets Manager, SaaS only).",
 
 		Attributes: map[string]schema.Attribute{
 			"name": schema.StringAttribute{
-				MarkdownDescription: "The name of the group",
+				MarkdownDescription: "The name of the group. Must not contain `/` or be `.` or `..`.",
 				Required:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 				Validators: []validator.String{
 					stringvalidator.RegexMatches(groupNamePattern, "must not contain '/'"),
+					noDotSegmentsValidator{},
 				},
 			},
 			"branch": schema.StringAttribute{
@@ -142,16 +147,18 @@ func (r *GroupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				// only known from the Configured instance. See ModifyPlan.
 			},
 			"annotations": schema.MapAttribute{
-				MarkdownDescription: "Key-value annotations for the group. Keys must not be empty. On Secrets " +
+				MarkdownDescription: "Key-value annotations for the group. Keys must not be empty or contain a `.` or `..` path segment. On Secrets " +
 					"Manager, SaaS, changes are applied in place: added and changed keys via a merging update, " +
 					"and removed keys by deleting each one individually. On Self-Hosted and OSS deployments any " +
 					"change to this attribute replaces the resource.",
 				Optional:    true,
 				ElementType: types.StringType,
 				// Empty keys are rejected on every backend: the per-key delete
-				// endpoint has no way to address one.
+				// endpoint has no way to address one. '.'/'..' segments are
+				// rejected because a proxy that decodes %2F would resolve them
+				// as path traversal in that endpoint's URL.
 				Validators: []validator.Map{
-					mapvalidator.KeysAre(stringvalidator.LengthAtLeast(1)),
+					mapvalidator.KeysAre(stringvalidator.LengthAtLeast(1), noDotSegmentsValidator{}),
 				},
 				// annotations' RequiresReplace is decided in ModifyPlan, for the
 				// same reason as owner's.
@@ -171,18 +178,14 @@ func (r *GroupResource) ValidateConfig(ctx context.Context, req resource.Validat
 	}
 
 	ValidateNonBlank(data.Name, &resp.Diagnostics, "Group name")
+	ValidateNoSurroundingWhitespace(data.Name, &resp.Diagnostics, "Group name")
 	ValidateBranch(data.Branch, &resp.Diagnostics, "branch")
+	ValidateNoSurroundingWhitespace(data.Branch, &resp.Diagnostics, "branch")
+	ValidateGroupBranch(data.Branch, &resp.Diagnostics, "branch")
 
-	// isSaaS() is false when the client is unresolved (e.g. an unknown JWT
-	// during a Terraform Cloud plan), matching the rest of this provider's
-	// nil-client handling; it's not a false negative on a real SaaS
-	// deployment.
-	//
-	// A warning, not an error: a pre-existing conjur_group created via policy
-	// before this backend existed may already have owner set. Erroring here
-	// would block every plan for that resource until the HCL is edited,
-	// exactly the disruptive upgrade that needs to be avoided.
-	if r.isSaaS() && !data.Owner.IsNull() && !data.Owner.IsUnknown() {
+	if r.client != nil && !r.isSaaS() {
+		ValidateOwner(data.Owner, &resp.Diagnostics, path.Root("owner"))
+	} else if r.isSaaS() && !data.Owner.IsNull() && !data.Owner.IsUnknown() {
 		resp.Diagnostics.AddWarning(
 			"Owner Ignored on Secrets Manager, SaaS",
 			"Secrets Manager, SaaS does not support 'owner' for groups, so it has no effect here and is not "+
@@ -207,6 +210,14 @@ func (r *GroupResource) Configure(_ context.Context, req resource.ConfigureReque
 // forces replace: Update applies annotations changes in place, and owner is
 // inert (the V2 Group model has no owner field), so an owner change flows
 // into Update as a no-op.
+//
+// When the client isn't configured for this plan (e.g. an unresolved JWT),
+// the backend is unknown, so an owner or annotations change is planned as an
+// in-place update with a warning rather than a replacement: forcing replace
+// would drop memberships and grants if the deployment turns out to be SaaS.
+// On SaaS Update then applies it in place; on Self-Hosted/OSS Update fails
+// without making any changes, and a plan with credentials available plans
+// the replacement.
 //
 // This lives here rather than in attribute plan modifiers because
 // the backend is per-provider-configuration: isSaaS() reads the client that
@@ -245,6 +256,11 @@ func (r *GroupResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanR
 		return
 	}
 
+	if r.client == nil {
+		resp.Diagnostics.AddWarning("Deployment Type Unknown at Plan Time", "The provider client is not configured during this plan (e.g. the JWT token is not yet known), so it can't be determined whether this is Secrets Manager, SaaS or a Self-Hosted/OSS deployment. The owner or annotations change is therefore planned as an in-place update. On Secrets Manager, SaaS it will be applied in place. On Self-Hosted and OSS the apply will fail without making any changes, because this resource must be replaced there; re-run the plan once the provider credentials are available so the replacement is planned.")
+		return
+	}
+
 	if ownerChanged {
 		resp.RequiresReplace = append(resp.RequiresReplace, path.Root("owner"))
 	}
@@ -254,9 +270,9 @@ func (r *GroupResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanR
 }
 
 // isSaaS reports whether groups should be managed through the V2 Groups REST
-// API rather than policy YAML. It defaults to the policy backend when the
-// client is unavailable (e.g. an unresolved JWT during plan), matching this
-// resource's behavior before the V2 API existed.
+// API rather than policy YAML. It returns false when the client is
+// unavailable (e.g. an unresolved JWT during plan), so callers that must not
+// assume Self-Hosted/OSS in that case (ModifyPlan) check r.client first.
 func (r *GroupResource) isSaaS() bool {
 	if r.client == nil {
 		return false
@@ -293,15 +309,20 @@ func (r *GroupResource) Create(ctx context.Context, req resource.CreateRequest, 
 // planned rather than refreshed from the response: annotations is not
 // Computed, so any difference in the server's echo (e.g. {} for a null plan)
 // would fail to apply with "inconsistent result after apply". The V2 Group
-// model has no owner field - ValidateConfig already rejects owner on this
-// backend, so there is nothing to send here even if it somehow reached this far.
+// model has no owner field - ValidateConfig only warns about owner on this
+// backend, so a configured owner is silently not sent.
 func (r *GroupResource) createV2(data *GroupResourceModel, resp *resource.CreateResponse) {
 	if _, err := r.client.CreateGroup(toV2Group(data)); err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create group: %s", err))
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create group: %s", serverErrorDetail(err)))
 	}
 }
 
 // createViaPolicy creates the group by generating and applying Conjur policy YAML, the provider's pre-V2 behavior.
+// The PATCH load is an upsert, so a group that already exists is adopted rather than rejected; that is only
+// warned about, since Self-Hosted/OSS has no import to bring an existing group under management otherwise.
+// The warning is best-effort: the existence check and the PATCH are not atomic, and Conjur has no create-if-absent
+// policy load, so a group created by another writer (e.g. a concurrent apply from a separate state) in between is
+// adopted without the warning.
 func (r *GroupResource) createViaPolicy(data *GroupResourceModel, resp *resource.CreateResponse) {
 	groupPolicy, err := r.generateGroupPolicy(data)
 	if err != nil {
@@ -309,8 +330,20 @@ func (r *GroupResource) createViaPolicy(data *GroupResourceModel, resp *resource
 		return
 	}
 
-	if err := policy.ApplyPolicy(r.client, groupPolicy, data.Branch.ValueString()); err != nil {
-		resp.Diagnostics.AddError("Error Applying Policy", fmt.Sprintf("Could not apply group policy: %s", err))
+	groupID := r.policyGroupRoleID(data)
+	exists, err := r.client.RoleExists(groupID)
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading Conjur group", fmt.Sprintf("Unable to check if group %q already exists: %s", groupID, serverErrorDetail(err)))
+		return
+	}
+
+	if err := policy.ApplyPolicy(r.client, groupPolicy, normalizeBranch(data.Branch.ValueString())); err != nil {
+		resp.Diagnostics.AddError("Error Applying Policy", fmt.Sprintf("Could not apply group policy: %s", serverErrorDetail(err)))
+		return
+	}
+
+	if exists {
+		resp.Diagnostics.AddWarning("Existing Group Adopted", fmt.Sprintf("The group %q already existed in Conjur and is now managed by Terraform. Its owner and annotations may have been rewritten to match this configuration, and it will be deleted when this resource is destroyed. If this group is managed elsewhere, run 'terraform state rm' on this resource before removing it from the configuration, so the group is not deleted.", groupID))
 	}
 }
 
@@ -324,13 +357,15 @@ func (r *GroupResource) createViaPolicy(data *GroupResourceModel, resp *resource
 // so the next plan retries only what's left. The PATCH response is not used to
 // refresh state, for the same reason as in createV2.
 //
-// On Self-Hosted/OSS Update is unreachable: name, branch, owner and
-// annotations all force replace, so Terraform never plans an in-place update
-// there. The error below is defensive, matching the pre-V2 behavior, rather
-// than removed.
+// On Self-Hosted/OSS name, branch, owner and annotations all force replace,
+// so Update is only reached there when the change was planned without a
+// configured client (see ModifyPlan). It must then fail without making any
+// changes, so both cases return an error. The framework pre-seeds the
+// response state with the prior state, so leaving it untouched without an
+// error would surface as "inconsistent result after apply" instead.
 func (r *GroupResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	if r.client == nil {
-		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
+		resp.Diagnostics.AddError("Provider Client Not Configured", "The Conjur provider client is not available during apply (e.g. the JWT token is still unknown), so the group can't be updated. No changes were made. Re-run the plan and apply once the provider credentials are available.")
 		return
 	}
 
@@ -355,7 +390,7 @@ func (r *GroupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	for _, key := range annotationKeysToRemove(state.Annotations, plan.Annotations) {
 		err := r.client.DeleteGroupAnnotation(identifier, key)
 		if err != nil && !isNotFoundErr(err) {
-			failure = fmt.Sprintf("Unable to remove annotation %q from group %q: %s", key, identifier, err)
+			failure = fmt.Sprintf("Unable to remove annotation %q from group %q: %s", key, identifier, serverErrorDetail(err))
 			break
 		}
 		if err != nil {
@@ -370,7 +405,7 @@ func (r *GroupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 
 	if failure == "" && annotationsNeedPatch(state.Annotations, plan.Annotations) {
 		if _, err := r.client.UpdateGroup(toV2Group(&plan)); err != nil {
-			failure = fmt.Sprintf("Unable to update annotations of group %q: %s", identifier, err)
+			failure = fmt.Sprintf("Unable to update annotations of group %q: %s", identifier, serverErrorDetail(err))
 		}
 	}
 
@@ -443,21 +478,27 @@ func (r *GroupResource) Read(ctx context.Context, req resource.ReadRequest, resp
 }
 
 // readV2 fetches the group from the V2 Groups API and refreshes annotations
-// from the response (there is no owner field to refresh). It reports whether
-// the resource was removed from state because the group no longer exists.
+// from the response (there is no owner field to refresh). Surrounding
+// whitespace is trimmed from name and branch so state written by earlier
+// provider versions, which trimmed before calling the API, converges to the
+// stored group without a replacement. It reports whether the resource was
+// removed from state because the group no longer exists.
 func (r *GroupResource) readV2(ctx context.Context, data *GroupResourceModel, resp *resource.ReadResponse) bool {
 	identifier := groupIdentifier(data.Branch.ValueString(), data.Name.ValueString())
 
 	group, err := r.client.ReadGroup(identifier)
 	if isNotFoundErr(err) {
+		resp.Diagnostics.AddWarning("Group Not Found", fmt.Sprintf("The group %q was not found in Conjur and will be removed from the state. If you did not expect this, please check your Conjur instance to ensure the group exists and can be managed by the provider identity.", identifier))
 		resp.State.RemoveResource(ctx)
 		return true
 	}
 	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read group %q: %s", identifier, err))
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read group %q: %s", identifier, serverErrorDetail(err)))
 		return false
 	}
 
+	data.Name = types.StringValue(strings.TrimSpace(data.Name.ValueString()))
+	data.Branch = types.StringValue(strings.TrimSpace(data.Branch.ValueString()))
 	r.applyGroupResponse(group, data)
 	return false
 }
@@ -467,12 +508,12 @@ func (r *GroupResource) readV2(ctx context.Context, data *GroupResourceModel, re
 // is otherwise left unchanged. It reports whether the resource was removed
 // from state.
 func (r *GroupResource) readPolicy(ctx context.Context, data *GroupResourceModel, resp *resource.ReadResponse) bool {
-	groupID := fullyQualifiedID(r.client, "group", branchQualifiedID(data.Branch.ValueString(), data.Name.ValueString()))
+	groupID := r.policyGroupRoleID(data)
 	exists, err := r.client.RoleExists(groupID)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading Conjur group",
-			fmt.Sprintf("Unable to check if group %q exists: %s", groupID, err),
+			fmt.Sprintf("Unable to check if group %q exists: %s", groupID, serverErrorDetail(err)),
 		)
 		return false
 	}
@@ -484,6 +525,12 @@ func (r *GroupResource) readPolicy(ctx context.Context, data *GroupResourceModel
 	}
 
 	return false
+}
+
+// policyGroupRoleID returns the fully qualified role ID of the group on the policy backend, using the same
+// normalized branch the policy is loaded into, so create, read and delete all address the same group.
+func (r *GroupResource) policyGroupRoleID(data *GroupResourceModel) string {
+	return fullyQualifiedID(r.client, "group", branchQualifiedID(normalizeBranch(data.Branch.ValueString()), data.Name.ValueString()))
 }
 
 func (r *GroupResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -508,14 +555,18 @@ func (r *GroupResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 	}
 
 	tflog.Trace(ctx, "deleted group resource")
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-// deleteV2 deletes the group through the V2 Groups API.
+// deleteV2 deletes the group through the V2 Groups API. A group that is already gone (404) counts as deleted.
 func (r *GroupResource) deleteV2(data *GroupResourceModel, resp *resource.DeleteResponse) {
 	identifier := groupIdentifier(data.Branch.ValueString(), data.Name.ValueString())
-	if err := r.client.DeleteGroup(identifier); err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete group %q: %s", identifier, err))
+	err := r.client.DeleteGroup(identifier)
+	if isNotFoundErr(err) {
+		resp.Diagnostics.AddWarning("Group Already Absent", fmt.Sprintf("The group %q was not found in Conjur, so there was nothing to delete. It may have been deleted outside Terraform.", identifier))
+		return
+	}
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete group %q: %s", identifier, serverErrorDetail(err)))
 	}
 }
 
@@ -528,8 +579,8 @@ func (r *GroupResource) deleteViaPolicy(data *GroupResourceModel, resp *resource
 		return
 	}
 
-	if err := policy.ApplyPolicy(r.client, groupPolicy, data.Branch.ValueString()); err != nil {
-		resp.Diagnostics.AddError("Error Applying Deletion Policy", fmt.Sprintf("Could not apply group deletion policy: %s", err))
+	if err := policy.ApplyPolicy(r.client, groupPolicy, normalizeBranch(data.Branch.ValueString())); err != nil {
+		resp.Diagnostics.AddError("Error Applying Deletion Policy", fmt.Sprintf("Could not apply group deletion policy: %s", serverErrorDetail(err)))
 	}
 }
 
@@ -557,7 +608,11 @@ func (r *GroupResource) ImportState(ctx context.Context, req resource.ImportStat
 	}
 
 	branch, name := splitParentAndName(id)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("branch"), branch)...)
+	if problem := groupImportIDProblem(branch, name); problem != "" {
+		resp.Diagnostics.AddError("Unexpected Import Identifier", fmt.Sprintf("Expected format: <branch>/<name>, e.g. data/teams/admins. Got %q: %s.", req.ID, problem))
+		return
+	}
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("branch"), normalizeBranch(branch))...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), name)...)
 }
 
@@ -580,22 +635,25 @@ func (r *GroupResource) applyGroupResponse(g *conjurapi.Group, data *GroupResour
 }
 
 // toV2Group builds the conjurapi.Group payload sent to the V2 Groups API on
-// both create and update, normalizing name/branch the same way as
-// groupIdentifier so the two call sites can't drift out of sync.
+// both create and update, normalizing branch the same way as groupIdentifier
+// so the two call sites can't drift out of sync. name is sent as configured:
+// ValidateConfig rejects surrounding whitespace, so there is nothing to trim.
 func toV2Group(data *GroupResourceModel) conjurapi.Group {
 	return conjurapi.Group{
-		Name:        strings.TrimSpace(data.Name.ValueString()),
+		Name:        data.Name.ValueString(),
 		Branch:      normalizeBranch(data.Branch.ValueString()),
 		Annotations: data.Annotations,
 	}
 }
 
 // groupIdentifier builds the "<branch>/<name>" identifier the V2 Groups API
-// expects, normalizing branch and trimming stray whitespace from name so a
-// leading/trailing "/" or space in either can't produce a malformed path
-// segment or a mismatched identifier. Unlike branchQualifiedID (shared with
-// conjur_host and conjur_secret, which have their own, different leading-slash
-// conventions), the V2 Groups API always wants a fully normalized identifier.
+// expects, normalizing branch so a leading/trailing "/" can't produce a
+// malformed path segment or a mismatched identifier. name is trimmed because
+// state written by earlier provider versions may still hold surrounding
+// whitespace that was stripped before the group was created. Unlike
+// branchQualifiedID (shared with conjur_host and conjur_secret, which have
+// their own, different leading-slash conventions), the V2 Groups API always
+// wants a fully normalized identifier.
 func groupIdentifier(branch, name string) string {
 	return branchQualifiedID(normalizeBranch(branch), strings.TrimSpace(name))
 }
@@ -605,7 +663,11 @@ func (r *GroupResource) generateGroupPolicy(data *GroupResourceModel) (string, e
 		Id: data.Name.ValueString(),
 	}
 
-	if owner := ownerFromObject(data.Owner); owner != nil {
+	owner, ownerDiags := ownerFromObject(data.Owner)
+	if err := diagsToError(ownerDiags); err != nil {
+		return "", err
+	}
+	if owner != nil {
 		ownerKind, err := conjurpolicy.KindString(owner.Kind)
 		if err != nil {
 			return "", fmt.Errorf("invalid owner kind: %w", err)

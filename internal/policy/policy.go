@@ -14,7 +14,7 @@ import (
 // Create a global mutex to prevent concurrent policy updates
 var policyMutex sync.Mutex
 
-// applyPolicy applies a policy to Conjur using PATCH mode
+// ApplyPolicy applies a policy to Conjur using PATCH mode
 func ApplyPolicy(client api.ClientV2, policy, branch string) error {
 	policyMutex.Lock()
 	defer policyMutex.Unlock()
@@ -25,9 +25,9 @@ func ApplyPolicy(client api.ClientV2, policy, branch string) error {
 	}
 
 	// Log the policy response for debugging
-	tflog.Debug(context.Background(), "Policy applied successfully", map[string]interface{}{
-		"created_roles": policyResponse.CreatedRoles,
-		"version":       policyResponse.Version,
+	tflog.Debug(context.Background(), "Policy applied successfully", map[string]any{
+		"created_roles_count": len(policyResponse.CreatedRoles),
+		"version":             policyResponse.Version,
 	})
 
 	return nil

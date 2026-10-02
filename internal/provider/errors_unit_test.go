@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/cyberark/conjur-api-go/conjurapi/response"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -65,4 +66,19 @@ func TestServerErrorDetail(t *testing.T) {
 			assert.Equal(t, tt.expected, serverErrorDetail(tt.err))
 		})
 	}
+}
+
+func TestDiagsToError(t *testing.T) {
+	var none diag.Diagnostics
+	assert.NoError(t, diagsToError(none))
+
+	var warningsOnly diag.Diagnostics
+	warningsOnly.AddWarning("Heads Up", "just a warning")
+	assert.NoError(t, diagsToError(warningsOnly))
+
+	var mixed diag.Diagnostics
+	mixed.AddError("First", "one")
+	mixed.AddWarning("Heads Up", "just a warning")
+	mixed.AddError("Second", "two")
+	assert.EqualError(t, diagsToError(mixed), "First: one; Second: two")
 }

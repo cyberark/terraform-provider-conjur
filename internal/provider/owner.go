@@ -1,34 +1,32 @@
 package provider
 
 import (
+	"fmt"
+
 	"github.com/cyberark/conjur-api-go/conjurapi"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-// ownerFromObject safely extracts a *conjurapi.Owner from an "owner" nested
-// attribute, or nil when it's null, unknown (the block was omitted from
-// config entirely), or its attributes aren't the expected type - this is the
-// single source of truth for that extraction so callers don't each repeat an
-// unchecked type assertion that would panic on an unexpected attribute type.
-// An empty-but-present block (owner = {}) is deliberately not "no owner":
-// it's passed through so conjurpolicy.KindString rejects the blank kind in
-// generateGroupPolicy, matching conjur_group's pre-V2 validation of an
-// explicit but incomplete owner. Used directly by the policy-YAML backends
-// that model owner as *conjurapi.Owner (conjur_group and
-// conjur_policy_branch); conjur_authenticator remaps its two fields into its
-// own conjurapi.AuthOwner, since the V2 Authenticator model uses that type
-// instead.
-func ownerFromObject(obj types.Object) *conjurapi.Owner {
+// ownerFromObject extracts a *conjurapi.Owner from an "owner" nested attribute.
+// It returns nil when the owner is null or unknown, and nil plus an error
+// diagnostic when kind/id aren't strings, so a configured owner is never
+// silently dropped. An empty block (owner = {}) is passed through, not treated
+// as "no owner", so the blank kind is rejected downstream.
+func ownerFromObject(obj types.Object) (*conjurapi.Owner, diag.Diagnostics) {
+	var diags diag.Diagnostics
 	if obj.IsNull() || obj.IsUnknown() {
-		return nil
+		return nil, diags
 	}
 	kind, kindOK := obj.Attributes()["kind"].(types.String)
 	id, idOK := obj.Attributes()["id"].(types.String)
 	if !kindOK || !idOK {
-		return nil
+		diags.AddAttributeError(path.Root("owner"), "Invalid Owner", fmt.Sprintf("Expected owner.kind and owner.id to be strings, got %T and %T.", obj.Attributes()["kind"], obj.Attributes()["id"]))
+		return nil, diags
 	}
-	return &conjurapi.Owner{Kind: kind.ValueString(), Id: id.ValueString()}
+	return &conjurapi.Owner{Kind: kind.ValueString(), Id: id.ValueString()}, diags
 }
 
 // ownerToObject is the inverse of ownerFromObject: it builds the "owner"

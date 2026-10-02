@@ -12,6 +12,7 @@ import (
 	"github.com/cyberark/conjur-api-go/conjurapi/response"
 	"github.com/cyberark/terraform-provider-conjur/internal/conjur/api/mocks"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -29,11 +30,12 @@ var saasBackendConfig = conjurapi.Config{Account: "conjur", Environment: conjura
 
 func TestGroupResource_Create(t *testing.T) {
 	tests := []struct {
-		name          string
-		data          GroupResourceModel
-		setupMock     func(*mocks.MockClientV2)
-		expectedError bool
-		errorContains string
+		name            string
+		data            GroupResourceModel
+		setupMock       func(*mocks.MockClientV2)
+		expectedError   bool
+		errorContains   string
+		warningContains string
 	}{
 		{
 			name: "successful group creation with minimal fields",
@@ -43,6 +45,7 @@ func TestGroupResource_Create(t *testing.T) {
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
 				mockV2.On("GetConfig").Return(policyBackendConfig)
+				mockV2.On("RoleExists", "conjur:group:data/test/developers").Return(false, nil)
 				mockV2.On("LoadPolicy", conjurapi.PolicyModePatch, "data/test", mock.MatchedBy(func(policy io.Reader) bool {
 					buf := new(strings.Builder)
 					_, _ = io.Copy(buf, policy)
@@ -60,11 +63,66 @@ func TestGroupResource_Create(t *testing.T) {
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
 				mockV2.On("GetConfig").Return(policyBackendConfig)
+				mockV2.On("RoleExists", "conjur:group:data/test/error-group").Return(false, nil)
 				mockV2.On("LoadPolicy", conjurapi.PolicyModePatch, "data/test", mock.Anything).Return(
 					nil, fmt.Errorf("permission denied"))
 			},
 			expectedError: true,
 			errorContains: "Could not apply group policy",
+		},
+		{
+			name: "typed 403 during policy creation includes status code",
+			data: GroupResourceModel{
+				Name:   types.StringValue("error-group"),
+				Branch: types.StringValue("data/test"),
+			},
+			setupMock: func(mockV2 *mocks.MockClientV2) {
+				mockV2.On("GetConfig").Return(policyBackendConfig)
+				mockV2.On("RoleExists", "conjur:group:data/test/error-group").Return(false, nil)
+				mockV2.On("LoadPolicy", conjurapi.PolicyModePatch, "data/test", mock.Anything).Return(nil, &response.ConjurError{Code: http.StatusForbidden, Message: "Forbidden"})
+			},
+			expectedError: true,
+			errorContains: "Could not apply group policy: status 403: Forbidden",
+		},
+		{
+			name: "policy branch with leading and trailing slashes is normalized",
+			data: GroupResourceModel{
+				Name:   types.StringValue("developers"),
+				Branch: types.StringValue("/data/test/"),
+			},
+			setupMock: func(mockV2 *mocks.MockClientV2) {
+				mockV2.On("GetConfig").Return(policyBackendConfig)
+				mockV2.On("RoleExists", "conjur:group:data/test/developers").Return(false, nil)
+				mockV2.On("LoadPolicy", conjurapi.PolicyModePatch, "data/test", mock.Anything).Return(&conjurapi.PolicyResponse{}, nil)
+			},
+			expectedError: false,
+		},
+		{
+			name: "existing group is adopted with a warning",
+			data: GroupResourceModel{
+				Name:   types.StringValue("developers"),
+				Branch: types.StringValue("data/test"),
+			},
+			setupMock: func(mockV2 *mocks.MockClientV2) {
+				mockV2.On("GetConfig").Return(policyBackendConfig)
+				mockV2.On("RoleExists", "conjur:group:data/test/developers").Return(true, nil)
+				mockV2.On("LoadPolicy", conjurapi.PolicyModePatch, "data/test", mock.Anything).Return(&conjurapi.PolicyResponse{}, nil)
+			},
+			expectedError:   false,
+			warningContains: `Existing Group Adopted`,
+		},
+		{
+			name: "existence check error does not load policy",
+			data: GroupResourceModel{
+				Name:   types.StringValue("developers"),
+				Branch: types.StringValue("data/test"),
+			},
+			setupMock: func(mockV2 *mocks.MockClientV2) {
+				mockV2.On("GetConfig").Return(policyBackendConfig)
+				mockV2.On("RoleExists", "conjur:group:data/test/developers").Return(false, &response.ConjurError{Code: http.StatusUnauthorized, Message: "Unauthorized"})
+			},
+			expectedError: true,
+			errorContains: `Unable to check if group "conjur:group:data/test/developers" already exists: status 401: Unauthorized`,
 		},
 		{
 			name: "creation with owner",
@@ -78,6 +136,7 @@ func TestGroupResource_Create(t *testing.T) {
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
 				mockV2.On("GetConfig").Return(policyBackendConfig)
+				mockV2.On("RoleExists", "conjur:group:data/production/admins").Return(false, nil)
 				mockV2.On("LoadPolicy", conjurapi.PolicyModePatch, "data/production", mock.MatchedBy(func(policy io.Reader) bool {
 					buf := new(strings.Builder)
 					_, _ = io.Copy(buf, policy)
@@ -96,6 +155,7 @@ func TestGroupResource_Create(t *testing.T) {
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
 				mockV2.On("GetConfig").Return(policyBackendConfig)
+				mockV2.On("RoleExists", "conjur:group:data/teams/platform-team").Return(false, nil)
 				mockV2.On("LoadPolicy", conjurapi.PolicyModePatch, "data/teams", mock.MatchedBy(func(policy io.Reader) bool {
 					buf := new(strings.Builder)
 					_, _ = io.Copy(buf, policy)
@@ -118,6 +178,7 @@ func TestGroupResource_Create(t *testing.T) {
 			},
 			setupMock: func(mockV2 *mocks.MockClientV2) {
 				mockV2.On("GetConfig").Return(policyBackendConfig)
+				mockV2.On("RoleExists", "conjur:group:data/groups/security-team").Return(false, nil)
 				mockV2.On("LoadPolicy", conjurapi.PolicyModePatch, "data/groups", mock.Anything).Return(&conjurapi.PolicyResponse{}, nil)
 			},
 			expectedError: false,
@@ -157,6 +218,19 @@ func TestGroupResource_Create(t *testing.T) {
 			expectedError: true,
 			errorContains: "Unable to create group",
 		},
+		{
+			name: "SaaS typed 401 during creation includes status code",
+			data: GroupResourceModel{
+				Name:   types.StringValue("error-group"),
+				Branch: types.StringValue("data/test"),
+			},
+			setupMock: func(mockV2 *mocks.MockClientV2) {
+				mockV2.On("GetConfig").Return(saasBackendConfig)
+				mockV2.On("CreateGroup", mock.Anything).Return(nil, &response.ConjurError{Code: http.StatusUnauthorized, Message: "Unauthorized"})
+			},
+			expectedError: true,
+			errorContains: "Unable to create group: status 401: Unauthorized",
+		},
 	}
 
 	for _, tt := range tests {
@@ -193,6 +267,11 @@ func TestGroupResource_Create(t *testing.T) {
 			r.Create(ctx, req, resp)
 
 			assertDiagOutcome(t, resp.Diagnostics, tt.expectedError, tt.errorContains)
+			if tt.warningContains == "" {
+				assert.Empty(t, resp.Diagnostics.Warnings())
+			} else {
+				assertWarningContains(t, resp.Diagnostics, tt.warningContains)
+			}
 			mockV2.AssertExpectations(t)
 		})
 	}
@@ -200,12 +279,15 @@ func TestGroupResource_Create(t *testing.T) {
 
 func TestGroupResource_Read(t *testing.T) {
 	tests := []struct {
-		name          string
-		data          GroupResourceModel
-		setupMock     func(*mocks.MockClientV2)
-		expectedError bool
-		shouldRemove  bool
-		errorContains string
+		name            string
+		data            GroupResourceModel
+		setupMock       func(*mocks.MockClientV2)
+		expectedError   bool
+		shouldRemove    bool
+		errorContains   string
+		warningContains string
+		expectedName    string
+		expectedBranch  string
 	}{
 		{
 			name: "group exists",
@@ -221,6 +303,19 @@ func TestGroupResource_Read(t *testing.T) {
 			shouldRemove:  false,
 		},
 		{
+			name: "policy backend keeps surrounding whitespace in name",
+			data: GroupResourceModel{
+				Name:   types.StringValue(" admins"),
+				Branch: types.StringValue("data/test"),
+			},
+			setupMock: func(mockV2 *mocks.MockClientV2) {
+				mockV2.On("GetConfig").Return(policyBackendConfig)
+				mockV2.On("RoleExists", "conjur:group:data/test/ admins").Return(true, nil)
+			},
+			expectedError: false,
+			shouldRemove:  false,
+		},
+		{
 			name: "group not found - removes from state",
 			data: GroupResourceModel{
 				Name:   types.StringValue("missing-group"),
@@ -230,8 +325,35 @@ func TestGroupResource_Read(t *testing.T) {
 				mockV2.On("GetConfig").Return(policyBackendConfig)
 				mockV2.On("RoleExists", "conjur:group:data/test/missing-group").Return(false, nil)
 			},
+			expectedError:   false,
+			shouldRemove:    true,
+			warningContains: `The group "conjur:group:data/test/missing-group" was not found`,
+		},
+		{
+			name: "policy branch with leading and trailing slashes is normalized",
+			data: GroupResourceModel{
+				Name:   types.StringValue("developers"),
+				Branch: types.StringValue("/data/test/"),
+			},
+			setupMock: func(mockV2 *mocks.MockClientV2) {
+				mockV2.On("GetConfig").Return(policyBackendConfig)
+				mockV2.On("RoleExists", "conjur:group:data/test/developers").Return(true, nil)
+			},
 			expectedError: false,
-			shouldRemove:  true,
+			shouldRemove:  false,
+		},
+		{
+			name: "typed 500 checking existence includes status code",
+			data: GroupResourceModel{
+				Name:   types.StringValue("error-group"),
+				Branch: types.StringValue("data/test"),
+			},
+			setupMock: func(mockV2 *mocks.MockClientV2) {
+				mockV2.On("GetConfig").Return(policyBackendConfig)
+				mockV2.On("RoleExists", "conjur:group:data/test/error-group").Return(false, &response.ConjurError{Code: http.StatusInternalServerError, Message: "Internal Server Error"})
+			},
+			expectedError: true,
+			errorContains: "status 500: Internal Server Error",
 		},
 		{
 			name: "API error checking existence",
@@ -295,6 +417,35 @@ func TestGroupResource_Read(t *testing.T) {
 			shouldRemove:  false,
 		},
 		{
+			name: "SaaS state with surrounding whitespace from earlier versions is trimmed",
+			data: GroupResourceModel{
+				Name:   types.StringValue(" admins "),
+				Branch: types.StringValue(" data/test "),
+			},
+			setupMock: func(mockV2 *mocks.MockClientV2) {
+				mockV2.On("GetConfig").Return(saasBackendConfig)
+				mockV2.On("ReadGroup", "data/test/admins").Return(&conjurapi.Group{Name: "admins", Branch: "data/test"}, nil)
+			},
+			expectedError:  false,
+			shouldRemove:   false,
+			expectedName:   "admins",
+			expectedBranch: "data/test",
+		},
+		{
+			name: "SaaS read trims whitespace but keeps branch slashes",
+			data: GroupResourceModel{
+				Name:   types.StringValue("admins"),
+				Branch: types.StringValue(" /data/test/ "),
+			},
+			setupMock: func(mockV2 *mocks.MockClientV2) {
+				mockV2.On("GetConfig").Return(saasBackendConfig)
+				mockV2.On("ReadGroup", "data/test/admins").Return(&conjurapi.Group{Name: "admins", Branch: "data/test"}, nil)
+			},
+			expectedError:  false,
+			shouldRemove:   false,
+			expectedBranch: "/data/test/",
+		},
+		{
 			name: "SaaS group not found - removes from state",
 			data: GroupResourceModel{
 				Name:   types.StringValue("missing-group"),
@@ -304,8 +455,22 @@ func TestGroupResource_Read(t *testing.T) {
 				mockV2.On("GetConfig").Return(saasBackendConfig)
 				mockV2.On("ReadGroup", "data/test/missing-group").Return(nil, &response.ConjurError{Code: http.StatusNotFound, Message: "404 Not Found"})
 			},
-			expectedError: false,
-			shouldRemove:  true,
+			expectedError:   false,
+			shouldRemove:    true,
+			warningContains: `The group "data/test/missing-group" was not found`,
+		},
+		{
+			name: "SaaS typed 403 reading group includes status code",
+			data: GroupResourceModel{
+				Name:   types.StringValue("error-group"),
+				Branch: types.StringValue("data/test"),
+			},
+			setupMock: func(mockV2 *mocks.MockClientV2) {
+				mockV2.On("GetConfig").Return(saasBackendConfig)
+				mockV2.On("ReadGroup", "data/test/error-group").Return(nil, &response.ConjurError{Code: http.StatusForbidden, Message: "Forbidden"})
+			},
+			expectedError: true,
+			errorContains: `Unable to read group "data/test/error-group": status 403: Forbidden`,
 		},
 		{
 			name: "SaaS API error reading group",
@@ -353,6 +518,11 @@ func TestGroupResource_Read(t *testing.T) {
 			r.Read(ctx, req, resp)
 
 			assertDiagOutcome(t, resp.Diagnostics, tt.expectedError, tt.errorContains)
+			if tt.warningContains == "" {
+				assert.Empty(t, resp.Diagnostics.Warnings())
+			} else {
+				assertWarningContains(t, resp.Diagnostics, tt.warningContains)
+			}
 			if !tt.expectedError {
 				if tt.shouldRemove {
 					// State should be removed when group doesn't exist
@@ -364,8 +534,15 @@ func TestGroupResource_Read(t *testing.T) {
 					var result GroupResourceModel
 					resp.State.Get(ctx, &result)
 					assert.False(t, result.Name.IsNull())
-					assert.Equal(t, tt.data.Name.ValueString(), result.Name.ValueString())
-					assert.Equal(t, tt.data.Branch.ValueString(), result.Branch.ValueString())
+					expectedName, expectedBranch := tt.data.Name.ValueString(), tt.data.Branch.ValueString()
+					if tt.expectedName != "" {
+						expectedName = tt.expectedName
+					}
+					if tt.expectedBranch != "" {
+						expectedBranch = tt.expectedBranch
+					}
+					assert.Equal(t, expectedName, result.Name.ValueString())
+					assert.Equal(t, expectedBranch, result.Branch.ValueString())
 				}
 			}
 			mockV2.AssertExpectations(t)
@@ -458,6 +635,117 @@ func TestGroupResource_Update_PolicyBackend(t *testing.T) {
 	mockV2.AssertNotCalled(t, "UpdateGroup", mock.Anything)
 }
 
+// TestGroupResource_Update_NilClient covers an in-place update planned without
+// a configured client (see ModifyPlan). The response state is seeded with the
+// prior state, as the framework does, so Update must return an error and leave
+// it untouched rather than record the planned values.
+func TestGroupResource_Update_NilClient(t *testing.T) {
+	r := &GroupResource{}
+
+	ctx := context.Background()
+	prior := GroupResourceModel{Name: types.StringValue("developers"), Branch: types.StringValue("data/test"), Owner: types.ObjectNull(groupOwnerAttrTypes), Annotations: map[string]string{"a": "1"}}
+	planned := GroupResourceModel{Name: types.StringValue("developers"), Branch: types.StringValue("data/test"), Owner: types.ObjectNull(groupOwnerAttrTypes), Annotations: map[string]string{"a": "2"}}
+	req := resource.UpdateRequest{Plan: newPlanWithSchema(getGroupTestSchema()), State: newStateWithSchema(getGroupTestSchema())}
+	require.False(t, req.Plan.Set(ctx, &planned).HasError())
+	require.False(t, req.State.Set(ctx, &prior).HasError())
+	resp := &resource.UpdateResponse{State: req.State}
+
+	r.Update(ctx, req, resp)
+
+	assertDiagOutcome(t, resp.Diagnostics, true, "Provider Client Not Configured")
+	var result GroupResourceModel
+	require.False(t, resp.State.Get(ctx, &result).HasError())
+	assert.Equal(t, prior.Annotations, result.Annotations)
+}
+
+// TestGroupResource_ServerErrorSanitized covers server-supplied error text in
+// diagnostics on every API call path: ANSI escapes, newlines and bidi controls
+// from the server must not reach CI logs, and the HTTP status is included.
+func TestGroupResource_ServerErrorSanitized(t *testing.T) {
+	ctx := context.Background()
+	s := getGroupTestSchema()
+	serverErr := &response.ConjurError{Code: http.StatusInternalServerError, Message: "\x1b[31mboom\x1b[0m\n[INFO] fake log line\r\u202e"}
+	data := GroupResourceModel{Name: types.StringValue("developers"), Branch: types.StringValue("data/test"), Owner: types.ObjectNull(groupOwnerAttrTypes), Annotations: map[string]string{"a": "1"}}
+
+	create := func(r *GroupResource) diag.Diagnostics {
+		req := resource.CreateRequest{Plan: newPlanWithSchema(s)}
+		require.False(t, req.Plan.Set(ctx, &data).HasError())
+		resp := &resource.CreateResponse{State: newStateWithSchema(s)}
+		r.Create(ctx, req, resp)
+		return resp.Diagnostics
+	}
+	read := func(r *GroupResource) diag.Diagnostics {
+		req := resource.ReadRequest{State: newStateWithSchema(s)}
+		require.False(t, req.State.Set(ctx, &data).HasError())
+		resp := &resource.ReadResponse{State: newStateWithSchema(s)}
+		r.Read(ctx, req, resp)
+		return resp.Diagnostics
+	}
+	del := func(r *GroupResource) diag.Diagnostics {
+		req := resource.DeleteRequest{State: newStateWithSchema(s)}
+		require.False(t, req.State.Set(ctx, &data).HasError())
+		resp := &resource.DeleteResponse{State: newStateWithSchema(s)}
+		r.Delete(ctx, req, resp)
+		return resp.Diagnostics
+	}
+	update := func(planAnnotations map[string]string) func(r *GroupResource) diag.Diagnostics {
+		return func(r *GroupResource) diag.Diagnostics {
+			planned := data
+			planned.Annotations = planAnnotations
+			req := resource.UpdateRequest{Plan: newPlanWithSchema(s), State: newStateWithSchema(s)}
+			require.False(t, req.Plan.Set(ctx, &planned).HasError())
+			require.False(t, req.State.Set(ctx, &data).HasError())
+			resp := &resource.UpdateResponse{State: req.State}
+			r.Update(ctx, req, resp)
+			return resp.Diagnostics
+		}
+	}
+
+	tests := []struct {
+		name  string
+		cfg   conjurapi.Config
+		setup func(*mocks.MockClientV2)
+		run   func(*GroupResource) diag.Diagnostics
+	}{
+		{name: "SaaS create", cfg: saasBackendConfig, setup: func(m *mocks.MockClientV2) { m.On("CreateGroup", mock.Anything).Return(nil, serverErr) }, run: create},
+		{name: "policy create existence check", cfg: policyBackendConfig, setup: func(m *mocks.MockClientV2) { m.On("RoleExists", mock.Anything).Return(false, serverErr) }, run: create},
+		{name: "policy create load", cfg: policyBackendConfig, setup: func(m *mocks.MockClientV2) {
+			m.On("RoleExists", mock.Anything).Return(false, nil)
+			m.On("LoadPolicy", mock.Anything, mock.Anything, mock.Anything).Return(nil, serverErr)
+		}, run: create},
+		{name: "SaaS read", cfg: saasBackendConfig, setup: func(m *mocks.MockClientV2) { m.On("ReadGroup", mock.Anything).Return(nil, serverErr) }, run: read},
+		{name: "policy read", cfg: policyBackendConfig, setup: func(m *mocks.MockClientV2) { m.On("RoleExists", mock.Anything).Return(false, serverErr) }, run: read},
+		{name: "SaaS delete", cfg: saasBackendConfig, setup: func(m *mocks.MockClientV2) { m.On("DeleteGroup", mock.Anything).Return(serverErr) }, run: del},
+		{name: "policy delete", cfg: policyBackendConfig, setup: func(m *mocks.MockClientV2) {
+			m.On("LoadPolicy", mock.Anything, mock.Anything, mock.Anything).Return(nil, serverErr)
+		}, run: del},
+		{name: "SaaS update annotation removal", cfg: saasBackendConfig, setup: func(m *mocks.MockClientV2) {
+			m.On("DeleteGroupAnnotation", mock.Anything, mock.Anything).Return(serverErr)
+		}, run: update(nil)},
+		{name: "SaaS update PATCH", cfg: saasBackendConfig, setup: func(m *mocks.MockClientV2) { m.On("UpdateGroup", mock.Anything).Return(nil, serverErr) }, run: update(map[string]string{"a": "2"})},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockV2 := mocks.NewMockClientV2(t)
+			mockV2.On("GetConfig").Return(tt.cfg)
+			tt.setup(mockV2)
+
+			diags := tt.run(&GroupResource{client: mockV2})
+
+			require.Len(t, diags.Errors(), 1, "%+v", diags)
+			detail := diags.Errors()[0].Detail()
+			assert.Contains(t, detail, "status 500: ")
+			assert.Contains(t, detail, "boom")
+			assert.Contains(t, detail, "fake log line")
+			for _, bad := range []string{"\x1b", "\n", "\r", "\u202e"} {
+				assert.NotContains(t, detail, bad)
+			}
+			mockV2.AssertExpectations(t)
+		})
+	}
+}
+
 type groupAnnotationDelete struct {
 	key string
 	err error
@@ -502,6 +790,8 @@ func TestGroupResource_Update(t *testing.T) {
 		{name: "404 then failure", state: map[string]string{"a": "1", "b": "2", "c": "3"}, plan: map[string]string{"c": "3"}, deletes: []groupAnnotationDelete{{key: "a", err: notFound}, {key: "b", err: fmt.Errorf("permission denied")}}, wantAnnotations: map[string]string{"b": "2", "c": "3"}, wantError: `Unable to remove annotation "b"`, wantWarning: `"a". They may`},
 		{name: "PATCH fails after deletes", state: map[string]string{"a": "1", "b": "2", "c": "3"}, plan: map[string]string{"a": "10", "d": "4"}, deletes: []groupAnnotationDelete{{key: "b"}, {key: "c"}}, patch: true, patchErr: fmt.Errorf("permission denied"), wantAnnotations: map[string]string{"a": "1"}, wantError: `Unable to update annotations of group "data/test/developers"`},
 		{name: "PATCH fails without deletes", state: map[string]string{"a": "1"}, plan: map[string]string{"a": "2"}, patch: true, patchErr: fmt.Errorf("permission denied"), wantAnnotations: map[string]string{"a": "1"}, wantError: "Unable to update annotations"},
+		{name: "typed 403 on PATCH includes status code", state: map[string]string{"a": "1"}, plan: map[string]string{"a": "2"}, patch: true, patchErr: &response.ConjurError{Code: http.StatusForbidden, Message: "Forbidden"}, wantAnnotations: map[string]string{"a": "1"}, wantError: `Unable to update annotations of group "data/test/developers": status 403: Forbidden`},
+		{name: "typed 500 on delete includes status code", state: map[string]string{"a": "1"}, plan: nil, deletes: []groupAnnotationDelete{{key: "a", err: &response.ConjurError{Code: http.StatusInternalServerError, Message: "Internal Server Error"}}}, wantAnnotations: map[string]string{"a": "1"}, wantError: `Unable to remove annotation "a" from group "data/test/developers": status 500: Internal Server Error`},
 		{name: "partial failure keeps prior owner", stateOwner: ownerAdmins, planOwner: ownerManagers, state: map[string]string{"a": "1"}, plan: map[string]string{"a": "2"}, patch: true, patchErr: fmt.Errorf("permission denied"), wantAnnotations: map[string]string{"a": "1"}, wantError: "Unable to update annotations"},
 		{name: "branch with leading and trailing slashes is trimmed", branch: "/data/test/", state: map[string]string{"a": "1", "b": "2"}, plan: map[string]string{"b": "3"}, deletes: []groupAnnotationDelete{{key: "a"}}, patch: true, wantAnnotations: map[string]string{"b": "3"}},
 		{name: "keys with slashes, spaces and unicode passed unchanged", state: map[string]string{"a/b": "1", "with space": "2", "ünï": "3"}, plan: map[string]string{"ünï": "4", "x/y z": "5"}, deletes: []groupAnnotationDelete{{key: "a/b"}, {key: "with space"}}, patch: true, wantAnnotations: map[string]string{"ünï": "4", "x/y z": "5"}},
@@ -617,11 +907,12 @@ func TestAnnotationsNeedPatch(t *testing.T) {
 
 func TestGroupResource_Delete(t *testing.T) {
 	tests := []struct {
-		name          string
-		data          GroupResourceModel
-		setupMock     func(*mocks.MockClientV2)
-		expectedError bool
-		errorContains string
+		name            string
+		data            GroupResourceModel
+		setupMock       func(*mocks.MockClientV2)
+		expectedError   bool
+		errorContains   string
+		warningContains string
 	}{
 		{
 			name: "successful deletion",
@@ -653,6 +944,31 @@ func TestGroupResource_Delete(t *testing.T) {
 			},
 			expectedError: true,
 			errorContains: "Could not apply group deletion policy",
+		},
+		{
+			name: "typed 500 during policy deletion includes status code",
+			data: GroupResourceModel{
+				Name:   types.StringValue("error-group"),
+				Branch: types.StringValue("data/test"),
+			},
+			setupMock: func(mockV2 *mocks.MockClientV2) {
+				mockV2.On("GetConfig").Return(policyBackendConfig)
+				mockV2.On("LoadPolicy", conjurapi.PolicyModePatch, "data/test", mock.Anything).Return(nil, &response.ConjurError{Code: http.StatusInternalServerError, Message: "Internal Server Error"})
+			},
+			expectedError: true,
+			errorContains: "Could not apply group deletion policy: status 500: Internal Server Error",
+		},
+		{
+			name: "policy branch with leading and trailing slashes is normalized",
+			data: GroupResourceModel{
+				Name:   types.StringValue("developers"),
+				Branch: types.StringValue("/data/test/"),
+			},
+			setupMock: func(mockV2 *mocks.MockClientV2) {
+				mockV2.On("GetConfig").Return(policyBackendConfig)
+				mockV2.On("LoadPolicy", conjurapi.PolicyModePatch, "data/test", mock.Anything).Return(&conjurapi.PolicyResponse{}, nil)
+			},
+			expectedError: false,
 		},
 		{
 			name: "deletion from nested branch",
@@ -711,6 +1027,18 @@ func TestGroupResource_Delete(t *testing.T) {
 			expectedError: false,
 		},
 		{
+			name: "SaaS deletion trims whitespace left in state by earlier versions",
+			data: GroupResourceModel{
+				Name:   types.StringValue(" developers "),
+				Branch: types.StringValue("data/test"),
+			},
+			setupMock: func(mockV2 *mocks.MockClientV2) {
+				mockV2.On("GetConfig").Return(saasBackendConfig)
+				mockV2.On("DeleteGroup", "data/test/developers").Return(nil)
+			},
+			expectedError: false,
+		},
+		{
 			name: "SaaS API error during deletion",
 			data: GroupResourceModel{
 				Name:   types.StringValue("error-group"),
@@ -722,6 +1050,32 @@ func TestGroupResource_Delete(t *testing.T) {
 			},
 			expectedError: true,
 			errorContains: "Unable to delete group",
+		},
+		{
+			name: "SaaS typed 403 during deletion includes status code",
+			data: GroupResourceModel{
+				Name:   types.StringValue("error-group"),
+				Branch: types.StringValue("data/test"),
+			},
+			setupMock: func(mockV2 *mocks.MockClientV2) {
+				mockV2.On("GetConfig").Return(saasBackendConfig)
+				mockV2.On("DeleteGroup", "data/test/error-group").Return(&response.ConjurError{Code: http.StatusForbidden, Message: "Forbidden"})
+			},
+			expectedError: true,
+			errorContains: `Unable to delete group "data/test/error-group": status 403: Forbidden`,
+		},
+		{
+			name: "SaaS 404 during deletion is success with warning",
+			data: GroupResourceModel{
+				Name:   types.StringValue("missing-group"),
+				Branch: types.StringValue("data/test"),
+			},
+			setupMock: func(mockV2 *mocks.MockClientV2) {
+				mockV2.On("GetConfig").Return(saasBackendConfig)
+				mockV2.On("DeleteGroup", "data/test/missing-group").Return(&response.ConjurError{Code: http.StatusNotFound, Message: "404 Not Found"})
+			},
+			expectedError:   false,
+			warningContains: `The group "data/test/missing-group" was not found in Conjur, so there was nothing to delete`,
 		},
 	}
 
@@ -756,6 +1110,11 @@ func TestGroupResource_Delete(t *testing.T) {
 			r.Delete(ctx, req, resp)
 
 			assertDiagOutcome(t, resp.Diagnostics, tt.expectedError, tt.errorContains)
+			if tt.warningContains == "" {
+				assert.Empty(t, resp.Diagnostics.Warnings())
+			} else {
+				assertWarningContains(t, resp.Diagnostics, tt.warningContains)
+			}
 			mockV2.AssertExpectations(t)
 		})
 	}
@@ -853,6 +1212,11 @@ func TestGroupResource_NameValidators(t *testing.T) {
 		{name: "name with slash", value: "teams/admins", expectError: true},
 		{name: "name with trailing slash", value: "admins/", expectError: true},
 		{name: "only slash in name", value: "/", expectError: true},
+		{name: "dot name", value: ".", expectError: true},
+		{name: "dot-dot name", value: "..", expectError: true},
+		{name: "name with leading dot", value: ".hidden", expectError: false},
+		{name: "name with dots inside", value: "a..b", expectError: false},
+		{name: "triple-dot name", value: "...", expectError: false},
 	}
 
 	for _, tc := range cases {
@@ -952,10 +1316,11 @@ func TestGroupResource_ValidateConfig_OwnerOnSaaS(t *testing.T) {
 // it can read the backend from THIS Configured instance and stay correct under
 // provider aliases pointing at different environments. On SaaS neither must
 // force a replacement: annotations changes are applied in place by Update, and
-// owner is inert. Off SaaS (and with no client, which can't be assumed to be
-// SaaS), any change - including null vs {} and unknown values - forces a
-// replacement of the changed attribute(s), matching the old attribute-level
-// RequiresReplace.
+// owner is inert. Off SaaS any change - including null vs {} and unknown
+// values - forces a replacement of the changed attribute(s), matching the old
+// attribute-level RequiresReplace. With no client the backend is unknown, so a
+// change is planned in place with a warning instead of forcing a replacement
+// that would drop memberships and grants on SaaS.
 //
 // Plans are built as raw tftypes values because GroupResourceModel can't hold
 // unknown annotations. GetConfig is only registered when something changed, so
@@ -990,6 +1355,7 @@ func TestGroupResource_ModifyPlan(t *testing.T) {
 		planAnn     tftypes.Value
 		unchanged   bool
 		wantReplace path.Paths
+		wantWarning string
 	}
 	// shared cases are run on both SaaS (never replace) and Self-Hosted (replace wantReplace).
 	shared := []modifyPlanCase{
@@ -1015,7 +1381,9 @@ func TestGroupResource_ModifyPlan(t *testing.T) {
 		backend string
 	}
 	tests := []modifyPlanRun{
-		{backend: "nil client", modifyPlanCase: modifyPlanCase{name: "annotations changed", stateOwner: ownerNull, planOwner: ownerNull, stateAnn: ann("a", "1"), planAnn: ann("a", "2"), wantReplace: replaceAnnotations}},
+		{backend: "nil client", modifyPlanCase: modifyPlanCase{name: "annotations changed", stateOwner: ownerNull, planOwner: ownerNull, stateAnn: ann("a", "1"), planAnn: ann("a", "2"), wantWarning: "Deployment Type Unknown at Plan Time"}},
+		{backend: "nil client", modifyPlanCase: modifyPlanCase{name: "owner changed", stateOwner: ownerAdmins, planOwner: ownerManagers, stateAnn: annNull, planAnn: annNull, wantWarning: "Deployment Type Unknown at Plan Time"}},
+		{backend: "nil client", modifyPlanCase: modifyPlanCase{name: "owner and annotations unchanged", stateOwner: ownerAdmins, planOwner: ownerAdmins, stateAnn: ann("a", "1"), planAnn: ann("a", "1"), unchanged: true}},
 	}
 	for _, c := range shared {
 		saasCase := c
@@ -1062,6 +1430,11 @@ func TestGroupResource_ModifyPlan(t *testing.T) {
 				assert.Equal(t, tt.wantReplace, resp.RequiresReplace)
 			} else {
 				assert.Empty(t, resp.RequiresReplace)
+			}
+			if tt.wantWarning == "" {
+				assert.Empty(t, resp.Diagnostics.Warnings())
+			} else if assert.Len(t, resp.Diagnostics.Warnings(), 1) {
+				assertWarningContains(t, resp.Diagnostics, tt.wantWarning)
 			}
 		})
 	}
@@ -1138,4 +1511,231 @@ func TestGroupResource_ValidateConfig_UnknownAnnotations(t *testing.T) {
 			})
 		}
 	}
+}
+
+// validateGroupConfig runs GroupResource.ValidateConfig against data on the given backend.
+func validateGroupConfig(t *testing.T, cfg conjurapi.Config, data GroupResourceModel) diag.Diagnostics {
+	t.Helper()
+	mockV2 := mocks.NewMockClientV2(t)
+	mockV2.On("GetConfig").Return(cfg)
+	return runGroupValidateConfig(t, &GroupResource{client: mockV2}, data)
+}
+
+// runGroupValidateConfig runs ValidateConfig on r, which may have a nil client, against data as the configuration.
+func runGroupValidateConfig(t *testing.T, r *GroupResource, data GroupResourceModel) diag.Diagnostics {
+	t.Helper()
+	if data.Owner.IsNull() {
+		data.Owner = types.ObjectNull(groupOwnerAttrTypes)
+	}
+	s := getGroupTestSchema()
+	plan := newPlanWithSchema(s)
+	ctx := context.Background()
+	require.False(t, plan.Set(ctx, &data).HasError())
+
+	resp := &resource.ValidateConfigResponse{}
+	r.ValidateConfig(ctx, resource.ValidateConfigRequest{Config: tfsdk.Config{Raw: plan.Raw, Schema: s}}, resp)
+	return resp.Diagnostics
+}
+
+func groupOwner(kind, id types.String) types.Object {
+	return types.ObjectValueMust(groupOwnerAttrTypes, map[string]attr.Value{"kind": kind, "id": id})
+}
+
+func TestGroupResource_ValidateConfig_NameAndBranch(t *testing.T) {
+	tests := []struct {
+		name          string
+		groupName     types.String
+		branch        types.String
+		expectError   bool
+		errorContains string
+	}{
+		{name: "valid name and branch", groupName: types.StringValue("admins"), branch: types.StringValue("data/teams")},
+		{name: "branch with surrounding slashes is accepted", groupName: types.StringValue("admins"), branch: types.StringValue("/data/teams/")},
+		{name: "branch segment containing dots is accepted", groupName: types.StringValue("admins"), branch: types.StringValue("data/v1.2/...x")},
+		{name: "unknown name is skipped", groupName: types.StringUnknown(), branch: types.StringValue("data/teams")},
+		{name: "name with leading whitespace", groupName: types.StringValue(" admins"), branch: types.StringValue("data"), expectError: true, errorContains: "Group name must not have leading or trailing whitespace"},
+		{name: "name with trailing whitespace", groupName: types.StringValue("admins\t"), branch: types.StringValue("data"), expectError: true, errorContains: "Group name must not have leading or trailing whitespace"},
+		{name: "branch with leading whitespace", groupName: types.StringValue("admins"), branch: types.StringValue(" data"), expectError: true, errorContains: "branch must not have leading or trailing whitespace"},
+		{name: "branch with trailing whitespace", groupName: types.StringValue("admins"), branch: types.StringValue("data/teams "), expectError: true, errorContains: "branch must not have leading or trailing whitespace"},
+		{name: "branch with colon", groupName: types.StringValue("admins"), branch: types.StringValue("policy:root"), expectError: true, errorContains: "branch must not contain ':'"},
+		{name: "branch with dot-dot segment", groupName: types.StringValue("admins"), branch: types.StringValue("data/../root"), expectError: true, errorContains: "branch must not contain '.' or '..' path segments"},
+		{name: "branch with dot segment", groupName: types.StringValue("admins"), branch: types.StringValue("./data"), expectError: true, errorContains: "branch must not contain '.' or '..' path segments"},
+		{name: "branch that is only dot-dot", groupName: types.StringValue("admins"), branch: types.StringValue(".."), expectError: true, errorContains: "branch must not contain '.' or '..' path segments"},
+	}
+
+	for _, backend := range []struct {
+		name string
+		cfg  conjurapi.Config
+	}{{"policy", policyBackendConfig}, {"SaaS", saasBackendConfig}} {
+		for _, tt := range tests {
+			t.Run(backend.name+"/"+tt.name, func(t *testing.T) {
+				diags := validateGroupConfig(t, backend.cfg, GroupResourceModel{Name: tt.groupName, Branch: tt.branch})
+				assertDiagOutcome(t, diags, tt.expectError, tt.errorContains)
+			})
+		}
+	}
+}
+
+func TestGroupResource_ValidateConfig_WhitespaceOnlyReportedOnce(t *testing.T) {
+	diags := validateGroupConfig(t, policyBackendConfig, GroupResourceModel{Name: types.StringValue("   "), Branch: types.StringValue("data")})
+	require.Len(t, diags.Errors(), 1, "%+v", diags)
+	assert.Contains(t, diags.Errors()[0].Detail(), "Group name cannot be empty.")
+}
+
+func TestGroupResource_ValidateConfig_Owner(t *testing.T) {
+	tests := []struct {
+		name          string
+		owner         types.Object
+		expectError   bool
+		errorContains string
+	}{
+		{name: "no owner", owner: types.ObjectNull(groupOwnerAttrTypes)},
+		{name: "unknown owner", owner: types.ObjectUnknown(groupOwnerAttrTypes)},
+		{name: "user owner", owner: groupOwner(types.StringValue("user"), types.StringValue("admin"))},
+		{name: "host owner", owner: groupOwner(types.StringValue("host"), types.StringValue("app"))},
+		{name: "group owner", owner: groupOwner(types.StringValue("group"), types.StringValue("admins"))},
+		{name: "layer owner", owner: groupOwner(types.StringValue("layer"), types.StringValue("apps"))},
+		{name: "policy owner", owner: groupOwner(types.StringValue("policy"), types.StringValue("data"))},
+		{name: "kind is case-insensitive", owner: groupOwner(types.StringValue("Group"), types.StringValue("admins"))},
+		{name: "unknown kind is skipped", owner: groupOwner(types.StringUnknown(), types.StringValue("admins"))},
+		{name: "unknown id is skipped", owner: groupOwner(types.StringValue("group"), types.StringUnknown())},
+		{name: "non-role kind", owner: groupOwner(types.StringValue("variable"), types.StringValue("db/password")), expectError: true, errorContains: `owner.kind must be one of: user, host, group, layer, policy. Got: "variable"`},
+		{name: "unrecognized kind", owner: groupOwner(types.StringValue("robot"), types.StringValue("r2")), expectError: true, errorContains: "owner.kind must be one of"},
+		{name: "kind with surrounding whitespace", owner: groupOwner(types.StringValue(" user"), types.StringValue("admin")), expectError: true, errorContains: "owner.kind must be one of"},
+		{name: "missing kind", owner: groupOwner(types.StringNull(), types.StringValue("admin")), expectError: true, errorContains: "owner.kind is required when owner is set."},
+		{name: "blank kind", owner: groupOwner(types.StringValue(" "), types.StringValue("admin")), expectError: true, errorContains: "owner.kind is required when owner is set."},
+		{name: "missing id", owner: groupOwner(types.StringValue("policy"), types.StringNull()), expectError: true, errorContains: "owner.id is required when owner is set."},
+		{name: "blank id", owner: groupOwner(types.StringValue("user"), types.StringValue("")), expectError: true, errorContains: "owner.id is required when owner is set."},
+		{name: "empty owner block", owner: groupOwner(types.StringNull(), types.StringNull()), expectError: true, errorContains: "owner.id is required when owner is set."},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			diags := validateGroupConfig(t, policyBackendConfig, GroupResourceModel{Name: types.StringValue("developers"), Branch: types.StringValue("data/test"), Owner: tt.owner})
+			assertDiagOutcome(t, diags, tt.expectError, tt.errorContains)
+		})
+	}
+}
+
+func TestGroupResource_ValidateConfig_OwnerNotValidatedOnSaaS(t *testing.T) {
+	owners := []types.Object{
+		groupOwner(types.StringValue("variable"), types.StringValue("db/password")),
+		groupOwner(types.StringNull(), types.StringNull()),
+		groupOwner(types.StringValue("user"), types.StringValue("")),
+	}
+	for _, owner := range owners {
+		diags := validateGroupConfig(t, saasBackendConfig, GroupResourceModel{Name: types.StringValue("developers"), Branch: types.StringValue("data/test"), Owner: owner})
+		assert.False(t, diags.HasError(), "%+v", diags)
+		assertWarningContains(t, diags, "Owner Ignored")
+	}
+}
+
+// Terraform validates before configuring the provider, so the deployment type is unknown and owner must be neither
+// rejected (it may be SaaS, where owner only warns) nor reported as ignored (it may be Self-Hosted/OSS).
+func TestGroupResource_ValidateConfig_OwnerWithoutClient(t *testing.T) {
+	owners := []types.Object{
+		groupOwner(types.StringValue("user"), types.StringValue("admin")),
+		groupOwner(types.StringValue("variable"), types.StringValue("db/password")),
+		groupOwner(types.StringNull(), types.StringNull()),
+		groupOwner(types.StringValue("user"), types.StringValue("")),
+	}
+	for _, owner := range owners {
+		diags := runGroupValidateConfig(t, &GroupResource{}, GroupResourceModel{Name: types.StringValue("developers"), Branch: types.StringValue("data/test"), Owner: owner})
+		assert.Empty(t, diags, "%+v", diags)
+	}
+}
+
+func TestGroupResource_AnnotationKeyValidators(t *testing.T) {
+	validators := getGroupTestSchema().Attributes["annotations"].(schema.MapAttribute).Validators
+
+	cases := []struct {
+		name        string
+		key         string
+		expectError bool
+	}{
+		{name: "simple key", key: "description"},
+		{name: "key with slashes", key: "authn-jwt/svc/sub"},
+		{name: "key with dots inside a segment", key: "app.kubernetes.io/name"},
+		{name: "key with leading dots in a segment", key: "..hidden/.x"},
+		{name: "empty key", key: "", expectError: true},
+		{name: "dot-dot key", key: "..", expectError: true},
+		{name: "dot key", key: ".", expectError: true},
+		{name: "dot-dot segment in the middle", key: "a/../b", expectError: true},
+		{name: "leading dot segment", key: "./x", expectError: true},
+		{name: "trailing dot-dot segment", key: "authn-jwt/..", expectError: true},
+		{name: "only dot-dot segments", key: "../..", expectError: true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			value := types.MapValueMust(types.StringType, map[string]attr.Value{tc.key: types.StringValue("v")})
+			var hasError bool
+			for _, v := range validators {
+				resp := &validator.MapResponse{}
+				v.ValidateMap(context.Background(), validator.MapRequest{Path: path.Root("annotations"), ConfigValue: value}, resp)
+				if resp.Diagnostics.HasError() {
+					hasError = true
+				}
+			}
+			assert.Equal(t, tc.expectError, hasError)
+		})
+	}
+}
+
+func TestGroupResource_ImportState_Validation(t *testing.T) {
+	tests := []struct {
+		name           string
+		id             string
+		expectError    bool
+		errorContains  string
+		expectedBranch string
+		expectedName   string
+	}{
+		{name: "plain identifier", id: "data/teams/admins", expectedBranch: "data/teams", expectedName: "admins"},
+		{name: "surrounding slashes are normalized", id: "/data/teams/admins/", expectedBranch: "data/teams", expectedName: "admins"},
+		{name: "no branch", id: "admins", expectError: true, errorContains: "Expected format: <branch>/<name>"},
+		{name: "empty", id: "", expectError: true, errorContains: "Expected format: <branch>/<name>"},
+		{name: "leading whitespace", id: " data/admins", expectError: true, errorContains: "branch and name must not have leading or trailing whitespace"},
+		{name: "trailing whitespace", id: "data/admins ", expectError: true, errorContains: "branch and name must not have leading or trailing whitespace"},
+		{name: "whitespace around separator", id: "data /admins", expectError: true, errorContains: "branch and name must not have leading or trailing whitespace"},
+		{name: "whitespace-only name", id: "data/ ", expectError: true, errorContains: "branch and name must not have leading or trailing whitespace"},
+		{name: "empty branch segment", id: "a//b/admins", expectError: true, errorContains: "branch must not contain empty segments"},
+		{name: "empty branch segment before name", id: "a//admins", expectError: true, errorContains: "branch must not contain empty segments"},
+		{name: "dot-dot branch segment", id: "data/../admins", expectError: true, errorContains: "branch must not contain '.' or '..' path segments"},
+		{name: "dot branch segment", id: "./data/admins", expectError: true, errorContains: "branch must not contain '.' or '..' path segments"},
+		{name: "dot-dot name", id: "data/..", expectError: true, errorContains: "name must not be '.' or '..'"},
+		{name: "colon in branch", id: "policy:root/admins", expectError: true, errorContains: "branch must not contain ':'"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockV2 := mocks.NewMockClientV2(t)
+			mockV2.On("GetConfig").Return(saasBackendConfig)
+			r := &GroupResource{client: mockV2}
+
+			resp := &resource.ImportStateResponse{State: tfsdk.State{Raw: tftypes.NewValue(tftypes.Object{}, nil), Schema: getGroupTestSchema()}}
+			ctx := context.Background()
+			r.ImportState(ctx, resource.ImportStateRequest{ID: tt.id}, resp)
+
+			assertDiagOutcome(t, resp.Diagnostics, tt.expectError, tt.errorContains)
+			if tt.expectError {
+				assert.Contains(t, resp.Diagnostics.Errors()[0].Summary(), "Unexpected Import Identifier")
+				return
+			}
+			var branch, name types.String
+			require.False(t, resp.State.GetAttribute(ctx, path.Root("branch"), &branch).HasError())
+			require.False(t, resp.State.GetAttribute(ctx, path.Root("name"), &name).HasError())
+			assert.Equal(t, tt.expectedBranch, branch.ValueString())
+			assert.Equal(t, tt.expectedName, name.ValueString())
+		})
+	}
+}
+
+func TestGroupIdentifierAndToV2Group(t *testing.T) {
+	assert.Equal(t, "data/teams/admins", groupIdentifier("/data/teams/", "admins"))
+	assert.Equal(t, "data/teams/admins", groupIdentifier(" data/teams ", " admins "))
+	g := toV2Group(&GroupResourceModel{Name: types.StringValue("admins"), Branch: types.StringValue("/data/teams/"), Annotations: map[string]string{"a": "1"}})
+	assert.Equal(t, "admins", g.Name)
+	assert.Equal(t, "data/teams", g.Branch)
+	assert.Equal(t, map[string]string{"a": "1"}, g.Annotations)
 }
