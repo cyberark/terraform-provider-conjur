@@ -819,7 +819,7 @@ type GeminiEnterpriseAttestationConfiguration struct {
 	// AllowedOrgIds List of GCP organisation IDs allowed to attest. Hard gate enforced before any policy evaluation.
 	AllowedOrgIds []string `json:"allowed_org_ids"`
 
-	// Audiences JWT aud values accepted by the attestor. Omitted means audience is not validated; if specified, at least one non-empty audience string is required.
+	// Audiences JWT aud values accepted by the attestor. Defaults to `urn:panw:swa` when omitted.
 	Audiences *[]string `json:"audiences,omitempty"`
 }
 

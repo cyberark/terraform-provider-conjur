@@ -5,10 +5,13 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.9.13] - 2026-10-07
 ### Added
 - Support for managing dynamic secret issuers via the `conjur_issuer` resource
   (AWS issuer type).
 - Support for V2 batch secret retrieval via the `conjur_secrets` data source and ephemeral resource (SaaS only).
+- Support for Gemini Enterprise attestation in SWA Server Groups via the `conjur_swa_server_group` resource.
 ### Changed
 - Updated conjur-api-go to v0.15.10.
 - `conjur_group` now updates `annotations` in place on Secrets Manager, SaaS instead of

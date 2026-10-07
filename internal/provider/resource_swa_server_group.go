@@ -60,6 +60,7 @@ type AttestationModel struct {
 	X509Pop           types.Object `tfsdk:"x509pop"`
 	K8sPsat           types.Object `tfsdk:"k8s_psat"`
 	GcpServiceAccount types.Object `tfsdk:"gcp_service_account"`
+	GeminiEnterprise  types.Object `tfsdk:"gemini_enterprise"`
 	AwsIid            types.Object `tfsdk:"aws_iid"`
 	K8sJwt            types.Object `tfsdk:"k8s_jwt"`
 }
@@ -75,6 +76,11 @@ type K8sPsatModel struct {
 type GcpServiceAccountModel struct {
 	AllowedProjectIDs types.List `tfsdk:"allowed_project_ids"`
 	Audiences         types.List `tfsdk:"audiences"`
+}
+
+type GeminiEnterpriseModel struct {
+	AllowedOrgIDs types.List `tfsdk:"allowed_org_ids"`
+	Audiences     types.List `tfsdk:"audiences"`
 }
 
 type AwsIidModel struct {
@@ -150,6 +156,13 @@ func gcpServiceAccountAttrTypes() map[string]attr.Type {
 	}
 }
 
+func geminiEnterpriseAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"allowed_org_ids": types.ListType{ElemType: types.StringType},
+		"audiences":       types.ListType{ElemType: types.StringType},
+	}
+}
+
 func awsIidVerifyOrgAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
 		"management_account_id":     types.StringType,
@@ -177,6 +190,7 @@ func attestationAttrTypes() map[string]attr.Type {
 		"x509pop":             types.ObjectType{AttrTypes: x509PopAttrTypes()},
 		"k8s_psat":            types.ObjectType{AttrTypes: k8sPsatAttrTypes()},
 		"gcp_service_account": types.ObjectType{AttrTypes: gcpServiceAccountAttrTypes()},
+		"gemini_enterprise":   types.ObjectType{AttrTypes: geminiEnterpriseAttrTypes()},
 		"aws_iid":             types.ObjectType{AttrTypes: awsIidAttrTypes()},
 		"k8s_jwt":             types.ObjectType{AttrTypes: k8sJwtAttrTypes()},
 	}
@@ -256,6 +270,36 @@ func attestationNestedAttributes() map[string]schema.Attribute {
 				},
 				"audiences": schema.ListAttribute{
 					MarkdownDescription: "Expected audience values for the GCP identity token (`aud` claim). Defaults to `urn:panw:swa` when omitted.",
+					Optional:            true,
+					Computed:            true,
+					ElementType:         types.StringType,
+					// The API applies this same default server-side when the field is
+					// omitted. Without Computed+Default here, the plan sees the config's
+					// null value as final, and the value the API actually returns on
+					// create/update looks like an inconsistent result to Terraform core.
+					Default: listdefault.StaticValue(
+						types.ListValueMust(types.StringType, []attr.Value{types.StringValue("urn:panw:swa")}),
+					),
+					Validators: []validator.List{
+						listvalidator.SizeAtLeast(1),
+					},
+				},
+			},
+		},
+		"gemini_enterprise": schema.SingleNestedAttribute{
+			MarkdownDescription: "Gemini Enterprise attestation configuration.",
+			Optional:            true,
+			Attributes: map[string]schema.Attribute{
+				"allowed_org_ids": schema.ListAttribute{
+					MarkdownDescription: "List of GCP organisation IDs allowed to attest. Hard gate enforced before any policy evaluation.",
+					Required:            true,
+					ElementType:         types.StringType,
+					Validators: []validator.List{
+						listvalidator.SizeAtLeast(1),
+					},
+				},
+				"audiences": schema.ListAttribute{
+					MarkdownDescription: "JWT aud values accepted by the attestor. Defaults to `urn:panw:swa` when omitted.",
 					Optional:            true,
 					Computed:            true,
 					ElementType:         types.StringType,
@@ -413,6 +457,7 @@ func updateAttestationFromResponse(ctx context.Context, model *ServerGroupResour
 		X509Pop:           types.ObjectNull(x509PopAttrTypes()),
 		K8sPsat:           types.ObjectNull(k8sPsatAttrTypes()),
 		GcpServiceAccount: types.ObjectNull(gcpServiceAccountAttrTypes()),
+		GeminiEnterprise:  types.ObjectNull(geminiEnterpriseAttrTypes()),
 		AwsIid:            types.ObjectNull(awsIidAttrTypes()),
 		K8sJwt:            types.ObjectNull(k8sJwtAttrTypes()),
 	}
@@ -455,6 +500,15 @@ func updateAttestationFromResponse(ctx context.Context, model *ServerGroupResour
 		obj, objDiags := types.ObjectValueFrom(ctx, gcpServiceAccountAttrTypes(), gcpModel)
 		diags.Append(objDiags...)
 		attestation.GcpServiceAccount = obj
+	}
+
+	if gemini := at.GeminiEnterprise; gemini != nil {
+		geminiModel := GeminiEnterpriseModel{}
+		appendOptionalStringList(ctx, &gemini.AllowedOrgIds, &geminiModel.AllowedOrgIDs, &diags)
+		appendOptionalStringList(ctx, gemini.Audiences, &geminiModel.Audiences, &diags)
+		obj, objDiags := types.ObjectValueFrom(ctx, geminiEnterpriseAttrTypes(), geminiModel)
+		diags.Append(objDiags...)
+		attestation.GeminiEnterprise = obj
 	}
 
 	if awsIid := at.AwsIid; awsIid != nil {
@@ -638,6 +692,21 @@ func buildGcpServiceAccount(ctx context.Context, gcp *GcpServiceAccountModel) (*
 	return config, diags
 }
 
+// buildGeminiEnterprise resolves the gemini_enterprise part from the model.
+func buildGeminiEnterprise(ctx context.Context, gemini *GeminiEnterpriseModel) (*swaclient.GeminiEnterpriseAttestationConfiguration, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	if gemini == nil {
+		return nil, diags
+	}
+
+	config := &swaclient.GeminiEnterpriseAttestationConfiguration{}
+	config.AllowedOrgIds = listAsStrings(ctx, gemini.AllowedOrgIDs, &diags)
+	if audiences := listAsStrings(ctx, gemini.Audiences, &diags); audiences != nil {
+		config.Audiences = &audiences
+	}
+	return config, diags
+}
+
 // buildAwsIid resolves the aws_iid part from the model.
 func buildAwsIid(ctx context.Context, awsIid *AwsIidModel, diags *diag.Diagnostics) *swaclient.AwsIidAttestationConfiguration {
 	if awsIid == nil {
@@ -687,6 +756,10 @@ func buildAttestationRequest(ctx context.Context, at *AttestationModel) (*swacli
 	gcp, gcpDiags := buildGcpServiceAccount(ctx, modelFromObject[GcpServiceAccountModel](ctx, at.GcpServiceAccount, &diags))
 	diags.Append(gcpDiags...)
 	attestation.GcpServiceAccount = gcp
+
+	gemini, geminiDiags := buildGeminiEnterprise(ctx, modelFromObject[GeminiEnterpriseModel](ctx, at.GeminiEnterprise, &diags))
+	diags.Append(geminiDiags...)
+	attestation.GeminiEnterprise = gemini
 
 	attestation.AwsIid = buildAwsIid(ctx, modelFromObject[AwsIidModel](ctx, at.AwsIid, &diags), &diags)
 
@@ -740,7 +813,7 @@ func (r *ServerGroupResource) Schema(ctx context.Context, req resource.SchemaReq
 				},
 			},
 			"attestation": schema.SingleNestedAttribute{
-				MarkdownDescription: "Node attestation configuration. Optionally specify any of x509pop, k8s_psat, gcp_service_account, aws_iid, or k8s_jwt; omit entirely for a server group with no attestation.",
+				MarkdownDescription: "Node attestation configuration. Optionally specify any of x509pop, k8s_psat, gcp_service_account, gemini_enterprise, aws_iid, or k8s_jwt; omit entirely for a server group with no attestation.",
 				Optional:            true,
 				Attributes:          attestationNestedAttributes(),
 			},
