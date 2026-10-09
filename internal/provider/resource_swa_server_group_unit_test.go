@@ -60,6 +60,9 @@ func mkK8sPsat(m K8sPsatModel) types.Object { return mkObjectFromValue(k8sPsatAt
 func mkGcpServiceAccount(m GcpServiceAccountModel) types.Object {
 	return mkObjectFromValue(gcpServiceAccountAttrTypes(), m)
 }
+func mkGeminiEnterprise(m GeminiEnterpriseModel) types.Object {
+	return mkObjectFromValue(geminiEnterpriseAttrTypes(), m)
+}
 func mkK8sJwt(m K8sJwtModel) types.Object { return mkObjectFromValue(k8sJwtAttrTypes(), m) }
 func mkAwsIidVerifyOrg(m AwsIidVerifyOrgModel) types.Object {
 	return mkObjectFromValue(awsIidVerifyOrgAttrTypes(), m)
@@ -82,6 +85,9 @@ func mkAttestation(m AttestationModel) types.Object {
 	}
 	if len(m.GcpServiceAccount.AttributeTypes(ctx)) == 0 {
 		m.GcpServiceAccount = types.ObjectNull(gcpServiceAccountAttrTypes())
+	}
+	if len(m.GeminiEnterprise.AttributeTypes(ctx)) == 0 {
+		m.GeminiEnterprise = types.ObjectNull(geminiEnterpriseAttrTypes())
 	}
 	if len(m.AwsIid.AttributeTypes(ctx)) == 0 {
 		m.AwsIid = types.ObjectNull(awsIidAttrTypes())
@@ -124,6 +130,9 @@ func decodeK8sPsat(t *testing.T, obj types.Object) K8sPsatModel {
 }
 func decodeGcpServiceAccount(t *testing.T, obj types.Object) GcpServiceAccountModel {
 	return decodeObject[GcpServiceAccountModel](t, obj)
+}
+func decodeGeminiEnterprise(t *testing.T, obj types.Object) GeminiEnterpriseModel {
+	return decodeObject[GeminiEnterpriseModel](t, obj)
 }
 func decodeAwsIid(t *testing.T, obj types.Object) AwsIidModel {
 	return decodeObject[AwsIidModel](t, obj)
@@ -280,6 +289,34 @@ func TestUpdateAttestationFromResponse(t *testing.T) {
 
 		var auds []string
 		require.False(t, gcp.Audiences.ElementsAs(ctx, &auds, false).HasError())
+		assert.Equal(t, []string{"urn:panw:swa"}, auds)
+	})
+
+	t.Run("gemini_enterprise from attestation field is reconciled into state", func(t *testing.T) {
+		model := &ServerGroupResourceModel{}
+		audiences := []string{"urn:panw:swa"}
+		at := &swaclient.AttestationConfiguration{
+			GeminiEnterprise: &swaclient.GeminiEnterpriseAttestationConfiguration{
+				AllowedOrgIds: []string{"org-a", "org-b"},
+				Audiences:     &audiences,
+			},
+		}
+
+		diags := updateAttestationFromResponse(ctx, model, at)
+		assert.False(t, diags.HasError())
+		require.False(t, model.Attestation.IsNull())
+		att := decodeAttestation(t, model.Attestation)
+		require.False(t, att.GeminiEnterprise.IsNull())
+		assert.True(t, att.X509Pop.IsNull())
+		assert.True(t, att.K8sPsat.IsNull())
+		gemini := decodeGeminiEnterprise(t, att.GeminiEnterprise)
+
+		var orgs []string
+		require.False(t, gemini.AllowedOrgIDs.ElementsAs(ctx, &orgs, false).HasError())
+		assert.Equal(t, []string{"org-a", "org-b"}, orgs)
+
+		var auds []string
+		require.False(t, gemini.Audiences.ElementsAs(ctx, &auds, false).HasError())
 		assert.Equal(t, []string{"urn:panw:swa"}, auds)
 	})
 
@@ -668,6 +705,39 @@ func TestServerGroupResource_Create(t *testing.T) {
 						GcpServiceAccount: &swaclient.GcpServiceAccountAttestationConfiguration{
 							AllowedProjectIds: []string{"project-a", "project-b"},
 							Audiences:         &audiences,
+						},
+					},
+				}).Return(&swaclient.PostServerGroupResponse{
+					HTTPResponse:                    makeHTTPResponse(http.StatusCreated),
+					ApplicationxSecretsmgrV2JSON201: sg,
+				}, nil)
+			},
+			expectedError: false,
+		},
+		{
+			// When gemini_enterprise is configured, the request must go out on the
+			// attestation API field.
+			name: "successful creation with Gemini Enterprise attestation",
+			data: ServerGroupResourceModel{
+				Name:            types.StringValue("prod-servers"),
+				TrustDomainName: types.StringValue("prod.example.org"),
+				Description:     types.StringNull(),
+				Attestation: mkAttestation(AttestationModel{
+					GeminiEnterprise: mkGeminiEnterprise(GeminiEnterpriseModel{
+						AllowedOrgIDs: mustStringList(t, "org-a", "org-b"),
+						Audiences:     mustStringList(t, "urn:panw:swa"),
+					}),
+				}),
+			},
+			setupMock: func(m *swamocks.MockClientWithResponsesInterface) {
+				sg := makeServerGroupResponse("prod-servers", "prod.example.org")
+				audiences := []string{"urn:panw:swa"}
+				m.On("PostServerGroupWithResponse", context.Background(), "prod.example.org", &swaclient.PostServerGroupParams{Accept: swaclient.ApplicationxSecretsmgrV2Json}, swaclient.PostServerGroupJSONRequestBody{
+					Name: "prod-servers",
+					Attestation: &swaclient.AttestationConfiguration{
+						GeminiEnterprise: &swaclient.GeminiEnterpriseAttestationConfiguration{
+							AllowedOrgIds: []string{"org-a", "org-b"},
+							Audiences:     &audiences,
 						},
 					},
 				}).Return(&swaclient.PostServerGroupResponse{
@@ -1860,6 +1930,127 @@ func TestServerGroupResource_ValidateConfig_UnknownGCPServiceAccount(t *testing.
 		context.Background(),
 		path.Root("attestation").AtName("gcp_service_account"),
 		types.ObjectUnknown(gcpAttrTypes),
+	).HasError())
+
+	r := &ServerGroupResource{}
+	req := resource.ValidateConfigRequest{
+		Config: buildServerConfigFromPlan(plan, s),
+	}
+	resp := &resource.ValidateConfigResponse{}
+
+	r.ValidateConfig(context.Background(), req, resp)
+
+	assert.False(t, resp.Diagnostics.HasError())
+}
+
+// Regression test: creating a gemini_enterprise server group without an explicit
+// `audiences` list used to fail with "Provider produced inconsistent result after
+// apply", for the same reason as TestServerGroupResource_GcpServiceAccount_DefaultAudienceOmitted:
+// the API applies a server-side default (`urn:panw:swa`) that the `audiences` attribute's
+// schema didn't mark Computed.
+func TestServerGroupResource_GeminiEnterprise_DefaultAudienceOmitted(t *testing.T) {
+	t.Parallel()
+
+	mockClient := swamocks.NewMockClientWithResponsesInterface(t)
+
+	defaultAudiences := []string{"urn:panw:swa"}
+	att := &swaclient.AttestationConfiguration{
+		GeminiEnterprise: &swaclient.GeminiEnterpriseAttestationConfiguration{
+			AllowedOrgIds: []string{"org-a"},
+			Audiences:     &defaultAudiences,
+		},
+	}
+
+	mockClient.EXPECT().
+		PostServerGroupWithResponse(mock.Anything, "test-td", mock.Anything, mock.Anything).
+		Return(&swaclient.PostServerGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusCreated),
+			ApplicationxSecretsmgrV2JSON201: &swaclient.ServerGroupResponse{
+				Name: "test-sg", TrustDomainName: "test-td", Attestation: att,
+			},
+		}, nil).Times(1)
+
+	mockClient.EXPECT().
+		GetServerGroupWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything).
+		Return(&swaclient.GetServerGroupResponse{
+			HTTPResponse: makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: &swaclient.ServerGroupResponse{
+				Name: "test-sg", TrustDomainName: "test-td", Attestation: att,
+			},
+		}, nil).Maybe()
+
+	mockClient.EXPECT().
+		DeleteServerGroupWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything).
+		Return(&swaclient.DeleteServerGroupResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
+
+	tfresource.Test(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
+		Steps: []tfresource.TestStep{
+			{
+				Config: `
+resource "conjur_swa_server_group" "test" {
+  name              = "test-sg"
+  trust_domain_name = "test-td"
+  attestation = {
+    gemini_enterprise = {
+      allowed_org_ids = ["org-a"]
+    }
+  }
+}
+`,
+				Check: tfresource.TestCheckResourceAttr(
+					"conjur_swa_server_group.test", "attestation.gemini_enterprise.audiences.0", "urn:panw:swa",
+				),
+			},
+		},
+	})
+}
+
+func TestServerGroupResource_ValidateConfig_RejectsEmptyGeminiAllowedOrgIDs(t *testing.T) {
+	t.Parallel()
+
+	mockClient := swamocks.NewMockClientWithResponsesInterface(t)
+
+	tfresource.Test(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
+		Steps: []tfresource.TestStep{
+			{
+				Config: `
+resource "conjur_swa_server_group" "test" {
+  name              = "test-sg"
+  trust_domain_name = "test-td"
+
+  attestation = {
+    gemini_enterprise = {
+      allowed_org_ids = []
+    }
+  }
+}
+`,
+				ExpectError: regexp.MustCompile(`(?s)allowed_org_ids.*at\s+least 1`),
+			},
+		},
+	})
+}
+
+// TestServerGroupResource_ValidateConfig_UnknownGeminiEnterprise mirrors
+// TestServerGroupResource_ValidateConfig_UnknownGCPServiceAccount for the gemini_enterprise
+// attestation variant.
+func TestServerGroupResource_ValidateConfig_UnknownGeminiEnterprise(t *testing.T) {
+	data := ServerGroupResourceModel{
+		Name:            types.StringValue("test-sg"),
+		TrustDomainName: types.StringValue("test-td"),
+		Attestation:     mkAttestation(AttestationModel{}),
+	}
+
+	s := getServerGroupTestSchema()
+	plan := newPlanWithSchema(s)
+	normalizeServerGroupModel(&data)
+	require.False(t, plan.Set(context.Background(), &data).HasError())
+	require.False(t, plan.SetAttribute(
+		context.Background(),
+		path.Root("attestation").AtName("gemini_enterprise"),
+		types.ObjectUnknown(geminiEnterpriseAttrTypes()),
 	).HasError())
 
 	r := &ServerGroupResource{}

@@ -60,6 +60,20 @@ resource "conjur_swa_server_group" "gcp" {
   }
 }
 
+# Server group using Gemini Enterprise attestation
+resource "conjur_swa_server_group" "gemini_enterprise" {
+  trust_domain_name = "prod.example.org"
+  name              = "gemini-servers"
+  description       = "Gemini Enterprise workload server group"
+
+  attestation = {
+    gemini_enterprise = {
+      allowed_org_ids = ["123456789012", "210987654321"]
+      audiences       = ["urn:panw:swa"]
+    }
+  }
+}
+
 # Server group using AWS Instance Identity Document (IID) attestation
 resource "conjur_swa_server_group" "aws_iid" {
   trust_domain_name = "prod.example.org"
@@ -125,7 +139,7 @@ resource "conjur_swa_server_group" "no_attestation" {
 
 ### Optional
 
-- `attestation` (Attributes) Node attestation configuration. Optionally specify any of x509pop, k8s_psat, gcp_service_account, aws_iid, or k8s_jwt; omit entirely for a server group with no attestation. (see [below for nested schema](#nestedatt--attestation))
+- `attestation` (Attributes) Node attestation configuration. Optionally specify any of x509pop, k8s_psat, gcp_service_account, gemini_enterprise, aws_iid, or k8s_jwt; omit entirely for a server group with no attestation. (see [below for nested schema](#nestedatt--attestation))
 - `description` (String) A description of the server group. Up to 1024 characters.
 - `node_attestation` (Attributes, Deprecated) Deprecated: use `attestation` instead. (see [below for nested schema](#nestedatt--node_attestation))
 
@@ -140,6 +154,7 @@ Optional:
 
 - `aws_iid` (Attributes) AWS Instance Identity Document (IID) attestation configuration. (see [below for nested schema](#nestedatt--attestation--aws_iid))
 - `gcp_service_account` (Attributes) GCP service account attestation configuration. (see [below for nested schema](#nestedatt--attestation--gcp_service_account))
+- `gemini_enterprise` (Attributes) Gemini Enterprise attestation configuration. (see [below for nested schema](#nestedatt--attestation--gemini_enterprise))
 - `k8s_jwt` (Attributes) Kubernetes JWT attestation configuration. (see [below for nested schema](#nestedatt--attestation--k8s_jwt))
 - `k8s_psat` (Attributes) Kubernetes Projected Service Account Token attestation configuration. (see [below for nested schema](#nestedatt--attestation--k8s_psat))
 - `x509pop` (Attributes) X.509 Proof of Possession attestation configuration. (see [below for nested schema](#nestedatt--attestation--x509pop))
@@ -176,6 +191,18 @@ Required:
 Optional:
 
 - `audiences` (List of String) Expected audience values for the GCP identity token (`aud` claim). Defaults to `urn:panw:swa` when omitted.
+
+
+<a id="nestedatt--attestation--gemini_enterprise"></a>
+### Nested Schema for `attestation.gemini_enterprise`
+
+Required:
+
+- `allowed_org_ids` (List of String) List of GCP organisation IDs allowed to attest. Hard gate enforced before any policy evaluation.
+
+Optional:
+
+- `audiences` (List of String) JWT aud values accepted by the attestor. Defaults to `urn:panw:swa` when omitted.
 
 
 <a id="nestedatt--attestation--k8s_jwt"></a>

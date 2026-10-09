@@ -45,6 +45,20 @@ resource "conjur_swa_server_group" "gcp" {
   }
 }
 
+# Server group using Gemini Enterprise attestation
+resource "conjur_swa_server_group" "gemini_enterprise" {
+  trust_domain_name = "prod.example.org"
+  name              = "gemini-servers"
+  description       = "Gemini Enterprise workload server group"
+
+  attestation = {
+    gemini_enterprise = {
+      allowed_org_ids = ["123456789012", "210987654321"]
+      audiences       = ["urn:panw:swa"]
+    }
+  }
+}
+
 # Server group using AWS Instance Identity Document (IID) attestation
 resource "conjur_swa_server_group" "aws_iid" {
   trust_domain_name = "prod.example.org"

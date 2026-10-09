@@ -1354,8 +1354,8 @@ components:
             type: string
             minLength: 1
           minItems: 1
-          description: JWT aud values accepted by the attestor. Omitted means audience is not validated; if specified, at least one non-empty audience string is required.
-
+          default: [urn:panw:swa]
+          description: JWT aud values accepted by the attestor. Defaults to `urn:panw:swa` when omitted.
     AwsIidAttestationConfiguration:
       type: object
       properties:
