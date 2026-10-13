@@ -36,7 +36,7 @@ Automated audit of code changes before opening a Pull Request. The skill analyze
 
 ### 3. Standard Compliance
 
-- Go version follows `go.mod` (currently >= 1.25, pinned to 1.26.2) — flag mismatches with CI/Dockerfiles if bumped inconsistently.
+- Go version follows `go.mod` (currently >= 1.27, pinned to 1.27.2) — flag mismatches with CI/Dockerfiles if bumped inconsistently.
 - Provider documentation (`docs/`) must be regenerated via `./bin/generate_docs` after any schema/example change — a PR that changes `internal/provider/*.go` schemas without corresponding `docs/` changes should be flagged.
 - `CHANGELOG.md` should reflect release-worthy changes, consistent with the GoReleaser-based release process (`.goreleaser.yml`).
 
