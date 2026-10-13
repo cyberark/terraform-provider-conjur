@@ -92,9 +92,9 @@ func TestAuthenticatorResource_buildAuthenticatorPayload(t *testing.T) {
 					EnforcedClaims: []string{"sub", "aud", "exp"},
 				},
 			},
-			Annotations: map[string]string{
-				"environment": "production",
-				"team":        "security",
+			Annotations: map[string]types.String{
+				"environment": types.StringValue("production"),
+				"team":        types.StringValue("security"),
 			},
 		}
 
@@ -354,7 +354,7 @@ func TestAuthenticatorResource_parseAuthenticatorResponse(t *testing.T) {
 
 		// Check Annotations
 		assert.Len(t, data.Annotations, 2)
-		assert.Equal(t, "production", data.Annotations["environment"])
-		assert.Equal(t, "security", data.Annotations["team"])
+		assert.Equal(t, "production", data.Annotations["environment"].ValueString())
+		assert.Equal(t, "security", data.Annotations["team"].ValueString())
 	})
 }
