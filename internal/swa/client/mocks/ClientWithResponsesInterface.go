@@ -18,19 +18,10 @@ func NewMockClientWithResponsesInterface(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *MockClientWithResponsesInterface {
-	if helper, ok := t.(interface{ Helper() }); ok {
-		helper.Helper()
-	}
-
 	mock := &MockClientWithResponsesInterface{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() {
-		if helper, ok := t.(interface{ Helper() }); ok {
-			helper.Helper()
-		}
-		mock.AssertExpectations(t)
-	})
+	t.Cleanup(func() { mock.AssertExpectations(t) })
 
 	return mock
 }
@@ -46,6 +37,101 @@ type MockClientWithResponsesInterface_Expecter struct {
 
 func (_m *MockClientWithResponsesInterface) EXPECT() *MockClientWithResponsesInterface_Expecter {
 	return &MockClientWithResponsesInterface_Expecter{mock: &_m.Mock}
+}
+
+// DeleteBuiltinCaGenerationWithResponse provides a mock function for the type MockClientWithResponsesInterface
+func (_mock *MockClientWithResponsesInterface) DeleteBuiltinCaGenerationWithResponse(ctx context.Context, trustDomainName client.TrustDomainName, generation client.CAGeneration, params *client.DeleteBuiltinCaGenerationParams, reqEditors ...client.RequestEditorFn) (*client.DeleteBuiltinCaGenerationResponse, error) {
+	var tmpRet mock.Arguments
+	if len(reqEditors) > 0 {
+		tmpRet = _mock.Called(ctx, trustDomainName, generation, params, reqEditors)
+	} else {
+		tmpRet = _mock.Called(ctx, trustDomainName, generation, params)
+	}
+	ret := tmpRet
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteBuiltinCaGenerationWithResponse")
+	}
+
+	var r0 *client.DeleteBuiltinCaGenerationResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, client.TrustDomainName, client.CAGeneration, *client.DeleteBuiltinCaGenerationParams, ...client.RequestEditorFn) (*client.DeleteBuiltinCaGenerationResponse, error)); ok {
+		return returnFunc(ctx, trustDomainName, generation, params, reqEditors...)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, client.TrustDomainName, client.CAGeneration, *client.DeleteBuiltinCaGenerationParams, ...client.RequestEditorFn) *client.DeleteBuiltinCaGenerationResponse); ok {
+		r0 = returnFunc(ctx, trustDomainName, generation, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*client.DeleteBuiltinCaGenerationResponse)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, client.TrustDomainName, client.CAGeneration, *client.DeleteBuiltinCaGenerationParams, ...client.RequestEditorFn) error); ok {
+		r1 = returnFunc(ctx, trustDomainName, generation, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClientWithResponsesInterface_DeleteBuiltinCaGenerationWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteBuiltinCaGenerationWithResponse'
+type MockClientWithResponsesInterface_DeleteBuiltinCaGenerationWithResponse_Call struct {
+	*mock.Call
+}
+
+// DeleteBuiltinCaGenerationWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - trustDomainName client.TrustDomainName
+//   - generation client.CAGeneration
+//   - params *client.DeleteBuiltinCaGenerationParams
+//   - reqEditors ...client.RequestEditorFn
+func (_e *MockClientWithResponsesInterface_Expecter) DeleteBuiltinCaGenerationWithResponse(ctx any, trustDomainName any, generation any, params any, reqEditors ...any) *MockClientWithResponsesInterface_DeleteBuiltinCaGenerationWithResponse_Call {
+	return &MockClientWithResponsesInterface_DeleteBuiltinCaGenerationWithResponse_Call{Call: _e.mock.On("DeleteBuiltinCaGenerationWithResponse",
+		append([]any{ctx, trustDomainName, generation, params}, reqEditors...)...)}
+}
+
+func (_c *MockClientWithResponsesInterface_DeleteBuiltinCaGenerationWithResponse_Call) Run(run func(ctx context.Context, trustDomainName client.TrustDomainName, generation client.CAGeneration, params *client.DeleteBuiltinCaGenerationParams, reqEditors ...client.RequestEditorFn)) *MockClientWithResponsesInterface_DeleteBuiltinCaGenerationWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 client.TrustDomainName
+		if args[1] != nil {
+			arg1 = args[1].(client.TrustDomainName)
+		}
+		var arg2 client.CAGeneration
+		if args[2] != nil {
+			arg2 = args[2].(client.CAGeneration)
+		}
+		var arg3 *client.DeleteBuiltinCaGenerationParams
+		if args[3] != nil {
+			arg3 = args[3].(*client.DeleteBuiltinCaGenerationParams)
+		}
+		var arg4 []client.RequestEditorFn
+		var variadicArgs []client.RequestEditorFn
+		if len(args) > 4 {
+			variadicArgs = args[4].([]client.RequestEditorFn)
+		}
+		arg4 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4...,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClientWithResponsesInterface_DeleteBuiltinCaGenerationWithResponse_Call) Return(deleteBuiltinCaGenerationResponse *client.DeleteBuiltinCaGenerationResponse, err error) *MockClientWithResponsesInterface_DeleteBuiltinCaGenerationWithResponse_Call {
+	_c.Call.Return(deleteBuiltinCaGenerationResponse, err)
+	return _c
+}
+
+func (_c *MockClientWithResponsesInterface_DeleteBuiltinCaGenerationWithResponse_Call) RunAndReturn(run func(ctx context.Context, trustDomainName client.TrustDomainName, generation client.CAGeneration, params *client.DeleteBuiltinCaGenerationParams, reqEditors ...client.RequestEditorFn) (*client.DeleteBuiltinCaGenerationResponse, error)) *MockClientWithResponsesInterface_DeleteBuiltinCaGenerationWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // DeleteNodeGroupWithResponse provides a mock function for the type MockClientWithResponsesInterface
@@ -430,6 +516,362 @@ func (_c *MockClientWithResponsesInterface_DeleteTrustDomainWithResponse_Call) R
 }
 
 func (_c *MockClientWithResponsesInterface_DeleteTrustDomainWithResponse_Call) RunAndReturn(run func(ctx context.Context, trustDomainName client.TrustDomainName, params *client.DeleteTrustDomainParams, reqEditors ...client.RequestEditorFn) (*client.DeleteTrustDomainResponse, error)) *MockClientWithResponsesInterface_DeleteTrustDomainWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetBuiltinCaGenerationWithResponse provides a mock function for the type MockClientWithResponsesInterface
+func (_mock *MockClientWithResponsesInterface) GetBuiltinCaGenerationWithResponse(ctx context.Context, trustDomainName client.TrustDomainName, generation client.CAGeneration, params *client.GetBuiltinCaGenerationParams, reqEditors ...client.RequestEditorFn) (*client.GetBuiltinCaGenerationResponse, error) {
+	var tmpRet mock.Arguments
+	if len(reqEditors) > 0 {
+		tmpRet = _mock.Called(ctx, trustDomainName, generation, params, reqEditors)
+	} else {
+		tmpRet = _mock.Called(ctx, trustDomainName, generation, params)
+	}
+	ret := tmpRet
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetBuiltinCaGenerationWithResponse")
+	}
+
+	var r0 *client.GetBuiltinCaGenerationResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, client.TrustDomainName, client.CAGeneration, *client.GetBuiltinCaGenerationParams, ...client.RequestEditorFn) (*client.GetBuiltinCaGenerationResponse, error)); ok {
+		return returnFunc(ctx, trustDomainName, generation, params, reqEditors...)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, client.TrustDomainName, client.CAGeneration, *client.GetBuiltinCaGenerationParams, ...client.RequestEditorFn) *client.GetBuiltinCaGenerationResponse); ok {
+		r0 = returnFunc(ctx, trustDomainName, generation, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*client.GetBuiltinCaGenerationResponse)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, client.TrustDomainName, client.CAGeneration, *client.GetBuiltinCaGenerationParams, ...client.RequestEditorFn) error); ok {
+		r1 = returnFunc(ctx, trustDomainName, generation, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClientWithResponsesInterface_GetBuiltinCaGenerationWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetBuiltinCaGenerationWithResponse'
+type MockClientWithResponsesInterface_GetBuiltinCaGenerationWithResponse_Call struct {
+	*mock.Call
+}
+
+// GetBuiltinCaGenerationWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - trustDomainName client.TrustDomainName
+//   - generation client.CAGeneration
+//   - params *client.GetBuiltinCaGenerationParams
+//   - reqEditors ...client.RequestEditorFn
+func (_e *MockClientWithResponsesInterface_Expecter) GetBuiltinCaGenerationWithResponse(ctx any, trustDomainName any, generation any, params any, reqEditors ...any) *MockClientWithResponsesInterface_GetBuiltinCaGenerationWithResponse_Call {
+	return &MockClientWithResponsesInterface_GetBuiltinCaGenerationWithResponse_Call{Call: _e.mock.On("GetBuiltinCaGenerationWithResponse",
+		append([]any{ctx, trustDomainName, generation, params}, reqEditors...)...)}
+}
+
+func (_c *MockClientWithResponsesInterface_GetBuiltinCaGenerationWithResponse_Call) Run(run func(ctx context.Context, trustDomainName client.TrustDomainName, generation client.CAGeneration, params *client.GetBuiltinCaGenerationParams, reqEditors ...client.RequestEditorFn)) *MockClientWithResponsesInterface_GetBuiltinCaGenerationWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 client.TrustDomainName
+		if args[1] != nil {
+			arg1 = args[1].(client.TrustDomainName)
+		}
+		var arg2 client.CAGeneration
+		if args[2] != nil {
+			arg2 = args[2].(client.CAGeneration)
+		}
+		var arg3 *client.GetBuiltinCaGenerationParams
+		if args[3] != nil {
+			arg3 = args[3].(*client.GetBuiltinCaGenerationParams)
+		}
+		var arg4 []client.RequestEditorFn
+		var variadicArgs []client.RequestEditorFn
+		if len(args) > 4 {
+			variadicArgs = args[4].([]client.RequestEditorFn)
+		}
+		arg4 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4...,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClientWithResponsesInterface_GetBuiltinCaGenerationWithResponse_Call) Return(getBuiltinCaGenerationResponse *client.GetBuiltinCaGenerationResponse, err error) *MockClientWithResponsesInterface_GetBuiltinCaGenerationWithResponse_Call {
+	_c.Call.Return(getBuiltinCaGenerationResponse, err)
+	return _c
+}
+
+func (_c *MockClientWithResponsesInterface_GetBuiltinCaGenerationWithResponse_Call) RunAndReturn(run func(ctx context.Context, trustDomainName client.TrustDomainName, generation client.CAGeneration, params *client.GetBuiltinCaGenerationParams, reqEditors ...client.RequestEditorFn) (*client.GetBuiltinCaGenerationResponse, error)) *MockClientWithResponsesInterface_GetBuiltinCaGenerationWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetBuiltinCaGenerationsWithResponse provides a mock function for the type MockClientWithResponsesInterface
+func (_mock *MockClientWithResponsesInterface) GetBuiltinCaGenerationsWithResponse(ctx context.Context, trustDomainName client.TrustDomainName, params *client.GetBuiltinCaGenerationsParams, reqEditors ...client.RequestEditorFn) (*client.GetBuiltinCaGenerationsResponse, error) {
+	var tmpRet mock.Arguments
+	if len(reqEditors) > 0 {
+		tmpRet = _mock.Called(ctx, trustDomainName, params, reqEditors)
+	} else {
+		tmpRet = _mock.Called(ctx, trustDomainName, params)
+	}
+	ret := tmpRet
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetBuiltinCaGenerationsWithResponse")
+	}
+
+	var r0 *client.GetBuiltinCaGenerationsResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, client.TrustDomainName, *client.GetBuiltinCaGenerationsParams, ...client.RequestEditorFn) (*client.GetBuiltinCaGenerationsResponse, error)); ok {
+		return returnFunc(ctx, trustDomainName, params, reqEditors...)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, client.TrustDomainName, *client.GetBuiltinCaGenerationsParams, ...client.RequestEditorFn) *client.GetBuiltinCaGenerationsResponse); ok {
+		r0 = returnFunc(ctx, trustDomainName, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*client.GetBuiltinCaGenerationsResponse)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, client.TrustDomainName, *client.GetBuiltinCaGenerationsParams, ...client.RequestEditorFn) error); ok {
+		r1 = returnFunc(ctx, trustDomainName, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClientWithResponsesInterface_GetBuiltinCaGenerationsWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetBuiltinCaGenerationsWithResponse'
+type MockClientWithResponsesInterface_GetBuiltinCaGenerationsWithResponse_Call struct {
+	*mock.Call
+}
+
+// GetBuiltinCaGenerationsWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - trustDomainName client.TrustDomainName
+//   - params *client.GetBuiltinCaGenerationsParams
+//   - reqEditors ...client.RequestEditorFn
+func (_e *MockClientWithResponsesInterface_Expecter) GetBuiltinCaGenerationsWithResponse(ctx any, trustDomainName any, params any, reqEditors ...any) *MockClientWithResponsesInterface_GetBuiltinCaGenerationsWithResponse_Call {
+	return &MockClientWithResponsesInterface_GetBuiltinCaGenerationsWithResponse_Call{Call: _e.mock.On("GetBuiltinCaGenerationsWithResponse",
+		append([]any{ctx, trustDomainName, params}, reqEditors...)...)}
+}
+
+func (_c *MockClientWithResponsesInterface_GetBuiltinCaGenerationsWithResponse_Call) Run(run func(ctx context.Context, trustDomainName client.TrustDomainName, params *client.GetBuiltinCaGenerationsParams, reqEditors ...client.RequestEditorFn)) *MockClientWithResponsesInterface_GetBuiltinCaGenerationsWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 client.TrustDomainName
+		if args[1] != nil {
+			arg1 = args[1].(client.TrustDomainName)
+		}
+		var arg2 *client.GetBuiltinCaGenerationsParams
+		if args[2] != nil {
+			arg2 = args[2].(*client.GetBuiltinCaGenerationsParams)
+		}
+		var arg3 []client.RequestEditorFn
+		var variadicArgs []client.RequestEditorFn
+		if len(args) > 3 {
+			variadicArgs = args[3].([]client.RequestEditorFn)
+		}
+		arg3 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3...,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClientWithResponsesInterface_GetBuiltinCaGenerationsWithResponse_Call) Return(getBuiltinCaGenerationsResponse *client.GetBuiltinCaGenerationsResponse, err error) *MockClientWithResponsesInterface_GetBuiltinCaGenerationsWithResponse_Call {
+	_c.Call.Return(getBuiltinCaGenerationsResponse, err)
+	return _c
+}
+
+func (_c *MockClientWithResponsesInterface_GetBuiltinCaGenerationsWithResponse_Call) RunAndReturn(run func(ctx context.Context, trustDomainName client.TrustDomainName, params *client.GetBuiltinCaGenerationsParams, reqEditors ...client.RequestEditorFn) (*client.GetBuiltinCaGenerationsResponse, error)) *MockClientWithResponsesInterface_GetBuiltinCaGenerationsWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetBuiltinCaWithResponse provides a mock function for the type MockClientWithResponsesInterface
+func (_mock *MockClientWithResponsesInterface) GetBuiltinCaWithResponse(ctx context.Context, trustDomainName client.TrustDomainName, params *client.GetBuiltinCaParams, reqEditors ...client.RequestEditorFn) (*client.GetBuiltinCaResponse, error) {
+	var tmpRet mock.Arguments
+	if len(reqEditors) > 0 {
+		tmpRet = _mock.Called(ctx, trustDomainName, params, reqEditors)
+	} else {
+		tmpRet = _mock.Called(ctx, trustDomainName, params)
+	}
+	ret := tmpRet
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetBuiltinCaWithResponse")
+	}
+
+	var r0 *client.GetBuiltinCaResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, client.TrustDomainName, *client.GetBuiltinCaParams, ...client.RequestEditorFn) (*client.GetBuiltinCaResponse, error)); ok {
+		return returnFunc(ctx, trustDomainName, params, reqEditors...)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, client.TrustDomainName, *client.GetBuiltinCaParams, ...client.RequestEditorFn) *client.GetBuiltinCaResponse); ok {
+		r0 = returnFunc(ctx, trustDomainName, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*client.GetBuiltinCaResponse)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, client.TrustDomainName, *client.GetBuiltinCaParams, ...client.RequestEditorFn) error); ok {
+		r1 = returnFunc(ctx, trustDomainName, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClientWithResponsesInterface_GetBuiltinCaWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetBuiltinCaWithResponse'
+type MockClientWithResponsesInterface_GetBuiltinCaWithResponse_Call struct {
+	*mock.Call
+}
+
+// GetBuiltinCaWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - trustDomainName client.TrustDomainName
+//   - params *client.GetBuiltinCaParams
+//   - reqEditors ...client.RequestEditorFn
+func (_e *MockClientWithResponsesInterface_Expecter) GetBuiltinCaWithResponse(ctx any, trustDomainName any, params any, reqEditors ...any) *MockClientWithResponsesInterface_GetBuiltinCaWithResponse_Call {
+	return &MockClientWithResponsesInterface_GetBuiltinCaWithResponse_Call{Call: _e.mock.On("GetBuiltinCaWithResponse",
+		append([]any{ctx, trustDomainName, params}, reqEditors...)...)}
+}
+
+func (_c *MockClientWithResponsesInterface_GetBuiltinCaWithResponse_Call) Run(run func(ctx context.Context, trustDomainName client.TrustDomainName, params *client.GetBuiltinCaParams, reqEditors ...client.RequestEditorFn)) *MockClientWithResponsesInterface_GetBuiltinCaWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 client.TrustDomainName
+		if args[1] != nil {
+			arg1 = args[1].(client.TrustDomainName)
+		}
+		var arg2 *client.GetBuiltinCaParams
+		if args[2] != nil {
+			arg2 = args[2].(*client.GetBuiltinCaParams)
+		}
+		var arg3 []client.RequestEditorFn
+		var variadicArgs []client.RequestEditorFn
+		if len(args) > 3 {
+			variadicArgs = args[3].([]client.RequestEditorFn)
+		}
+		arg3 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3...,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClientWithResponsesInterface_GetBuiltinCaWithResponse_Call) Return(getBuiltinCaResponse *client.GetBuiltinCaResponse, err error) *MockClientWithResponsesInterface_GetBuiltinCaWithResponse_Call {
+	_c.Call.Return(getBuiltinCaResponse, err)
+	return _c
+}
+
+func (_c *MockClientWithResponsesInterface_GetBuiltinCaWithResponse_Call) RunAndReturn(run func(ctx context.Context, trustDomainName client.TrustDomainName, params *client.GetBuiltinCaParams, reqEditors ...client.RequestEditorFn) (*client.GetBuiltinCaResponse, error)) *MockClientWithResponsesInterface_GetBuiltinCaWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetCaBundlesPemWithResponse provides a mock function for the type MockClientWithResponsesInterface
+func (_mock *MockClientWithResponsesInterface) GetCaBundlesPemWithResponse(ctx context.Context, trustDomainName client.TrustDomainName, reqEditors ...client.RequestEditorFn) (*client.GetCaBundlesPemResponse, error) {
+	var tmpRet mock.Arguments
+	if len(reqEditors) > 0 {
+		tmpRet = _mock.Called(ctx, trustDomainName, reqEditors)
+	} else {
+		tmpRet = _mock.Called(ctx, trustDomainName)
+	}
+	ret := tmpRet
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetCaBundlesPemWithResponse")
+	}
+
+	var r0 *client.GetCaBundlesPemResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, client.TrustDomainName, ...client.RequestEditorFn) (*client.GetCaBundlesPemResponse, error)); ok {
+		return returnFunc(ctx, trustDomainName, reqEditors...)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, client.TrustDomainName, ...client.RequestEditorFn) *client.GetCaBundlesPemResponse); ok {
+		r0 = returnFunc(ctx, trustDomainName, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*client.GetCaBundlesPemResponse)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, client.TrustDomainName, ...client.RequestEditorFn) error); ok {
+		r1 = returnFunc(ctx, trustDomainName, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClientWithResponsesInterface_GetCaBundlesPemWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetCaBundlesPemWithResponse'
+type MockClientWithResponsesInterface_GetCaBundlesPemWithResponse_Call struct {
+	*mock.Call
+}
+
+// GetCaBundlesPemWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - trustDomainName client.TrustDomainName
+//   - reqEditors ...client.RequestEditorFn
+func (_e *MockClientWithResponsesInterface_Expecter) GetCaBundlesPemWithResponse(ctx any, trustDomainName any, reqEditors ...any) *MockClientWithResponsesInterface_GetCaBundlesPemWithResponse_Call {
+	return &MockClientWithResponsesInterface_GetCaBundlesPemWithResponse_Call{Call: _e.mock.On("GetCaBundlesPemWithResponse",
+		append([]any{ctx, trustDomainName}, reqEditors...)...)}
+}
+
+func (_c *MockClientWithResponsesInterface_GetCaBundlesPemWithResponse_Call) Run(run func(ctx context.Context, trustDomainName client.TrustDomainName, reqEditors ...client.RequestEditorFn)) *MockClientWithResponsesInterface_GetCaBundlesPemWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 client.TrustDomainName
+		if args[1] != nil {
+			arg1 = args[1].(client.TrustDomainName)
+		}
+		var arg2 []client.RequestEditorFn
+		var variadicArgs []client.RequestEditorFn
+		if len(args) > 2 {
+			variadicArgs = args[2].([]client.RequestEditorFn)
+		}
+		arg2 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2...,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClientWithResponsesInterface_GetCaBundlesPemWithResponse_Call) Return(getCaBundlesPemResponse *client.GetCaBundlesPemResponse, err error) *MockClientWithResponsesInterface_GetCaBundlesPemWithResponse_Call {
+	_c.Call.Return(getCaBundlesPemResponse, err)
+	return _c
+}
+
+func (_c *MockClientWithResponsesInterface_GetCaBundlesPemWithResponse_Call) RunAndReturn(run func(ctx context.Context, trustDomainName client.TrustDomainName, reqEditors ...client.RequestEditorFn) (*client.GetCaBundlesPemResponse, error)) *MockClientWithResponsesInterface_GetCaBundlesPemWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -2441,56 +2883,57 @@ func (_c *MockClientWithResponsesInterface_PatchTrustDomainWithResponse_Call) Ru
 	return _c
 }
 
-// PostBuiltinCaProvisionWithResponse provides a mock function for the type MockClientWithResponsesInterface
-func (_mock *MockClientWithResponsesInterface) PostBuiltinCaProvisionWithResponse(ctx context.Context, trustDomainName client.TrustDomainName, params *client.PostBuiltinCaProvisionParams, reqEditors ...client.RequestEditorFn) (*client.PostBuiltinCaProvisionResponse, error) {
+// PostBuiltinCaGenerationActivateWithResponse provides a mock function for the type MockClientWithResponsesInterface
+func (_mock *MockClientWithResponsesInterface) PostBuiltinCaGenerationActivateWithResponse(ctx context.Context, trustDomainName client.TrustDomainName, generation client.CAGeneration, params *client.PostBuiltinCaGenerationActivateParams, reqEditors ...client.RequestEditorFn) (*client.PostBuiltinCaGenerationActivateResponse, error) {
 	var tmpRet mock.Arguments
 	if len(reqEditors) > 0 {
-		tmpRet = _mock.Called(ctx, trustDomainName, params, reqEditors)
+		tmpRet = _mock.Called(ctx, trustDomainName, generation, params, reqEditors)
 	} else {
-		tmpRet = _mock.Called(ctx, trustDomainName, params)
+		tmpRet = _mock.Called(ctx, trustDomainName, generation, params)
 	}
 	ret := tmpRet
 
 	if len(ret) == 0 {
-		panic("no return value specified for PostBuiltinCaProvisionWithResponse")
+		panic("no return value specified for PostBuiltinCaGenerationActivateWithResponse")
 	}
 
-	var r0 *client.PostBuiltinCaProvisionResponse
+	var r0 *client.PostBuiltinCaGenerationActivateResponse
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, client.TrustDomainName, *client.PostBuiltinCaProvisionParams, ...client.RequestEditorFn) (*client.PostBuiltinCaProvisionResponse, error)); ok {
-		return returnFunc(ctx, trustDomainName, params, reqEditors...)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, client.TrustDomainName, client.CAGeneration, *client.PostBuiltinCaGenerationActivateParams, ...client.RequestEditorFn) (*client.PostBuiltinCaGenerationActivateResponse, error)); ok {
+		return returnFunc(ctx, trustDomainName, generation, params, reqEditors...)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, client.TrustDomainName, *client.PostBuiltinCaProvisionParams, ...client.RequestEditorFn) *client.PostBuiltinCaProvisionResponse); ok {
-		r0 = returnFunc(ctx, trustDomainName, params, reqEditors...)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, client.TrustDomainName, client.CAGeneration, *client.PostBuiltinCaGenerationActivateParams, ...client.RequestEditorFn) *client.PostBuiltinCaGenerationActivateResponse); ok {
+		r0 = returnFunc(ctx, trustDomainName, generation, params, reqEditors...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*client.PostBuiltinCaProvisionResponse)
+			r0 = ret.Get(0).(*client.PostBuiltinCaGenerationActivateResponse)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, client.TrustDomainName, *client.PostBuiltinCaProvisionParams, ...client.RequestEditorFn) error); ok {
-		r1 = returnFunc(ctx, trustDomainName, params, reqEditors...)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, client.TrustDomainName, client.CAGeneration, *client.PostBuiltinCaGenerationActivateParams, ...client.RequestEditorFn) error); ok {
+		r1 = returnFunc(ctx, trustDomainName, generation, params, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
 	}
 	return r0, r1
 }
 
-// MockClientWithResponsesInterface_PostBuiltinCaProvisionWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PostBuiltinCaProvisionWithResponse'
-type MockClientWithResponsesInterface_PostBuiltinCaProvisionWithResponse_Call struct {
+// MockClientWithResponsesInterface_PostBuiltinCaGenerationActivateWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PostBuiltinCaGenerationActivateWithResponse'
+type MockClientWithResponsesInterface_PostBuiltinCaGenerationActivateWithResponse_Call struct {
 	*mock.Call
 }
 
-// PostBuiltinCaProvisionWithResponse is a helper method to define mock.On call
+// PostBuiltinCaGenerationActivateWithResponse is a helper method to define mock.On call
 //   - ctx context.Context
 //   - trustDomainName client.TrustDomainName
-//   - params *client.PostBuiltinCaProvisionParams
+//   - generation client.CAGeneration
+//   - params *client.PostBuiltinCaGenerationActivateParams
 //   - reqEditors ...client.RequestEditorFn
-func (_e *MockClientWithResponsesInterface_Expecter) PostBuiltinCaProvisionWithResponse(ctx any, trustDomainName any, params any, reqEditors ...any) *MockClientWithResponsesInterface_PostBuiltinCaProvisionWithResponse_Call {
-	return &MockClientWithResponsesInterface_PostBuiltinCaProvisionWithResponse_Call{Call: _e.mock.On("PostBuiltinCaProvisionWithResponse",
-		append([]any{ctx, trustDomainName, params}, reqEditors...)...)}
+func (_e *MockClientWithResponsesInterface_Expecter) PostBuiltinCaGenerationActivateWithResponse(ctx any, trustDomainName any, generation any, params any, reqEditors ...any) *MockClientWithResponsesInterface_PostBuiltinCaGenerationActivateWithResponse_Call {
+	return &MockClientWithResponsesInterface_PostBuiltinCaGenerationActivateWithResponse_Call{Call: _e.mock.On("PostBuiltinCaGenerationActivateWithResponse",
+		append([]any{ctx, trustDomainName, generation, params}, reqEditors...)...)}
 }
 
-func (_c *MockClientWithResponsesInterface_PostBuiltinCaProvisionWithResponse_Call) Run(run func(ctx context.Context, trustDomainName client.TrustDomainName, params *client.PostBuiltinCaProvisionParams, reqEditors ...client.RequestEditorFn)) *MockClientWithResponsesInterface_PostBuiltinCaProvisionWithResponse_Call {
+func (_c *MockClientWithResponsesInterface_PostBuiltinCaGenerationActivateWithResponse_Call) Run(run func(ctx context.Context, trustDomainName client.TrustDomainName, generation client.CAGeneration, params *client.PostBuiltinCaGenerationActivateParams, reqEditors ...client.RequestEditorFn)) *MockClientWithResponsesInterface_PostBuiltinCaGenerationActivateWithResponse_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -2500,9 +2943,103 @@ func (_c *MockClientWithResponsesInterface_PostBuiltinCaProvisionWithResponse_Ca
 		if args[1] != nil {
 			arg1 = args[1].(client.TrustDomainName)
 		}
-		var arg2 *client.PostBuiltinCaProvisionParams
+		var arg2 client.CAGeneration
 		if args[2] != nil {
-			arg2 = args[2].(*client.PostBuiltinCaProvisionParams)
+			arg2 = args[2].(client.CAGeneration)
+		}
+		var arg3 *client.PostBuiltinCaGenerationActivateParams
+		if args[3] != nil {
+			arg3 = args[3].(*client.PostBuiltinCaGenerationActivateParams)
+		}
+		var arg4 []client.RequestEditorFn
+		var variadicArgs []client.RequestEditorFn
+		if len(args) > 4 {
+			variadicArgs = args[4].([]client.RequestEditorFn)
+		}
+		arg4 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4...,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClientWithResponsesInterface_PostBuiltinCaGenerationActivateWithResponse_Call) Return(postBuiltinCaGenerationActivateResponse *client.PostBuiltinCaGenerationActivateResponse, err error) *MockClientWithResponsesInterface_PostBuiltinCaGenerationActivateWithResponse_Call {
+	_c.Call.Return(postBuiltinCaGenerationActivateResponse, err)
+	return _c
+}
+
+func (_c *MockClientWithResponsesInterface_PostBuiltinCaGenerationActivateWithResponse_Call) RunAndReturn(run func(ctx context.Context, trustDomainName client.TrustDomainName, generation client.CAGeneration, params *client.PostBuiltinCaGenerationActivateParams, reqEditors ...client.RequestEditorFn) (*client.PostBuiltinCaGenerationActivateResponse, error)) *MockClientWithResponsesInterface_PostBuiltinCaGenerationActivateWithResponse_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PostBuiltinCaGenerationWithResponse provides a mock function for the type MockClientWithResponsesInterface
+func (_mock *MockClientWithResponsesInterface) PostBuiltinCaGenerationWithResponse(ctx context.Context, trustDomainName client.TrustDomainName, params *client.PostBuiltinCaGenerationParams, reqEditors ...client.RequestEditorFn) (*client.PostBuiltinCaGenerationResponse, error) {
+	var tmpRet mock.Arguments
+	if len(reqEditors) > 0 {
+		tmpRet = _mock.Called(ctx, trustDomainName, params, reqEditors)
+	} else {
+		tmpRet = _mock.Called(ctx, trustDomainName, params)
+	}
+	ret := tmpRet
+
+	if len(ret) == 0 {
+		panic("no return value specified for PostBuiltinCaGenerationWithResponse")
+	}
+
+	var r0 *client.PostBuiltinCaGenerationResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, client.TrustDomainName, *client.PostBuiltinCaGenerationParams, ...client.RequestEditorFn) (*client.PostBuiltinCaGenerationResponse, error)); ok {
+		return returnFunc(ctx, trustDomainName, params, reqEditors...)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, client.TrustDomainName, *client.PostBuiltinCaGenerationParams, ...client.RequestEditorFn) *client.PostBuiltinCaGenerationResponse); ok {
+		r0 = returnFunc(ctx, trustDomainName, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*client.PostBuiltinCaGenerationResponse)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, client.TrustDomainName, *client.PostBuiltinCaGenerationParams, ...client.RequestEditorFn) error); ok {
+		r1 = returnFunc(ctx, trustDomainName, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockClientWithResponsesInterface_PostBuiltinCaGenerationWithResponse_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PostBuiltinCaGenerationWithResponse'
+type MockClientWithResponsesInterface_PostBuiltinCaGenerationWithResponse_Call struct {
+	*mock.Call
+}
+
+// PostBuiltinCaGenerationWithResponse is a helper method to define mock.On call
+//   - ctx context.Context
+//   - trustDomainName client.TrustDomainName
+//   - params *client.PostBuiltinCaGenerationParams
+//   - reqEditors ...client.RequestEditorFn
+func (_e *MockClientWithResponsesInterface_Expecter) PostBuiltinCaGenerationWithResponse(ctx any, trustDomainName any, params any, reqEditors ...any) *MockClientWithResponsesInterface_PostBuiltinCaGenerationWithResponse_Call {
+	return &MockClientWithResponsesInterface_PostBuiltinCaGenerationWithResponse_Call{Call: _e.mock.On("PostBuiltinCaGenerationWithResponse",
+		append([]any{ctx, trustDomainName, params}, reqEditors...)...)}
+}
+
+func (_c *MockClientWithResponsesInterface_PostBuiltinCaGenerationWithResponse_Call) Run(run func(ctx context.Context, trustDomainName client.TrustDomainName, params *client.PostBuiltinCaGenerationParams, reqEditors ...client.RequestEditorFn)) *MockClientWithResponsesInterface_PostBuiltinCaGenerationWithResponse_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 client.TrustDomainName
+		if args[1] != nil {
+			arg1 = args[1].(client.TrustDomainName)
+		}
+		var arg2 *client.PostBuiltinCaGenerationParams
+		if args[2] != nil {
+			arg2 = args[2].(*client.PostBuiltinCaGenerationParams)
 		}
 		var arg3 []client.RequestEditorFn
 		var variadicArgs []client.RequestEditorFn
@@ -2520,12 +3057,12 @@ func (_c *MockClientWithResponsesInterface_PostBuiltinCaProvisionWithResponse_Ca
 	return _c
 }
 
-func (_c *MockClientWithResponsesInterface_PostBuiltinCaProvisionWithResponse_Call) Return(postBuiltinCaProvisionResponse *client.PostBuiltinCaProvisionResponse, err error) *MockClientWithResponsesInterface_PostBuiltinCaProvisionWithResponse_Call {
-	_c.Call.Return(postBuiltinCaProvisionResponse, err)
+func (_c *MockClientWithResponsesInterface_PostBuiltinCaGenerationWithResponse_Call) Return(postBuiltinCaGenerationResponse *client.PostBuiltinCaGenerationResponse, err error) *MockClientWithResponsesInterface_PostBuiltinCaGenerationWithResponse_Call {
+	_c.Call.Return(postBuiltinCaGenerationResponse, err)
 	return _c
 }
 
-func (_c *MockClientWithResponsesInterface_PostBuiltinCaProvisionWithResponse_Call) RunAndReturn(run func(ctx context.Context, trustDomainName client.TrustDomainName, params *client.PostBuiltinCaProvisionParams, reqEditors ...client.RequestEditorFn) (*client.PostBuiltinCaProvisionResponse, error)) *MockClientWithResponsesInterface_PostBuiltinCaProvisionWithResponse_Call {
+func (_c *MockClientWithResponsesInterface_PostBuiltinCaGenerationWithResponse_Call) RunAndReturn(run func(ctx context.Context, trustDomainName client.TrustDomainName, params *client.PostBuiltinCaGenerationParams, reqEditors ...client.RequestEditorFn) (*client.PostBuiltinCaGenerationResponse, error)) *MockClientWithResponsesInterface_PostBuiltinCaGenerationWithResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }

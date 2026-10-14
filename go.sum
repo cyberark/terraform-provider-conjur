@@ -51,8 +51,8 @@ github.com/bufbuild/protocompile v0.14.1 h1:iA73zAf/fyljNjQKwYzUHD6AD4R8KMasmwa/
 github.com/bufbuild/protocompile v0.14.1/go.mod h1:ppVdAIhbr2H8asPk6k4pY7t9zB1OU5DoEw9xY/FUi1c=
 github.com/cloudflare/circl v1.6.5 h1:O64F26HEqNhznd/hrC5KZXVKYuKM2rx4deZDTc4ihQA=
 github.com/cloudflare/circl v1.6.5/go.mod h1:h5LNyxAc5nTue9DS5jT+48en2PSDYt3zdGnz5OstK6c=
-github.com/cyberark/conjur-api-go v0.16.0 h1:Ur85G4LIZi0rZuzgq6PRlwC5zmteYndOGPs6874KcA0=
-github.com/cyberark/conjur-api-go v0.16.0/go.mod h1:P6ShoSZ6IQcqcyqWnUHRs7xLN+rE9v/+pcphMfrekvo=
+github.com/cyberark/conjur-api-go v0.16.1 h1:DfP1ORQZV/X2ueTqsRRghUuxfV6p5UReubhXV1oJH0A=
+github.com/cyberark/conjur-api-go v0.16.1/go.mod h1:P6ShoSZ6IQcqcyqWnUHRs7xLN+rE9v/+pcphMfrekvo=
 github.com/cyphar/filepath-securejoin v0.6.1 h1:5CeZ1jPXEiYt3+Z6zqprSAgSWiggmpVyciv8syjIpVE=
 github.com/cyphar/filepath-securejoin v0.6.1/go.mod h1:A8hd4EnAeyujCJRrICiOWqjS1AX0a9kM5XL+NwKoYSc=
 github.com/danieljoos/wincred v1.2.3 h1:v7dZC2x32Ut3nEfRH+vhoZGvN72+dQ/snVXo/vMFLdQ=

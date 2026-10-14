@@ -72,7 +72,20 @@ paths:
           $ref: '#/components/responses/InternalServerError'
     post:
       summary: Register SWA trust domain
-      description: Registers a new SWA trust domain.
+      description: |
+        Registers a new SWA trust domain.
+
+        Built-in CA data left over from an earlier trust domain with the same
+        name is deleted as part of this call, so certificates issued under the
+        old trust domain are not trusted by the new one.
+
+        When the built-in CA is enabled, the trust domain's first root CA
+        (generation 1, `ACTIVE`) is also provisioned as part of this call.
+
+        If either step fails, the trust domain is removed again and the call
+        returns an error, so it can be retried with the same name. If the
+        removal also fails, the trust domain remains and must be deleted
+        before retrying.
       operationId: post-trust-domain
       tags:
         - Trust Domains
@@ -154,7 +167,9 @@ paths:
     delete:
       summary: Delete SWA trust domain
       description: >
-        Deletes the SWA trust domain and all resources inside it.
+        Deletes the SWA trust domain and all resources inside it, including its
+        built-in X.509 certificate authority. The root CA certificates leave the
+        trust bundle, and their signing keys are scheduled for deletion.
       operationId: delete-trust-domain
       tags:
         - Trust Domains
@@ -217,6 +232,39 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/swa/trust-domains/{trust-domain-name}/.well-known/ca-bundles/bundle.pem:
+    parameters:
+      - $ref: '#/components/parameters/TrustDomainName'
+    get:
+      summary: Get SWA CA trust bundle as PEM
+      description: |
+        Returns the combined SWA CA trust bundle (root CAs and built-in
+        self-signed CA certificates) for the given `trust-domain-name` as raw
+        concatenated PEM, so it can be written straight to a trust store without
+        being decoded from JSON first. An unknown or unprovisioned trust domain
+        yields an empty body.
+      operationId: get-ca-bundles-pem
+      tags:
+        - Trust Domains
+      # kics-scan ignore-line
+      security: []
+      responses:
+        '200':
+          description: CA trust bundle retrieved successfully
+          content:
+            application/x-pem-file:
+              schema:
+                type: string
+                description: Concatenated PEM certificate bundle.
+                example: |
+                  -----BEGIN CERTIFICATE-----
+                  MIIB...
+                  -----END CERTIFICATE-----
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /api/swa/trust-domains/{trust-domain-name}/.well-known/spiffe/bundle.json:
     parameters:
       - $ref: '#/components/parameters/TrustDomainName'
@@ -245,24 +293,78 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
-  /api/swa/trust-domains/{trust-domain-name}/builtin-ca/provision:
+  /api/swa/trust-domains/{trust-domain-name}/builtin-ca:
     parameters:
       - $ref: '#/components/parameters/AcceptSwa'
       - $ref: '#/components/parameters/TrustDomainName'
-    post:
-      summary: Provision the built-in root CA
+    get:
+      summary: Get built-in CA state
       description: |
-        Provisions the initial built-in root CA for the path `trust-domain-name`
-        and activates it immediately. If the trust domain has no CA configuration
-        yet, a default one is created as part of this call. Rotation of an
-        existing CA is not yet supported, so a second call returns 409 while a
-        root CA already exists.
-      operationId: post-builtin-ca-provision
+        Returns an overview of the built-in CA for the path `trust-domain-name`:
+        the signing generation, a staged generation awaiting activation,
+        generations still draining after a rotation, the CA configuration and the
+        trust bundle URLs relying parties should poll.
+      operationId: get-builtin-ca
+      tags:
+        - Trust Domains
+      responses:
+        '200':
+          $ref: '#/components/responses/BuiltinCAStateSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/TrustDomainNotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/swa/trust-domains/{trust-domain-name}/builtin-ca/generations:
+    parameters:
+      - $ref: '#/components/parameters/AcceptSwa'
+      - $ref: '#/components/parameters/TrustDomainName'
+    get:
+      summary: List built-in CA generations
+      description: |
+        Lists every root CA generation for the path `trust-domain-name`, oldest
+        first, including generations that are no longer in use. A trust domain
+        that has never been provisioned yields an empty list.
+      operationId: get-builtin-ca-generations
+      tags:
+        - Trust Domains
+      responses:
+        '200':
+          $ref: '#/components/responses/BuiltinCAGenerationListSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/TrustDomainNotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      summary: Provision the next built-in CA generation
+      description: |
+        Provisions a root CA generation for the path `trust-domain-name`. On a
+        trust domain that has no root CA yet, such as one registered before the
+        built-in CA was enabled, this creates generation 1 directly in `ACTIVE`;
+        otherwise it creates the next generation in `READY`, which
+        joins the trust bundle immediately but does not sign until it is
+        activated. Only one generation may await activation at a time, so a
+        second call while a `READY` generation exists returns 409. If the trust
+        domain has no CA configuration yet, a default one is created as part of
+        this call.
+      operationId: post-builtin-ca-generation
       tags:
         - Trust Domains
       responses:
         '201':
-          $ref: '#/components/responses/BuiltinCAProvisioned'
+          $ref: '#/components/responses/BuiltinCAGenerationCreated'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -272,9 +374,100 @@ paths:
         '404':
           $ref: '#/components/responses/TrustDomainNotFound'
         '409':
-          $ref: '#/components/responses/BuiltinCAConflict'
+          $ref: '#/components/responses/BuiltinCAGenerationConflict'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/swa/trust-domains/{trust-domain-name}/builtin-ca/generations/{generation}:
+    parameters:
+      - $ref: '#/components/parameters/AcceptSwa'
+      - $ref: '#/components/parameters/TrustDomainName'
+      - $ref: '#/components/parameters/CAGeneration'
+    get:
+      summary: Get a built-in CA generation
+      description: |
+        Returns one root CA generation of the path `trust-domain-name`.
+      operationId: get-builtin-ca-generation
+      tags:
+        - Trust Domains
+      responses:
+        '200':
+          $ref: '#/components/responses/BuiltinCAGenerationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/CAGenerationNotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      summary: Cancel a built-in CA generation
+      description: |
+        Cancels a `READY` generation of the path `trust-domain-name` that has not
+        been activated. The generation leaves the trust bundle, its key is
+        scheduled for deletion and it can never be activated. Only a `READY`
+        generation can be cancelled; any other state returns 409. The generation
+        number is not reused, so the next provisioned generation takes the
+        following number.
+
+        Cancelling changes the trust bundle, so relying parties should refresh it.
+      operationId: delete-builtin-ca-generation
+      tags:
+        - Trust Domains
+      responses:
+        '204':
+          description: Generation cancelled successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/CAGenerationNotFound'
+        '409':
+          $ref: '#/components/responses/CAGenerationStateConflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/swa/trust-domains/{trust-domain-name}/builtin-ca/generations/{generation}/activate:
+    parameters:
+      - $ref: '#/components/parameters/AcceptSwa'
+      - $ref: '#/components/parameters/TrustDomainName'
+      - $ref: '#/components/parameters/CAGeneration'
+    post:
+      summary: Activate a built-in CA generation
+      description: |
+        Promotes a `READY` generation of the path `trust-domain-name` to
+        `ACTIVE`, so it signs from now on, and demotes the outgoing generation to
+        `DEPRECATED_DRAINING`, where it stays trusted until its certificate
+        expires. Activating the generation that is already `ACTIVE` changes
+        nothing and still returns 200; any other state returns 409.
+
+        Wait until every SWA Server and relying party has fetched the updated
+        trust bundle before activating. Certificates signed by a generation that
+        a relying party has not yet seen fail validation until it refreshes.
+      operationId: post-builtin-ca-generation-activate
+      tags:
+        - Trust Domains
+      responses:
+        '200':
+          $ref: '#/components/responses/BuiltinCAGenerationSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/CAGenerationNotFound'
+        '409':
+          $ref: '#/components/responses/CAGenerationStateConflict'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -796,6 +989,17 @@ components:
         maxLength: 60
         pattern: '^[a-zA-Z0-9._-]+$'
         example: 'prod.example.com'
+    CAGeneration:
+      name: generation
+      in: path
+      description: >
+        The root CA generation number. The initial CA is generation 1.
+      required: true
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+        example: 2
     ServerGroupName:
       name: server-group-name
       in: path
@@ -1110,17 +1314,86 @@ components:
         application/x.secretsmgr.v2+json:
           schema:
             $ref: '#/components/schemas/ServerGroupResponse'
-    BuiltinCAProvisioned:
-      description: Built-in root CA provisioned successfully.
+    BuiltinCAStateSuccess:
+      description: Built-in CA state.
       headers:
         Content-Type:
           $ref: '#/components/headers/Content-Type-V2'
       content:
         application/x.secretsmgr.v2+json:
           schema:
-            $ref: '#/components/schemas/BuiltinCAResponse'
-    BuiltinCAConflict:
-      description: A root CA already exists for this trust domain.
+            $ref: '#/components/schemas/BuiltinCAStateResponse'
+    BuiltinCAGenerationCreated:
+      description: Built-in CA generation provisioned successfully.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/BuiltinCAGenerationResponse'
+    BuiltinCAGenerationSuccess:
+      description: Built-in CA generation details.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/BuiltinCAGenerationResponse'
+    BuiltinCAGenerationListSuccess:
+      description: A list of all built-in CA generations.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/BuiltinCAGenerationListResponse'
+          examples:
+            Example 1:
+              value:
+                generations:
+                  - id: '018a1f4c-3b21-7c05-8d19-2f6a4b8c1d03'
+                    trust_domain_name: 'prod.example.com'
+                    generation: 1
+                    state: 'INACTIVE'
+                    algorithm: 'EC_P256'
+                    valid_from: '2023-07-06T10:30:00Z'
+                    expires_at: '2023-11-03T10:30:00Z'
+                    activated_at: '2023-07-06T10:30:00Z'
+                    deprecated_at: '2023-11-03T10:30:00Z'
+                  - id: '018b7d90-5e42-7a18-b3c7-9d0e1f2a3b4c'
+                    trust_domain_name: 'prod.example.com'
+                    generation: 2
+                    state: 'DEPRECATED_DRAINING'
+                    algorithm: 'EC_P384'
+                    valid_from: '2023-11-03T10:30:00Z'
+                    expires_at: '2024-03-02T10:30:00Z'
+                    ready_at: '2023-10-27T10:30:00Z'
+                    activated_at: '2023-11-03T10:30:00Z'
+                    deprecated_at: '2024-01-15T10:30:00Z'
+                    estimated_inactive_at: '2024-03-02T10:30:00Z'
+                  - id: '018f3a2b-1c4d-7e8f-9a0b-1c2d3e4f5a6b'
+                    trust_domain_name: 'prod.example.com'
+                    generation: 3
+                    state: 'ACTIVE'
+                    algorithm: 'EC_P384'
+                    valid_from: '2024-01-15T10:30:00Z'
+                    expires_at: '2024-05-14T10:30:00Z'
+                    ready_at: '2024-01-08T10:30:00Z'
+                    activated_at: '2024-01-15T14:00:00Z'
+                  - id: '018f5c7e-2d63-7b91-a4d2-5e6f7a8b9c0d'
+                    trust_domain_name: 'prod.example.com'
+                    generation: 4
+                    state: 'READY'
+                    algorithm: 'EC_P384'
+                    valid_from: '2024-01-19T09:00:00Z'
+                    expires_at: '2024-05-18T09:00:00Z'
+                    ready_at: '2024-01-19T09:00:00Z'
+                count: 4
+    BuiltinCAGenerationConflict:
+      description: A generation is already awaiting activation.
       headers:
         Content-Type:
           $ref: '#/components/headers/Content-Type-V2'
@@ -1128,6 +1401,39 @@ components:
         application/x.secretsmgr.v2+json:
           schema:
             $ref: '#/components/schemas/Error'
+          examples:
+            CAGenerationReadyExists:
+              value:
+                code: ca_generation_ready_exists
+                message: trust domain 'prod.example.com' already has a ready root CA
+    CAGenerationNotFound:
+      description: The requested CA generation does not exist.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            CAGenerationNotFound:
+              value:
+                code: ca_generation_not_found
+                message: root CA for trust domain 'prod.example.com' generation 3 not found
+    CAGenerationStateConflict:
+      description: The generation's current state does not allow this operation.
+      headers:
+        Content-Type:
+          $ref: '#/components/headers/Content-Type-V2'
+      content:
+        application/x.secretsmgr.v2+json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            CAGenerationInvalidState:
+              value:
+                code: ca_generation_invalid_state
+                message: root CA for trust domain 'prod.example.com' generation 2 is in state DEPRECATED_DRAINING
     ServerGroupSuccess:
       description: Server group details.
       headers:
@@ -1821,10 +2127,26 @@ components:
           maximum: 86400
           description: Workload X.509 SVID lifetime in seconds.
           example: 3600
+        intermediate_certificate_ttl:
+          type: integer
+          format: int32
+          minimum: 86400
+          maximum: 604800
+          description: |
+            Lifetime of an intermediate CA certificate, in seconds. Must be at least
+            twice `workload_ttl`. Defaults to 24 hours, or to twice
+            `workload_ttl` when that is longer.
+          example: 86400
+        intermediate_key_algorithm:
+          allOf:
+            - $ref: '#/components/schemas/CAKeyAlgorithm'
+          description: Key algorithm used for intermediate CA certificates. Defaults to `EC_P256`.
+        ca:
+          $ref: '#/components/schemas/X509CAConfigurationInput'
     UpdateX509ConfigurationInput:
       type: object
-      required:
-        - workload_ttl
+      description: The TTL rules apply to the trust domain's settings after this update.
+      minProperties: 1
       properties:
         workload_ttl:
           type: integer
@@ -1833,6 +2155,78 @@ components:
           maximum: 86400
           description: Workload X.509 SVID lifetime in seconds.
           example: 3600
+        intermediate_certificate_ttl:
+          type: integer
+          format: int32
+          minimum: 86400
+          maximum: 604800
+          description: |
+            Lifetime of an intermediate CA certificate, in seconds. Must be at least
+            twice `workload_ttl`.
+          example: 86400
+        intermediate_key_algorithm:
+          allOf:
+            - $ref: '#/components/schemas/CAKeyAlgorithm'
+          description: Key algorithm used for intermediate CA certificates.
+        ca:
+          $ref: '#/components/schemas/X509CAConfigurationInput'
+
+    CAKeyAlgorithm:
+      type: string
+      enum: [EC_P256, EC_P384, RSA_2048, RSA_4096]
+      description: Key algorithm of a CA certificate.
+      example: 'EC_P384'
+
+    CAType:
+      type: string
+      enum: [builtin]
+      x-enum-varnames: [CATypeBuiltin]
+      description: |
+        Certificate authority that signs the trust domain's intermediate CA
+        certificates. `builtin` is the root CA that SWA manages for the trust domain.
+      example: 'builtin'
+
+    # `type` is required so that further CA types can be added later as a
+    # oneOf keyed on it, each with its own `config` schema.
+    X509CAConfigurationInput:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          $ref: '#/components/schemas/CAType'
+        config:
+          $ref: '#/components/schemas/BuiltinRootCAConfigurationInput'
+
+    BuiltinRootCAConfigurationInput:
+      type: object
+      properties:
+        root_ca_ttl:
+          type: integer
+          format: int32
+          minimum: 10368000
+          maximum: 315360000
+          description: |
+            Lifetime of a root CA certificate, in seconds. Must be at least twice
+            `intermediate_certificate_ttl`. Defaults to 120 days. A change applies to
+            the next root CA generation; existing generations keep their lifetime.
+          example: 10368000
+        root_key_algorithm:
+          allOf:
+            - $ref: '#/components/schemas/CAKeyAlgorithm'
+          description: |
+            Key algorithm used for new root CA generations. Defaults to `EC_P384`. A
+            change applies to the next root CA generation.
+        root_rotation_trigger_fraction:
+          type: number
+          format: double
+          minimum: 0.5
+          maximum: 0.9
+          description: |
+            How far into a root CA's lifetime the next generation is provisioned, as
+            a fraction of its total validity. Defaults to 0.75. Stored now; takes
+            effect once automatic root CA rotation is available.
+          example: 0.75
 
     X509Configuration:
       type: object
@@ -1846,6 +2240,50 @@ components:
           maximum: 86400
           description: Workload X.509 SVID lifetime in seconds.
           example: 3600
+        intermediate_certificate_ttl:
+          type: integer
+          format: int32
+          description: Lifetime of an intermediate CA certificate, in seconds.
+          example: 86400
+        intermediate_key_algorithm:
+          allOf:
+            - $ref: '#/components/schemas/CAKeyAlgorithm'
+          description: Key algorithm used for intermediate CA certificates.
+        ca:
+          $ref: '#/components/schemas/X509CAConfiguration'
+
+    X509CAConfiguration:
+      type: object
+      required:
+        - type
+        - config
+      properties:
+        type:
+          $ref: '#/components/schemas/CAType'
+        config:
+          $ref: '#/components/schemas/BuiltinRootCAConfiguration'
+
+    BuiltinRootCAConfiguration:
+      type: object
+      required:
+        - root_ca_ttl
+        - root_key_algorithm
+        - root_rotation_trigger_fraction
+      properties:
+        root_ca_ttl:
+          type: integer
+          format: int32
+          description: Lifetime of a root CA certificate, in seconds.
+          example: 10368000
+        root_key_algorithm:
+          $ref: '#/components/schemas/CAKeyAlgorithm'
+        root_rotation_trigger_fraction:
+          type: number
+          format: double
+          description: |
+            How far into a root CA's lifetime the next generation is provisioned, as
+            a fraction of its total validity.
+          example: 0.75
 
     SystemConfigurationInput:
       type: object
@@ -1930,7 +2368,7 @@ components:
           maxLength: 50
           description: Last update timestamp in date-time format.
           example: '2024-01-15T10:30:00Z'
-    BuiltinCAResponse:
+    BuiltinCAGenerationResponse:
       type: object
       required:
         - id
@@ -1938,13 +2376,13 @@ components:
         - generation
         - state
         - algorithm
-        - not_before
-        - not_after
+        - valid_from
+        - expires_at
       properties:
         id:
           type: string
           format: uuid
-          description: Unique identifier of the provisioned root CA.
+          description: Unique identifier of the root CA generation.
           example: '018f3a2b-1c4d-7e8f-9a0b-1c2d3e4f5a6b'
         trust_domain_name:
           type: string
@@ -1954,29 +2392,198 @@ components:
         generation:
           type: integer
           format: int32
-          description: Root CA generation. The initial CA is generation 1.
+          description: |
+            Root CA generation. The initial CA is generation 1, and numbers
+            increase by one per rotation. A number is never reused, including by
+            a generation that was cancelled before it was ever activated.
           example: 1
         state:
           type: string
           enum: [READY, ACTIVE, DEPRECATED_DRAINING, INACTIVE]
-          description: Lifecycle state. A freshly provisioned root CA is ACTIVE.
+          description: |
+            Lifecycle state:
+            - `READY`: trusted but not yet signing, awaiting activation.
+            - `ACTIVE`: the signing generation. At most one per trust domain.
+            - `DEPRECATED_DRAINING`: no longer signing, still trusted until its
+              certificate expires.
+            - `INACTIVE`: out of the trust bundle and unusable.
           example: 'ACTIVE'
         algorithm:
           type: string
           enum: [EC_P256, EC_P384, RSA_2048, RSA_4096]
           description: Key algorithm of the root CA.
           example: 'EC_P384'
-        not_before:
+        valid_from:
           type: string
           format: date-time
           maxLength: 50
           description: Certificate validity start, in date-time format.
           example: '2024-01-15T10:30:00Z'
-        not_after:
+        expires_at:
           type: string
           format: date-time
           maxLength: 50
           description: Certificate validity end, in date-time format.
+          example: '2024-05-14T10:30:00Z'
+        ready_at:
+          type: string
+          format: date-time
+          maxLength: 50
+          description: |
+            When this generation entered `READY`. Absent on a generation created
+            directly in `ACTIVE`.
+          example: '2024-01-15T10:30:00Z'
+        activated_at:
+          type: string
+          format: date-time
+          maxLength: 50
+          description: When this generation started signing. Absent until it does.
+          example: '2024-01-15T14:00:00Z'
+        deprecated_at:
+          type: string
+          format: date-time
+          maxLength: 50
+          description: |
+            When this generation stopped signing. Absent unless it has been
+            superseded by a later generation.
+          example: '2024-04-10T10:30:00Z'
+        estimated_inactive_at:
+          type: string
+          format: date-time
+          maxLength: 50
+          description: |
+            When a draining generation is expected to leave the trust bundle,
+            which is when its certificate expires. Absent for every other state.
+          example: '2024-05-14T10:30:00Z'
+
+    BuiltinCAGenerationListResponse:
+      type: object
+      required:
+        - generations
+        - count
+      properties:
+        generations:
+          type: array
+          description: Root CA generations returned in this response, oldest first.
+          items:
+            $ref: '#/components/schemas/BuiltinCAGenerationResponse'
+        count:
+          type: integer
+          format: int64
+          description: Number of generations returned in this response.
+          example: 4
+
+    BuiltinCAStateResponse:
+      type: object
+      required:
+        - trust_domain_name
+        - configuration
+        - trust_bundle_urls
+      properties:
+        trust_domain_name:
+          type: string
+          maxLength: 60
+          description: Trust domain this built-in CA belongs to.
+          example: 'prod.example.com'
+        configuration:
+          $ref: '#/components/schemas/BuiltinCAConfiguration'
+        active_generation:
+          allOf:
+            - $ref: '#/components/schemas/BuiltinCAGenerationResponse'
+          description: |
+            The signing generation. Absent while a trust domain is still being
+            provisioned, during which no certificates can be issued.
+        ready_generation:
+          allOf:
+            - $ref: '#/components/schemas/BuiltinCAGenerationResponse'
+          description: |
+            The generation awaiting activation. Absent outside a rotation.
+        deprecated_generations:
+          type: array
+          description: |
+            Generations that no longer sign but are still trusted until their
+            certificates expire. Empty unless a rotation has been activated.
+          items:
+            $ref: '#/components/schemas/BuiltinCAGenerationResponse'
+        trust_bundle_urls:
+          $ref: '#/components/schemas/TrustBundleURLs'
+        metrics:
+          $ref: '#/components/schemas/BuiltinCAMetrics'
+
+    # Certificate authority settings only. The lifetime of the SVIDs issued to
+    # workloads is trust domain configuration, not CA configuration: read and set
+    # it through the trust domain's `x509.workload_ttl`.
+    BuiltinCAConfiguration:
+      type: object
+      description: |
+        The CA configuration in effect. Set it through the trust domain's `x509`
+        settings when creating or updating the trust domain.
+      properties:
+        root_ca_ttl:
+          type: integer
+          format: int32
+          readOnly: true
+          description: |
+            Lifetime of a root CA certificate, in seconds. Defaults to 120 days.
+          example: 10368000
+        root_key_algorithm:
+          type: string
+          enum: [EC_P256, EC_P384, RSA_2048, RSA_4096]
+          readOnly: true
+          description: Key algorithm used for new root CA generations.
+          example: 'EC_P384'
+        intermediate_certificate_ttl:
+          type: integer
+          format: int32
+          readOnly: true
+          description: |
+            Lifetime of an intermediate CA certificate, in seconds. Defaults to
+            24 hours.
+          example: 86400
+        intermediate_key_algorithm:
+          type: string
+          enum: [EC_P256, EC_P384, RSA_2048, RSA_4096]
+          readOnly: true
+          description: Key algorithm used for intermediate CA certificates.
+          example: 'EC_P256'
+        root_rotation_trigger_fraction:
+          type: number
+          format: double
+          minimum: 0.5
+          maximum: 0.9
+          readOnly: true
+          description: |
+            How far into a root CA's lifetime the next generation is provisioned,
+            as a fraction of its total validity.
+          example: 0.75
+
+    TrustBundleURLs:
+      type: object
+      required:
+        - pem_url
+        - spiffe_bundle_url
+      properties:
+        pem_url:
+          type: string
+          maxLength: 2048
+          description: URL serving the trust bundle as concatenated PEM.
+          example: 'https://tenant.secretsmgr.cyberark.cloud/api/swa/trust-domains/prod.example.com/.well-known/ca-bundles?format=pem'
+        spiffe_bundle_url:
+          type: string
+          maxLength: 2048
+          description: URL serving the trust bundle as a SPIFFE trust bundle document.
+          example: 'https://tenant.secretsmgr.cyberark.cloud/api/swa/trust-domains/prod.example.com/.well-known/spiffe/bundle.json'
+
+    BuiltinCAMetrics:
+      type: object
+      properties:
+        active_expires_at:
+          type: string
+          format: date-time
+          maxLength: 50
+          description: |
+            When the signing generation's certificate expires. Absent while there
+            is no signing generation.
           example: '2024-05-14T10:30:00Z'
 
     CreateServerRequest:
@@ -2513,6 +3120,13 @@ components:
       type: object
       required: [name, workload_type]
       properties:
+        # The reserved names are SPIFFE ID first path segments with a fixed meaning to SWA. Every SPIFFE ID
+        # template starts with the node group name, so a node group with one of these names could render
+        # SPIFFE IDs that imitate those identities. They are rejected by validateNodeGroupName in the
+        # service layer:
+        #   - swa-agent, server: SWA Server's own agent and server identities. SWA Server treats a client
+        #     certificate under /swa-agent/<node-group>/ as that node group's agent.
+        #   - ai-agents, gcp: non-delegating attestor paths (/ai-agents/gemini/, /gcp/service-account/)
         name:
           type: string
           minLength: 1
@@ -2520,7 +3134,8 @@ components:
           pattern: '^[a-zA-Z0-9._-]+$'
           description: >
             The unique node group name. This value is case-sensitive, must contain 1-60 characters, and can include letters,
-            numbers, periods, underscores, and hyphens only. When the server group uses X.509 proof-of-possession
+            numbers, periods, underscores, and hyphens only. The names `swa-agent`, `server`, `ai-agents` and `gcp`
+            are reserved and cannot be used. When the server group uses X.509 proof-of-possession
             attestation, the name must match the Subject Common Name (CN) in the node's X.509 certificate. When the
             server group uses Kubernetes attestation, the name must match the value of the swa_nodegroup pod label on
             the SWA Agent.

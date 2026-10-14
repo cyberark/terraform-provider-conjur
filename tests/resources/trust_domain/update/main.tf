@@ -30,11 +30,25 @@ resource "conjur_swa_trust_domain" "imported" {
   }
 
   x509 = {
-    workload_ttl = 7200
+    workload_ttl                 = 7200
+    intermediate_certificate_ttl = 172800
+    intermediate_key_algorithm   = "EC_P384"
+
+    ca = {
+      type = "builtin"
+      config = {
+        root_ca_ttl        = 20736000
+        root_key_algorithm = "EC_P384"
+      }
+    }
   }
 }
 
 output "update_status" {
-  value = conjur_swa_trust_domain.imported.jwt.token_ttl == 600 ? "success" : "fail"
+  value = (
+    conjur_swa_trust_domain.imported.jwt.token_ttl == 600 &&
+    conjur_swa_trust_domain.imported.x509.intermediate_certificate_ttl == 172800 &&
+    conjur_swa_trust_domain.imported.x509.ca.config.root_ca_ttl == 20736000
+  ) ? "success" : "fail"
 }
 

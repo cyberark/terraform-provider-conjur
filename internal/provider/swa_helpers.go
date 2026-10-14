@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
@@ -109,4 +110,36 @@ func appendOptionalStringList(ctx context.Context, source *[]string, target *typ
 	listValue, listDiags := optionalStringListValue(ctx, source)
 	diags.Append(listDiags...)
 	*target = listValue
+}
+
+// isSet reports whether v holds a configured value, i.e. is neither null nor
+// unknown. Request builders use it to omit unset Optional+Computed attributes
+// so the server applies its own defaults.
+func isSet(v attr.Value) bool {
+	return !v.IsNull() && !v.IsUnknown()
+}
+
+// int32PtrFromInt64 returns nil for unset values (see isSet).
+func int32PtrFromInt64(v types.Int64) *int32 {
+	if !isSet(v) {
+		return nil
+	}
+	return new(int32(v.ValueInt64()))
+}
+
+// float64Ptr returns nil for unset values (see isSet).
+func float64Ptr(v types.Float64) *float64 {
+	if !isSet(v) {
+		return nil
+	}
+	return v.ValueFloat64Pointer()
+}
+
+// changedPtr returns plan unless it is unset or equals state. PATCH builders
+// use it to send only the values that differ from the prior state.
+func changedPtr[T comparable](plan, state *T) *T {
+	if plan == nil || (state != nil && *plan == *state) {
+		return nil
+	}
+	return plan
 }

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/stretchr/testify/assert"
@@ -166,11 +167,13 @@ func TestApplyOptionalModel_DecodeErrorSkipsApplyAndReturnsFalse(t *testing.T) {
 	var diags diag.Diagnostics
 	applied := false
 
-	// x509AttrTypes has a different shape than JWTConfigModel, so decoding it
+	// This object has a different shape than JWTConfigModel, so decoding it
 	// as a JWTConfigModel fails and adds a diagnostic.
-	obj, objDiags := types.ObjectValueFrom(ctx, x509AttrTypes, &X509ConfigModel{
-		WorkloadTTL: types.Int64Value(3600),
-	})
+	obj, objDiags := types.ObjectValueFrom(ctx,
+		map[string]attr.Type{"workload_ttl": types.Int64Type},
+		struct {
+			WorkloadTTL types.Int64 `tfsdk:"workload_ttl"`
+		}{WorkloadTTL: types.Int64Value(3600)})
 	require.False(t, objDiags.HasError())
 
 	ok := applyOptionalModel(ctx, obj, &diags, func(*JWTConfigModel) {
@@ -180,4 +183,45 @@ func TestApplyOptionalModel_DecodeErrorSkipsApplyAndReturnsFalse(t *testing.T) {
 	assert.False(t, ok)
 	assert.False(t, applied)
 	assert.True(t, diags.HasError())
+}
+
+func TestIsSet(t *testing.T) {
+	assert.True(t, isSet(types.StringValue("")))
+	assert.True(t, isSet(types.Int64Value(0)))
+	assert.False(t, isSet(types.StringNull()))
+	assert.False(t, isSet(types.Int64Unknown()))
+}
+
+func TestInt32PtrFromInt64(t *testing.T) {
+	assert.Nil(t, int32PtrFromInt64(types.Int64Null()))
+	assert.Nil(t, int32PtrFromInt64(types.Int64Unknown()))
+
+	got := int32PtrFromInt64(types.Int64Value(3600))
+	require.NotNil(t, got)
+	assert.Equal(t, int32(3600), *got)
+
+	// A configured zero is a real value, not "unset".
+	got = int32PtrFromInt64(types.Int64Value(0))
+	require.NotNil(t, got)
+	assert.Equal(t, int32(0), *got)
+}
+
+func TestFloat64Ptr(t *testing.T) {
+	assert.Nil(t, float64Ptr(types.Float64Null()))
+	assert.Nil(t, float64Ptr(types.Float64Unknown()))
+
+	got := float64Ptr(types.Float64Value(0.75))
+	require.NotNil(t, got)
+	assert.Equal(t, 0.75, *got)
+}
+
+func TestChangedPtr(t *testing.T) {
+	one, two := 1, 2
+	sameAsOne := 1
+
+	assert.Nil(t, changedPtr[int](nil, nil), "unset plan is omitted")
+	assert.Nil(t, changedPtr(nil, &one), "unset plan is omitted even with prior state")
+	assert.Nil(t, changedPtr(&one, &sameAsOne), "unchanged value is omitted")
+	assert.Same(t, &two, changedPtr(&two, &one), "changed value is kept")
+	assert.Same(t, &one, changedPtr(&one, nil), "value with no prior state is kept")
 }
