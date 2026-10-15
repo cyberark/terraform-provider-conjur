@@ -4,33 +4,18 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
-	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
-
-	swaclient "github.com/cyberark/terraform-provider-conjur/internal/swa/client"
 )
 
 // swaResourceNamePattern mirrors the charset every SWA resource name path
 // parameter shares in openapi.yaml (trust domain, server group, server): 1-60
 // characters, letters, numbers, periods, underscores, and hyphens only.
 var swaResourceNamePattern = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
-
-// configureSWAClient centralizes ProviderData type assertion for SWA resources
-// and enforces that the deployment offers CapabilitySWA. It delegates the
-// environment check to requireCapability so SWA shares one code path with every
-// other capability-gated resource.
-func configureSWAClient(req resource.ConfigureRequest, resp *resource.ConfigureResponse, resourceName string) (swaclient.ClientWithResponsesInterface, bool) {
-	clients, ok := configureConjurClient(req, resp, CapabilitySWA, resourceName)
-	if !ok {
-		return nil, false
-	}
-
-	return clients.swaClient, true
-}
 
 // optionalStringValue normalizes nullable API string fields for Terraform state.
 func optionalStringValue(s *string) types.String {
@@ -50,10 +35,8 @@ func apiStatusError(op string, code int, body []byte) (summary, detail string) {
 // immediately in that case. It does not inspect the response body or handle
 // transport-level errors — callers check those before calling doSWARequest.
 func doSWARequest(op string, statusCode int, body []byte, diags *diag.Diagnostics, want ...int) bool {
-	for _, w := range want {
-		if statusCode == w {
-			return true
-		}
+	if slices.Contains(want, statusCode) {
+		return true
 	}
 	summary, detail := apiStatusError(op, statusCode, body)
 	diags.AddError(summary, detail)

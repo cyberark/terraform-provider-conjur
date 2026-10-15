@@ -26,15 +26,17 @@ var (
 
 func NewSecretsDataSource() datasource.DataSource {
 	return &SecretsDataSource{
-		typeName:   "conjur_secrets",
-		capability: CapabilityBatchSecrets,
+		dataSourceBase[api.ClientV2]{
+			conjurComponent(
+				"conjur_secrets",
+				CapabilityBatchSecrets,
+			),
+		},
 	}
 }
 
 type SecretsDataSource struct {
-	typeName   string
-	capability Capability
-	client     api.ClientV2
+	dataSourceBase[api.ClientV2]
 }
 
 // secretsModel is the shared schema model for the batch secrets data source and
@@ -54,10 +56,6 @@ var namesListValidators = []validator.List{
 		stringvalidator.LengthAtLeast(1),
 		stringvalidator.RegexMatches(regexp.MustCompile(`\S`), "must not be empty or contain only whitespace")),
 	listvalidator.UniqueValues(),
-}
-
-func (s *SecretsDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_secrets"
 }
 
 func (s *SecretsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -84,14 +82,6 @@ func (s *SecretsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest
 			},
 		},
 	}
-}
-
-func (s *SecretsDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	clients, ok := configureDataSourceClient(req, resp, s.capability, s.typeName)
-	if !ok {
-		return
-	}
-	s.client = clients.conjurClient
 }
 
 func (s *SecretsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {

@@ -31,16 +31,18 @@ var (
 
 func NewAuthenticatorResource() resource.Resource {
 	return &AuthenticatorResource{
-		typeName:   "conjur_authenticator",
-		capability: CapabilityCoreV2,
+		resourceBase[api.ClientV2]{
+			conjurComponent(
+				"conjur_authenticator",
+				CapabilityCoreV2,
+			),
+		},
 	}
 }
 
 // AuthenticatorResource defines the resource implementation.
 type AuthenticatorResource struct {
-	typeName   string
-	capability Capability
-	client     api.ClientV2
+	resourceBase[api.ClientV2]
 }
 
 // AuthenticatorResourceModel describes the resource data model.
@@ -68,10 +70,6 @@ type AuthenticatorIdentityModel struct {
 	TokenAppProperty types.String      `tfsdk:"token_app_property"`
 	ClaimAliases     map[string]string `tfsdk:"claim_aliases"`
 	EnforcedClaims   []string          `tfsdk:"enforced_claims"`
-}
-
-func (r *AuthenticatorResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_authenticator"
 }
 
 func (r *AuthenticatorResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -227,14 +225,6 @@ func (r *AuthenticatorResource) ValidateConfig(ctx context.Context, req resource
 	ValidateContainedIn(data.Type, &resp.Diagnostics, "Authenticator type", []string{"jwt", "aws_iam", "certificate"}, false)
 	ValidateNonBlank(data.Name, &resp.Diagnostics, "Authenticator name")
 	ValidateContainedIn(data.Subtype, &resp.Diagnostics, "Authenticator subtype", []string{"gitlab", "github_actions", "kubernetes", "jenkins"}, true)
-}
-
-func (r *AuthenticatorResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	clients, ok := configureConjurClient(req, resp, r.capability, r.typeName)
-	if !ok {
-		return
-	}
-	r.client = clients.conjurClient
 }
 
 func (r *AuthenticatorResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

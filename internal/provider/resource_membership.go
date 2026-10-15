@@ -26,9 +26,7 @@ var (
 )
 
 type membershipResource struct {
-	typeName   string
-	capability Capability
-	client     api.ClientV2
+	resourceBase[api.ClientV2]
 }
 
 type membershipResourceModel struct {
@@ -40,13 +38,13 @@ type membershipResourceModel struct {
 
 func NewMembershipResource() resource.Resource {
 	return &membershipResource{
-		typeName:   "conjur_membership",
-		capability: CapabilityGroupsV2,
+		resourceBase[api.ClientV2]{
+			conjurComponent(
+				"conjur_membership",
+				CapabilityGroupsV2,
+			),
+		},
 	}
-}
-
-func (r *membershipResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_membership"
 }
 
 func (r *membershipResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -92,14 +90,6 @@ func (r *membershipResource) ValidateConfig(ctx context.Context, req resource.Va
 	ValidateNonBlank(data.GroupID, &resp.Diagnostics, "group_id")
 	ValidateContainedIn(data.MemberKind, &resp.Diagnostics, "member_kind", []string{"user", "host", "group"}, false)
 	ValidateNonBlank(data.MemberID, &resp.Diagnostics, "member_id")
-}
-
-func (r *membershipResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	clients, ok := configureConjurClient(req, resp, r.capability, r.typeName)
-	if !ok {
-		return
-	}
-	r.client = clients.conjurClient
 }
 
 func (r *membershipResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

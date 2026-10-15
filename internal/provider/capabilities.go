@@ -6,10 +6,7 @@ import (
 	"strings"
 
 	"github.com/cyberark/conjur-api-go/conjurapi"
-	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
-	"github.com/hashicorp/terraform-plugin-framework/ephemeral"
-	"github.com/hashicorp/terraform-plugin-framework/resource"
 )
 
 // Capability identifies a Secrets Manager feature that a resource or data source
@@ -108,8 +105,6 @@ func (c Capability) String() string {
 func environmentNames(envs []conjurapi.EnvironmentType) string {
 	names := make([]string, 0, len(envs))
 	for _, env := range envs {
-		// FullName has a pointer receiver, so take an addressable copy.
-		env := env
 		names = append(names, env.FullName())
 	}
 
@@ -197,23 +192,4 @@ func configureProviderClients(providerData any, c Capability, resourceName strin
 	}
 
 	return clients, true
-}
-
-// configureConjurClient resolves the Conjur V2 client for a resource, gated on c.
-func configureConjurClient(req resource.ConfigureRequest, resp *resource.ConfigureResponse, c Capability, resourceName string) (*providerClients, bool) {
-	return configureProviderClients(req.ProviderData, c, resourceName, &resp.Diagnostics)
-}
-
-// configureDataSourceClient is the datasource.ConfigureRequest counterpart of
-// configureConjurClient. The framework uses distinct request/response types per
-// interface, so these thin wrappers exist purely to avoid repeating the
-// unwrapping at every call site.
-func configureDataSourceClient(req datasource.ConfigureRequest, resp *datasource.ConfigureResponse, c Capability, resourceName string) (*providerClients, bool) {
-	return configureProviderClients(req.ProviderData, c, resourceName, &resp.Diagnostics)
-}
-
-// configureEphemeralClient is the ephemeral.ConfigureRequest counterpart of
-// configureConjurClient.
-func configureEphemeralClient(req ephemeral.ConfigureRequest, resp *ephemeral.ConfigureResponse, c Capability, resourceName string) (*providerClients, bool) {
-	return configureProviderClients(req.ProviderData, c, resourceName, &resp.Diagnostics)
 }

@@ -33,8 +33,7 @@ var (
 )
 
 type NodeGroupResource struct {
-	typeName string
-	client   swaclient.ClientWithResponsesInterface
+	resourceBase[swaclient.ClientWithResponsesInterface]
 }
 
 type NodeGroupResourceModel struct {
@@ -62,7 +61,14 @@ var workloadConfigurationAttrTypes = map[string]attr.Type{
 }
 
 func NewNodeGroupResource() resource.Resource {
-	return &NodeGroupResource{typeName: "conjur_swa_node_group"}
+	return &NodeGroupResource{
+		resourceBase[swaclient.ClientWithResponsesInterface]{
+			swaComponent(
+				"conjur_swa_node_group",
+				CapabilitySWA,
+			),
+		},
+	}
 }
 
 // buildWorkloadConfiguration converts the Terraform model to the API client WorkloadConfiguration.
@@ -86,11 +92,7 @@ func buildWorkloadConfiguration(ctx context.Context, wcObj types.Object) (*swacl
 	return result, diags
 }
 
-func (r *NodeGroupResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_swa_node_group"
-}
-
-func (r *NodeGroupResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *NodeGroupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages an SWA Node Group.",
 		Attributes: map[string]schema.Attribute{
@@ -163,14 +165,6 @@ func (r *NodeGroupResource) Schema(ctx context.Context, req resource.SchemaReque
 			},
 		},
 	}
-}
-
-func (r *NodeGroupResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	client, ok := configureSWAClient(req, resp, r.typeName)
-	if !ok {
-		return
-	}
-	r.client = client
 }
 
 func (r *NodeGroupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

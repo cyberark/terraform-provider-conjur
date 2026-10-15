@@ -34,8 +34,7 @@ var (
 )
 
 type ServerResource struct {
-	typeName string
-	client   swaclient.ClientWithResponsesInterface
+	resourceBase[swaclient.ClientWithResponsesInterface]
 }
 
 type ServerResourceModel struct {
@@ -85,7 +84,14 @@ var serverAuthAttrTypes = map[string]attr.Type{
 }
 
 func NewServerResource() resource.Resource {
-	return &ServerResource{typeName: "conjur_swa_server"}
+	return &ServerResource{
+		resourceBase[swaclient.ClientWithResponsesInterface]{
+			swaComponent(
+				"conjur_swa_server",
+				CapabilitySWA,
+			),
+		},
+	}
 }
 
 func knownStringValue(v types.String) bool {
@@ -396,7 +402,7 @@ func syncServerAuthFromResponse(ctx context.Context, state *ServerResourceModel,
 		CACert:   optionalStringValue(auth.Data.CaCert),
 		Identity: types.ObjectNull(serverAuthIdentityAttrTypes),
 	}
-	// TEMPORARY: the API does not currently echo the JWT `sub` (subject) claim in
+	// TEMPORARY, FIXME: the API does not currently echo the JWT `sub` (subject) claim in
 	// the authentication data. Only overwrite the subject when the response
 	// includes it; otherwise keep the value already in state (originally from the
 	// create request). Without this, `auth.subject` drifts to null on every read
@@ -456,11 +462,7 @@ func syncServerAuthFromResponse(ctx context.Context, state *ServerResourceModel,
 	return nil
 }
 
-func (r *ServerResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_swa_server"
-}
-
-func (r *ServerResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *ServerResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages an SWA Server (agent).",
 		Attributes: map[string]schema.Attribute{
@@ -614,14 +616,6 @@ func (r *ServerResource) ValidateConfig(ctx context.Context, req resource.Valida
 	}
 
 	validateCreateServerAuthConfig(ctx, auth, &resp.Diagnostics)
-}
-
-func (r *ServerResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	client, ok := configureSWAClient(req, resp, r.typeName)
-	if !ok {
-		return
-	}
-	r.client = client
 }
 
 func (r *ServerResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

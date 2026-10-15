@@ -27,15 +27,20 @@ func (c *apiWrapper) CertificateSign(issuerName string, sign conjurapi.Sign) (*c
 
 func NewCertificateSignDataSource() datasource.DataSource {
 	return &certificateSignDataSource{
-		typeName:   "conjur_certificate_sign",
-		capability: CapabilityIssuersV2,
+		dataSourceBase[certificateSigner]{
+			baseProviderComponent[certificateSigner]{
+				typeName:   "conjur_certificate_sign",
+				capability: CapabilityIssuersV2,
+				clientSelector: func(clients *providerClients) certificateSigner {
+					return &apiWrapper{clients.conjurClient}
+				},
+			},
+		},
 	}
 }
 
 type certificateSignDataSource struct {
-	typeName   string
-	capability Capability
-	client     certificateSigner
+	dataSourceBase[certificateSigner]
 }
 
 type certificateSignDataSourceModel struct {
@@ -47,10 +52,6 @@ type certificateSignDataSourceModel struct {
 	Certificate types.String   `tfsdk:"certificate"`
 	Chain       []types.String `tfsdk:"chain"`
 	PrivateKey  types.String   `tfsdk:"private_key"`
-}
-
-func (d *certificateSignDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_certificate_sign"
 }
 
 func (d *certificateSignDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -90,15 +91,6 @@ func (d *certificateSignDataSource) Schema(_ context.Context, _ datasource.Schem
 			},
 		},
 	}
-}
-
-func (d *certificateSignDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	clients, ok := configureDataSourceClient(req, resp, d.capability, d.typeName)
-	if !ok {
-		return
-	}
-
-	d.client = &apiWrapper{clients.conjurClient}
 }
 
 func (d *certificateSignDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {

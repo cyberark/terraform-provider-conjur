@@ -19,19 +19,17 @@ var (
 
 func NewEphemeralSecretsResource() ephemeral.EphemeralResource {
 	return &EphemeralSecretsResource{
-		typeName:   "conjur_secrets",
-		capability: CapabilityBatchSecrets,
+		ephemeralBase[api.ClientV2]{
+			conjurComponent(
+				"conjur_secrets",
+				CapabilityBatchSecrets,
+			),
+		},
 	}
 }
 
 type EphemeralSecretsResource struct {
-	typeName   string
-	capability Capability
-	client     api.ClientV2
-}
-
-func (e *EphemeralSecretsResource) Metadata(_ context.Context, req ephemeral.MetadataRequest, resp *ephemeral.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_secrets"
+	ephemeralBase[api.ClientV2]
 }
 
 func (e *EphemeralSecretsResource) Schema(_ context.Context, _ ephemeral.SchemaRequest, resp *ephemeral.SchemaResponse) {
@@ -58,14 +56,6 @@ func (e *EphemeralSecretsResource) Schema(_ context.Context, _ ephemeral.SchemaR
 			},
 		},
 	}
-}
-
-func (e *EphemeralSecretsResource) Configure(_ context.Context, req ephemeral.ConfigureRequest, resp *ephemeral.ConfigureResponse) {
-	clients, ok := configureEphemeralClient(req, resp, e.capability, e.typeName)
-	if !ok {
-		return
-	}
-	e.client = clients.conjurClient
 }
 
 // Open retrieves the secret values via batch retrieval. This is called during each
