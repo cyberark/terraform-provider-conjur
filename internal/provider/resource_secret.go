@@ -41,16 +41,18 @@ var (
 
 func NewSecretResource() resource.Resource {
 	return &SecretResource{
-		typeName:   "conjur_secret",
-		capability: CapabilityStaticSecretsV2,
+		resourceBase[api.ClientV2]{
+			conjurComponent(
+				"conjur_secret",
+				CapabilityStaticSecretsV2,
+			),
+		},
 	}
 }
 
 // SecretResource defines the resource implementation.
 type SecretResource struct {
-	typeName   string
-	capability Capability
-	client     api.ClientV2
+	resourceBase[api.ClientV2]
 }
 
 type SecretResourceModel struct {
@@ -74,11 +76,7 @@ type SecretSubject struct {
 	Kind types.String `tfsdk:"kind"`
 }
 
-func (r *SecretResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_secret"
-}
-
-func (r *SecretResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *SecretResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "CyberArk Secrets Manager secret resource",
 
@@ -171,14 +169,6 @@ func (r *SecretResource) Schema(ctx context.Context, req resource.SchemaRequest,
 	}
 }
 
-func (r *SecretResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	clients, ok := configureConjurClient(req, resp, r.capability, r.typeName)
-	if !ok {
-		return
-	}
-	r.client = clients.conjurClient
-}
-
 func (r *SecretResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 	var data SecretResourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
@@ -254,7 +244,7 @@ func (r *SecretResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	// Assume permissions in the model are correct since it was just created (otherwise we would need a separate request to evaluate them)
-	r.parseSecretResponse(*secretResp, conjurapi.PermissionResponse{}, &data)
+	_ = r.parseSecretResponse(*secretResp, conjurapi.PermissionResponse{}, &data)
 
 	tflog.Trace(ctx, "created secret resource")
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -323,7 +313,7 @@ func (r *SecretResource) Read(ctx context.Context, req resource.ReadRequest, res
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-// Only supports rotating the secret value
+// Update Only supports rotating the secret value
 func (r *SecretResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	if r.client == nil {
 		AddProviderClientNotConfiguredWarning(&resp.Diagnostics)
@@ -395,7 +385,6 @@ func (r *SecretResource) Delete(ctx context.Context, req resource.DeleteRequest,
 }
 
 func (r *SecretResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	// Split the full ID into branch and name components
 	segments := strings.Split(req.ID, "/")
 	if len(segments) < 2 {
 		resp.Diagnostics.AddError(
@@ -414,13 +403,10 @@ func (r *SecretResource) ImportState(ctx context.Context, req resource.ImportSta
 
 // buildSecretPayload maps the resource model to an API payload
 func (r *SecretResource) buildSecretPayload(data *SecretResourceModel) (conjurapi.StaticSecret, error) {
-	// Initialize with required fields
 	secret := conjurapi.StaticSecret{
 		Name:   data.Name.ValueString(),
 		Branch: data.Branch.ValueString(),
 	}
-
-	// Supply optional attributes only if provided
 	if !data.MimeType.IsNull() && !data.MimeType.IsUnknown() {
 		secret.MimeType = data.MimeType.ValueString()
 	}
@@ -499,7 +485,7 @@ func (r *SecretResource) parseSecretResponse(secretResp conjurapi.StaticSecretRe
 func (r *SecretResource) generateSecretDeletionPolicy(data *SecretResourceModel) (string, error) {
 	name := strings.TrimSpace(data.Name.ValueString())
 
-	delete := conjurpolicy.Delete{
+	deletePolicy := conjurpolicy.Delete{
 		Record: conjurpolicy.ResourceRef{
 			Kind: conjurpolicy.KindVariable,
 			Id:   name,
@@ -507,7 +493,7 @@ func (r *SecretResource) generateSecretDeletionPolicy(data *SecretResourceModel)
 	}
 
 	// Create policy body with the delete statement
-	policyStatements := conjurpolicy.PolicyStatements{delete}
+	policyStatements := conjurpolicy.PolicyStatements{deletePolicy}
 	yamlBytes, err := yaml.Marshal(policyStatements)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal deletion policy to YAML: %w", err)

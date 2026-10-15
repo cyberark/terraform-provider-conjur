@@ -45,8 +45,7 @@ var x509AttrTypes = map[string]attr.Type{
 }
 
 type TrustDomainResource struct {
-	typeName string
-	client   swaclient.ClientWithResponsesInterface
+	resourceBase[swaclient.ClientWithResponsesInterface]
 }
 
 // TrustDomainResourceModel uses types.Object for jwt and x509 so the framework
@@ -112,14 +111,17 @@ func setTrustDomainStateFromResponse(ctx context.Context, model *TrustDomainReso
 }
 
 func NewTrustDomainResource() resource.Resource {
-	return &TrustDomainResource{typeName: "conjur_swa_trust_domain"}
+	return &TrustDomainResource{
+		resourceBase[swaclient.ClientWithResponsesInterface]{
+			swaComponent(
+				"conjur_swa_trust_domain",
+				CapabilitySWA,
+			),
+		},
+	}
 }
 
-func (r *TrustDomainResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_swa_trust_domain"
-}
-
-func (r *TrustDomainResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *TrustDomainResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages an SWA Trust Domain.",
 		Attributes: map[string]schema.Attribute{
@@ -208,14 +210,6 @@ func (r *TrustDomainResource) Schema(ctx context.Context, req resource.SchemaReq
 			},
 		},
 	}
-}
-
-func (r *TrustDomainResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	client, ok := configureSWAClient(req, resp, r.typeName)
-	if !ok {
-		return
-	}
-	r.client = client
 }
 
 func (r *TrustDomainResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

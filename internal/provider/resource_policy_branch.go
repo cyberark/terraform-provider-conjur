@@ -25,15 +25,17 @@ var _ resource.ResourceWithValidateConfig = &PolicyBranchResource{}
 
 func NewPolicyBranchResource() resource.Resource {
 	return &PolicyBranchResource{
-		typeName:   "conjur_policy_branch",
-		capability: CapabilityCoreV2,
+		resourceBase[api.ClientV2]{
+			conjurComponent(
+				"conjur_policy_branch",
+				CapabilityCoreV2,
+			),
+		},
 	}
 }
 
 type PolicyBranchResource struct {
-	typeName   string
-	capability Capability
-	client     api.ClientV2
+	resourceBase[api.ClientV2]
 }
 
 type PolicyBranchResourceModel struct {
@@ -42,10 +44,6 @@ type PolicyBranchResourceModel struct {
 	Owner       types.Object `tfsdk:"owner"`
 	Annotations types.Map    `tfsdk:"annotations"`
 	FullID      types.String `tfsdk:"full_id"`
-}
-
-func (r *PolicyBranchResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_policy_branch"
 }
 
 func (r *PolicyBranchResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -118,14 +116,6 @@ func (r *PolicyBranchResource) ValidateConfig(ctx context.Context, req resource.
 
 	ValidateNonBlank(data.Name, &resp.Diagnostics, "Policy branch name")
 	ValidateBranch(data.Branch, &resp.Diagnostics, "branch")
-}
-
-func (r *PolicyBranchResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	clients, ok := configureConjurClient(req, resp, r.capability, r.typeName)
-	if !ok {
-		return
-	}
-	r.client = clients.conjurClient
 }
 
 func (r *PolicyBranchResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

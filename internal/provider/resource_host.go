@@ -27,16 +27,18 @@ var (
 
 func NewHostResource() resource.Resource {
 	return &HostResource{
-		typeName:   "conjur_host",
-		capability: CapabilityWorkloadAuthnDescriptors,
+		resourceBase[api.ClientV2]{
+			conjurComponent(
+				"conjur_host",
+				CapabilityWorkloadAuthnDescriptors,
+			),
+		},
 	}
 }
 
 // HostResource defines the resource implementation.
 type HostResource struct {
-	typeName   string
-	capability Capability
-	client     api.ClientV2
+	resourceBase[api.ClientV2]
 }
 
 // HostResourceModel describes the resource data model.
@@ -59,10 +61,6 @@ type HostAuthnDescriptor struct {
 	Type      types.String      `tfsdk:"type"`
 	ServiceID types.String      `tfsdk:"service_id"`
 	Data      map[string]string `tfsdk:"data"`
-}
-
-func (r *HostResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_host"
 }
 
 func (r *HostResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -179,15 +177,6 @@ func (r *HostResource) ValidateConfig(ctx context.Context, req resource.Validate
 			)
 		}
 	}
-}
-
-func (r *HostResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	clients, ok := configureConjurClient(req, resp, r.capability, r.typeName)
-	if !ok {
-		return
-	}
-
-	r.client = clients.conjurClient
 }
 
 func (r *HostResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

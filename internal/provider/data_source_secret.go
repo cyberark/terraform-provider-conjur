@@ -18,26 +18,23 @@ var (
 
 func NewSecretDataSource() datasource.DataSource {
 	return &SecretDataSource{
-		typeName:   "conjur_secret",
-		capability: CapabilityCoreV2,
+		dataSourceBase[api.ClientV2]{
+			conjurComponent(
+				"conjur_secret",
+				CapabilityCoreV2,
+			),
+		},
 	}
 }
 
 type SecretDataSource struct {
-	typeName   string
-	capability Capability
-	client     api.ClientV2
+	dataSourceBase[api.ClientV2]
 }
 
 type SecretDataSourceModel struct {
 	Name    types.String `tfsdk:"name"`
 	Version types.Int64  `tfsdk:"version"`
 	Value   types.String `tfsdk:"value"`
-}
-
-// Metadata returns the resource type name.
-func (d *SecretDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_secret"
 }
 
 func (d *SecretDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -59,15 +56,6 @@ func (d *SecretDataSource) Schema(_ context.Context, _ datasource.SchemaRequest,
 			},
 		},
 	}
-}
-
-// Configure adds the provider configured client to this datasource.
-func (d *SecretDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	clients, ok := configureDataSourceClient(req, resp, d.capability, d.typeName)
-	if !ok {
-		return
-	}
-	d.client = clients.conjurClient
 }
 
 func (d *SecretDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {

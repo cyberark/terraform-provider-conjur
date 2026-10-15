@@ -31,16 +31,18 @@ var (
 
 func NewPermissionResource() resource.Resource {
 	return &PermissionResource{
-		typeName:   "conjur_permission",
-		capability: CapabilityCoreV2,
+		resourceBase[api.ClientV2]{
+			conjurComponent(
+				"conjur_permission",
+				CapabilityCoreV2,
+			),
+		},
 	}
 }
 
 // PermissionResource defines the resource implementation.
 type PermissionResource struct {
-	typeName   string
-	capability Capability
-	client     api.ClientV2
+	resourceBase[api.ClientV2]
 }
 
 // PermissionResourceModel describes the resource data model.
@@ -62,10 +64,6 @@ type ResourceModel struct {
 	Name   types.String `tfsdk:"name"`
 	Kind   types.String `tfsdk:"kind"`
 	Branch types.String `tfsdk:"branch"`
-}
-
-func (r *PermissionResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_permission"
 }
 
 func (r *PermissionResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -146,14 +144,6 @@ func (r *PermissionResource) ValidateConfig(ctx context.Context, req resource.Va
 
 	// Validate privileges
 	ValidatePrivileges(data.Privileges, &resp.Diagnostics, "privileges")
-}
-
-func (r *PermissionResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	clients, ok := configureConjurClient(req, resp, r.capability, r.typeName)
-	if !ok {
-		return
-	}
-	r.client = clients.conjurClient
 }
 
 func (r *PermissionResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -349,7 +339,7 @@ func (r *PermissionResource) generatePermissionPolicy(data *PermissionResourceMo
 
 	branch, roleID, resourceID := derivePolicyContext(data)
 
-	policy := conjurpolicy.PolicyStatements{
+	policyStatements := conjurpolicy.PolicyStatements{
 		conjurpolicy.Permit{
 			Role:       conjurpolicy.ResourceRef{Kind: roleKind, Id: roleID},
 			Resources:  conjurpolicy.ResourceRef{Kind: resKind, Id: resourceID},
@@ -362,7 +352,7 @@ func (r *PermissionResource) generatePermissionPolicy(data *PermissionResourceMo
 		},
 	}
 
-	yamlBytes, err := yaml.Marshal(policy)
+	yamlBytes, err := yaml.Marshal(policyStatements)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to marshal policy: %w", err)
 	}
@@ -383,7 +373,7 @@ func (r *PermissionResource) generatePermissionDenyPolicy(data *PermissionResour
 
 	branch, roleID, resourceID := derivePolicyContext(data)
 
-	policy := conjurpolicy.PolicyStatements{
+	policyStatements := conjurpolicy.PolicyStatements{
 		conjurpolicy.Deny{
 			Role:       conjurpolicy.ResourceRef{Kind: roleKind, Id: roleID},
 			Resources:  conjurpolicy.ResourceRef{Kind: resKind, Id: resourceID},
@@ -391,7 +381,7 @@ func (r *PermissionResource) generatePermissionDenyPolicy(data *PermissionResour
 		},
 	}
 
-	yamlBytes, err := yaml.Marshal(policy)
+	yamlBytes, err := yaml.Marshal(policyStatements)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to marshal policy: %w", err)
 	}
@@ -489,7 +479,7 @@ func mergePolicyBranch(a, b string) string {
 func splitID(fullID string) (kind, branch, name string, err error) {
 	segments := strings.Split(fullID, "/")
 	if len(segments) < 2 {
-		// At minimum we expect kind + name
+		// At minimum, we expect kind + name
 		return "", "", "", fmt.Errorf("invalid Secrets Manager ID: %s. Expected at least kind/name", fullID)
 	}
 

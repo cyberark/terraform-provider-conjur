@@ -34,15 +34,17 @@ var (
 
 func NewIssuerResource() resource.Resource {
 	return &IssuerResource{
-		typeName:   "conjur_issuer",
-		capability: CapabilityIssuersV1,
+		resourceBase[api.ClientV2]{
+			conjurComponent(
+				"conjur_issuer",
+				CapabilityIssuersV1,
+			),
+		},
 	}
 }
 
 type IssuerResource struct {
-	typeName   string
-	capability Capability
-	client     api.ClientV2
+	resourceBase[api.ClientV2]
 }
 
 type IssuerResourceModel struct {
@@ -82,11 +84,7 @@ type AWSIssuerData struct {
 	SecretAccessKeySecretRef SecretRef `json:"secret_access_key_secret_ref"`
 }
 
-func (r *IssuerResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_issuer"
-}
-
-func (r *IssuerResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *IssuerResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "CyberArk Secrets Manager issuer resource. Destroying this resource deletes only the issuer itself and leaves the referenced Secrets Manager secrets intact.",
 		Attributes: map[string]schema.Attribute{
@@ -131,14 +129,6 @@ func (r *IssuerResource) Schema(ctx context.Context, req resource.SchemaRequest,
 			},
 		},
 	}
-}
-
-func (r *IssuerResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	clients, ok := configureConjurClient(req, resp, r.capability, r.typeName)
-	if !ok {
-		return
-	}
-	r.client = clients.conjurClient
 }
 
 func (r *IssuerResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {

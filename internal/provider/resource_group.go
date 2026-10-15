@@ -44,8 +44,12 @@ var groupNamePattern = regexp.MustCompile(`^[^/]*$`)
 
 func NewGroupResource() resource.Resource {
 	return &GroupResource{
-		typeName:   "conjur_group",
-		capability: CapabilityGroupsV2,
+		resourceBase[api.ClientV2]{
+			conjurComponent(
+				"conjur_group",
+				CapabilityGroupsV2,
+			),
+		},
 	}
 }
 
@@ -77,9 +81,7 @@ func NewGroupResource() resource.Resource {
 // Self-Hosted/OSS, where owner and annotations force replace and Update was
 // never supported.
 type GroupResource struct {
-	typeName   string
-	capability Capability
-	client     api.ClientV2
+	resourceBase[api.ClientV2]
 }
 
 // GroupResourceModel describes the resource data model.
@@ -88,10 +90,6 @@ type GroupResourceModel struct {
 	Branch      types.String      `tfsdk:"branch"`
 	Owner       types.Object      `tfsdk:"owner"`
 	Annotations map[string]string `tfsdk:"annotations"`
-}
-
-func (r *GroupResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_group"
 }
 
 func (r *GroupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -195,14 +193,6 @@ func (r *GroupResource) ValidateConfig(ctx context.Context, req resource.Validat
 				"Self-Hosted and OSS.",
 		)
 	}
-}
-
-func (r *GroupResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	clients, ok := configureConjurClient(req, resp, r.capability, r.typeName)
-	if !ok {
-		return
-	}
-	r.client = clients.conjurClient
 }
 
 // ModifyPlan forces replacement when owner or annotations change on

@@ -31,15 +31,20 @@ func (c *apiWrapper) CertificateIssue(issuerName string, issue conjurapi.Issue) 
 }
 
 type certificateIssueDataSource struct {
-	typeName   string
-	capability Capability
-	client     certificateIssuer
+	dataSourceBase[certificateIssuer]
 }
 
 func NewCertificateIssueDataSource() datasource.DataSource {
 	return &certificateIssueDataSource{
-		typeName:   "conjur_certificate_issue",
-		capability: CapabilityIssuersV2,
+		dataSourceBase[certificateIssuer]{
+			baseProviderComponent[certificateIssuer]{
+				typeName:   "conjur_certificate_issue",
+				capability: CapabilityIssuersV2,
+				clientSelector: func(clients *providerClients) certificateIssuer {
+					return &apiWrapper{clients.conjurClient}
+				},
+			},
+		},
 	}
 }
 
@@ -63,10 +68,6 @@ type certificateIssueDataSourceModel struct {
 	Certificate types.String   `tfsdk:"certificate"`
 	Chain       []types.String `tfsdk:"chain"`
 	PrivateKey  types.String   `tfsdk:"private_key"`
-}
-
-func (d *certificateIssueDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_certificate_issue"
 }
 
 func (d *certificateIssueDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
@@ -120,14 +121,6 @@ func (d *certificateIssueDataSource) Schema(_ context.Context, _ datasource.Sche
 			},
 		},
 	}
-}
-
-func (d *certificateIssueDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	clients, ok := configureDataSourceClient(req, resp, d.capability, d.typeName)
-	if !ok {
-		return
-	}
-	d.client = &apiWrapper{clients.conjurClient}
 }
 
 func (d *certificateIssueDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {

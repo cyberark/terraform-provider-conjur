@@ -35,8 +35,7 @@ var (
 )
 
 type ServerGroupResource struct {
-	typeName string
-	client   swaclient.ClientWithResponsesInterface
+	resourceBase[swaclient.ClientWithResponsesInterface]
 }
 
 type ServerGroupResourceModel struct {
@@ -197,7 +196,14 @@ func attestationAttrTypes() map[string]attr.Type {
 }
 
 func NewServerGroupResource() resource.Resource {
-	return &ServerGroupResource{typeName: "conjur_swa_server_group"}
+	return &ServerGroupResource{
+		resourceBase[swaclient.ClientWithResponsesInterface]{
+			swaComponent(
+				"conjur_swa_server_group",
+				CapabilitySWA,
+			),
+		},
+	}
 }
 
 // attestationNestedAttributes returns the nested attribute schema shared by both the
@@ -772,11 +778,7 @@ func buildAttestationRequest(ctx context.Context, at *AttestationModel) (*swacli
 	return attestation, diags
 }
 
-func (r *ServerGroupResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_swa_server_group"
-}
-
-func (r *ServerGroupResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *ServerGroupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages an SWA Server Group.",
 		Attributes: map[string]schema.Attribute{
@@ -909,14 +911,6 @@ func validateK8sJwtClusters(ctx context.Context, k8sJwt *K8sJwtModel, diags *dia
 			)
 		}
 	}
-}
-
-func (r *ServerGroupResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	client, ok := configureSWAClient(req, resp, r.typeName)
-	if !ok {
-		return
-	}
-	r.client = client
 }
 
 func (r *ServerGroupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

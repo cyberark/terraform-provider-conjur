@@ -18,26 +18,23 @@ var (
 
 func NewEphemeralSecretResource() ephemeral.EphemeralResource {
 	return &EphemeralSecretResource{
-		typeName:   "conjur_secret",
-		capability: CapabilityCoreV2,
+		ephemeralBase[api.ClientV2]{
+			conjurComponent(
+				"conjur_secret",
+				CapabilityCoreV2,
+			),
+		},
 	}
 }
 
 type EphemeralSecretResource struct {
-	typeName   string
-	capability Capability
-	client     api.ClientV2
+	ephemeralBase[api.ClientV2]
 }
 
 type EphemeralSecretResourceModel struct {
 	Name    types.String `tfsdk:"name"`
 	Version types.Int64  `tfsdk:"version"`
 	Value   types.String `tfsdk:"value"`
-}
-
-// Metadata returns the resource type name.
-func (r *EphemeralSecretResource) Metadata(_ context.Context, req ephemeral.MetadataRequest, resp *ephemeral.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_secret"
 }
 
 func (r *EphemeralSecretResource) Schema(_ context.Context, _ ephemeral.SchemaRequest, resp *ephemeral.SchemaResponse) {
@@ -59,15 +56,6 @@ func (r *EphemeralSecretResource) Schema(_ context.Context, _ ephemeral.SchemaRe
 			},
 		},
 	}
-}
-
-// Configure adds the provider configured client to this ephemeral resource.
-func (r *EphemeralSecretResource) Configure(_ context.Context, req ephemeral.ConfigureRequest, resp *ephemeral.ConfigureResponse) {
-	clients, ok := configureEphemeralClient(req, resp, r.capability, r.typeName)
-	if !ok {
-		return
-	}
-	r.client = clients.conjurClient
 }
 
 // Open retrieves the secret value. This is called during each Terraform operation
