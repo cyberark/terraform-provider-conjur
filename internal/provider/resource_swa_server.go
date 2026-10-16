@@ -94,10 +94,6 @@ func NewServerResource() resource.Resource {
 	}
 }
 
-func knownStringValue(v types.String) bool {
-	return !v.IsNull() && !v.IsUnknown()
-}
-
 // jsonSemanticallyEqual reports whether two JSON documents are equal ignoring
 // insignificant differences such as whitespace and object key order.
 func jsonSemanticallyEqual(a, b string) bool {
@@ -116,7 +112,7 @@ func jsonSemanticallyEqual(a, b string) bool {
 // the user's original formatting rather than replacing it with a reformatted
 // but equivalent value, which would produce a diff.
 func preferPriorJSONString(prior, incoming types.String) types.String {
-	if !knownStringValue(prior) || !knownStringValue(incoming) {
+	if !isSet(prior) || !isSet(incoming) {
 		return incoming
 	}
 	if jsonSemanticallyEqual(prior.ValueString(), incoming.ValueString()) {
@@ -168,17 +164,6 @@ func (m requiresReplaceIfKnownModifier) PlanModifyString(_ context.Context, req 
 		return
 	}
 	resp.RequiresReplace = true
-}
-
-func nonEmptyKnownStringValue(v types.String) bool {
-	return knownStringValue(v) && v.ValueString() != ""
-}
-
-func stringPointerFromValue(v types.String) *string {
-	if !knownStringValue(v) {
-		return nil
-	}
-	return new(v.ValueString())
 }
 
 func buildCreateServerIdentity(ctx context.Context, identityObj types.Object) (*struct {
@@ -276,7 +261,7 @@ func validateCreateServerAuthConfig(ctx context.Context, auth *ServerAuthenticat
 		return false
 	}
 
-	if !auth.Identity.IsNull() && !auth.Identity.IsUnknown() {
+	if isSet(auth.Identity) {
 		identity := modelFromObject[ServerAuthenticationIdentityModel](ctx, auth.Identity, diags)
 		if diags.HasError() {
 			return false
@@ -306,7 +291,7 @@ func buildCreateServerJWTAuthData(ctx context.Context, auth *ServerAuthenticatio
 	jwtAuthData.Audience = stringPointerFromValue(auth.Audience)
 	jwtAuthData.CaCert = stringPointerFromValue(auth.CACert)
 
-	if knownStringValue(auth.PublicKeys) {
+	if isSet(auth.PublicKeys) {
 		var pk map[string]any
 		if err := json.Unmarshal([]byte(auth.PublicKeys.ValueString()), &pk); err != nil {
 			diags.AddError("Invalid public_keys JSON", err.Error())
@@ -339,7 +324,7 @@ func buildUpdateServerJWTAuthData(auth *ServerAuthenticationModel) (swaclient.Up
 		Audience: stringPointerFromValue(auth.Audience),
 	}
 
-	if knownStringValue(auth.PublicKeys) {
+	if isSet(auth.PublicKeys) {
 		var pk map[string]any
 		if err := json.Unmarshal([]byte(auth.PublicKeys.ValueString()), &pk); err != nil {
 			diags.AddError("Invalid public_keys JSON", err.Error())
@@ -387,7 +372,7 @@ func syncServerAuthFromResponse(ctx context.Context, state *ServerResourceModel,
 	// Decode any prior auth so we can preserve the subject the API does not echo (see below)
 	// and keep the user's original public_keys formatting via preferPriorJSONString.
 	prior := ServerAuthenticationModel{PublicKeys: types.StringNull()}
-	if !state.Auth.IsNull() && !state.Auth.IsUnknown() {
+	if isSet(state.Auth) {
 		if diags := state.Auth.As(ctx, &prior, basetypes.ObjectAsOptions{}); diags.HasError() {
 			return fmt.Errorf("failed to decode prior auth from state: %v", diags)
 		}
@@ -408,7 +393,7 @@ func syncServerAuthFromResponse(ctx context.Context, state *ServerResourceModel,
 	// create request). Without this, `auth.subject` drifts to null on every read
 	// and, because `auth` forces replacement, triggers a spurious destroy/create.
 	// Remove this fallback once the API returns `sub`.
-	if sub := optionalStringValue(auth.Data.Sub); knownStringValue(sub) {
+	if sub := optionalStringValue(auth.Data.Sub); isSet(sub) {
 		authModel.Subject = sub
 	}
 

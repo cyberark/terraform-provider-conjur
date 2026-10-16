@@ -480,7 +480,7 @@ func (p *providerImpl) createAzureClient(config *conjurapi.Config, data *provide
 	config.ServiceID = data.ServiceID.ValueString()
 	config.AuthnType = "azure"
 	config.JWTHostID = strings.TrimPrefix(data.HostID.ValueString(), "host/")
-	if !data.ClientID.IsNull() && !data.ClientID.IsUnknown() {
+	if isSet(data.ClientID) {
 		config.AzureClientID = data.ClientID.ValueString()
 	}
 

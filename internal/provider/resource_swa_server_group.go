@@ -669,7 +669,7 @@ func buildK8sJwtClusters(ctx context.Context, k8sJwt *K8sJwtModel) (map[string]s
 		diags.Append(clusterConfig.ServiceAccountAllowList.ElementsAs(ctx, &saList, false)...)
 		cluster.ServiceAccountAllowList = saList
 
-		if knownStringValue(clusterConfig.PublicKeys) {
+		if isSet(clusterConfig.PublicKeys) {
 			var pk swaclient.K8sJwtClusterPublicKeys
 			if err := json.Unmarshal([]byte(clusterConfig.PublicKeys.ValueString()), &pk); err != nil {
 				diags.AddError("Invalid k8s_jwt public_keys JSON", err.Error())
@@ -722,7 +722,7 @@ func buildAwsIid(ctx context.Context, awsIid *AwsIidModel, diags *diag.Diagnosti
 	config := &swaclient.AwsIidAttestationConfiguration{
 		AssumeRole: stringPointerFromValue(awsIid.AssumeRole),
 	}
-	if knownStringValue(awsIid.Partition) {
+	if isSet(awsIid.Partition) {
 		partition := swaclient.AwsIidAttestationConfigurationPartition(awsIid.Partition.ValueString())
 		config.Partition = &partition
 	}
