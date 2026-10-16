@@ -407,7 +407,7 @@ func buildDataPayload(d *AuthenticatorDataModel) (map[string]interface{}, error)
 	addIfNotNull(payload, "issuer", d.Issuer)
 	addIfNotNull(payload, "ca_cert", d.CACert)
 
-	if !d.PublicKeys.IsNull() && !d.PublicKeys.IsUnknown() {
+	if isSet(d.PublicKeys) {
 		var obj any
 		if err := json.Unmarshal([]byte(d.PublicKeys.ValueString()), &obj); err != nil {
 			return nil, fmt.Errorf("invalid JSON in public_keys: %w", err)
@@ -532,39 +532,10 @@ func parseIdentityFromMap(data map[string]interface{}) *AuthenticatorIdentityMod
 	return &im
 }
 
-// Helper functions to ensure properly handling of null/unknown/unset values
-func valueStringPtr(v types.String) *string {
-	if v.IsNull() || v.IsUnknown() {
-		return nil
-	}
-	return v.ValueStringPointer()
-}
-
-func valueBoolPtr(v types.Bool) *bool {
-	if v.IsNull() || v.IsUnknown() {
-		return nil
-	}
-	return v.ValueBoolPointer()
-}
-
 func addIfNotNull(m map[string]interface{}, key string, v types.String) {
-	if !v.IsNull() && !v.IsUnknown() {
+	if isSet(v) {
 		m[key] = v.ValueString()
 	}
-}
-
-func stringOrNull(s *string) types.String {
-	if s != nil {
-		return types.StringValue(*s)
-	}
-	return types.StringNull()
-}
-
-func boolOrNull(b *bool) types.Bool {
-	if b != nil {
-		return types.BoolValue(*b)
-	}
-	return types.BoolNull()
 }
 
 func stringFromMap(m map[string]interface{}, key string) types.String {

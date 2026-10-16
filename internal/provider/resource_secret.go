@@ -180,8 +180,8 @@ func (r *SecretResource) ValidateConfig(ctx context.Context, req resource.Valida
 	ValidateNonBlank(data.Name, &resp.Diagnostics, "Secret name")
 
 	// Validate that value and value_wo are mutually exclusive
-	hasValue := !data.Value.IsNull() && !data.Value.IsUnknown()
-	hasValueWO := !data.ValueWO.IsNull() && !data.ValueWO.IsUnknown()
+	hasValue := isSet(data.Value)
+	hasValueWO := isSet(data.ValueWO)
 	if hasValue && hasValueWO {
 		resp.Diagnostics.AddError(
 			"Invalid Attribute Combination",
@@ -190,7 +190,7 @@ func (r *SecretResource) ValidateConfig(ctx context.Context, req resource.Valida
 	}
 
 	// Validate that value_wo_version requires value_wo
-	if !data.ValueWOVersion.IsNull() && !data.ValueWOVersion.IsUnknown() {
+	if isSet(data.ValueWOVersion) {
 		if data.ValueWO.IsNull() {
 			resp.Diagnostics.AddError(
 				"Invalid Attribute Combination",
@@ -292,7 +292,7 @@ func (r *SecretResource) Read(ctx context.Context, req resource.ReadRequest, res
 	valueRW, diags := req.Private.GetKey(ctx, valueRWKey)
 	resp.Diagnostics.Append(diags...)
 	hasPrivateStateMarker := len(valueRW) > 0 && string(valueRW) == "true"
-	hasValueInState := !data.Value.IsNull() && !data.Value.IsUnknown()
+	hasValueInState := isSet(data.Value)
 	shouldFetchValue := hasPrivateStateMarker || (len(valueRW) == 0 && hasValueInState)
 
 	if shouldFetchValue {
@@ -407,10 +407,10 @@ func (r *SecretResource) buildSecretPayload(data *SecretResourceModel) (conjurap
 		Name:   data.Name.ValueString(),
 		Branch: data.Branch.ValueString(),
 	}
-	if !data.MimeType.IsNull() && !data.MimeType.IsUnknown() {
+	if isSet(data.MimeType) {
 		secret.MimeType = data.MimeType.ValueString()
 	}
-	if !data.Value.IsNull() && !data.Value.IsUnknown() {
+	if isSet(data.Value) {
 		secret.Value = data.Value.ValueString()
 	}
 	if len(data.Permissions) > 0 {

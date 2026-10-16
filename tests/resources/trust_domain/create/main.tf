@@ -30,7 +30,17 @@ resource "conjur_swa_trust_domain" "test" {
   }
 
   x509 = {
-    workload_ttl = 3600
+    workload_ttl                 = 3600
+    intermediate_certificate_ttl = 86400
+    intermediate_key_algorithm   = "EC_P256"
+
+    ca = {
+      type = "builtin"
+      config = {
+        root_ca_ttl        = 10368000
+        root_key_algorithm = "EC_P384"
+      }
+    }
   }
 }
 

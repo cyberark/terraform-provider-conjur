@@ -302,7 +302,7 @@ func (r *HostResource) buildHostPayload(data *HostResourceModel) (*conjurapi.Wor
 	host.AuthnDescriptors = authnDescriptorsToAPI(data.AuthnDescriptors)
 
 	// Add optional fields only if they are set
-	if !data.Type.IsNull() && !data.Type.IsUnknown() {
+	if isSet(data.Type) {
 		host.Type = data.Type.ValueString()
 	}
 

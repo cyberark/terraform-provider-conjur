@@ -31,3 +31,25 @@ resource "conjur_swa_trust_domain" "full" {
   }
 }
 
+# Trust domain with custom certificate and built-in CA configuration.
+# Attributes you omit take the server defaults and are reported in state.
+resource "conjur_swa_trust_domain" "custom_ca" {
+  name = "ca.example.org"
+
+  x509 = {
+    workload_ttl                 = 3600
+    intermediate_certificate_ttl = 172800 # at least twice workload_ttl
+    intermediate_key_algorithm   = "EC_P384"
+
+    ca = {
+      type = "builtin"
+      config = {
+        # Changes to root_ca_ttl and root_key_algorithm apply to the next
+        # root CA generation only.
+        root_ca_ttl                    = 20736000
+        root_key_algorithm             = "EC_P384"
+        root_rotation_trigger_fraction = 0.75
+      }
+    }
+  }
+}

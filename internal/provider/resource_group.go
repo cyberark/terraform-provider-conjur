@@ -183,7 +183,7 @@ func (r *GroupResource) ValidateConfig(ctx context.Context, req resource.Validat
 
 	if r.client != nil && !r.isSaaS() {
 		ValidateOwner(data.Owner, &resp.Diagnostics, path.Root("owner"))
-	} else if r.isSaaS() && !data.Owner.IsNull() && !data.Owner.IsUnknown() {
+	} else if r.isSaaS() && isSet(data.Owner) {
 		resp.Diagnostics.AddWarning(
 			"Owner Ignored on Secrets Manager, SaaS",
 			"Secrets Manager, SaaS does not support 'owner' for groups, so it has no effect here and is not "+
