@@ -21,8 +21,7 @@ import (
 	swaclient "github.com/cyberark/terraform-provider-conjur/internal/swa/client"
 )
 
-// nodeGroupNamePattern mirrors the API's NodeGroupName path parameter constraint:
-// 1-60 characters, letters, numbers, periods, underscores, and hyphens only.
+// nodeGroupNamePattern mirrors the API's NodeGroupName path parameter constraint.
 var nodeGroupNamePattern = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -51,10 +50,6 @@ type WorkloadConfigurationModel struct {
 	WorkloadRegistrationPolicies types.List   `tfsdk:"workload_registration_policies"`
 }
 
-// workloadConfigurationAttrTypes describes the object type of the
-// workload_configuration nested attribute. It is used to build/parse
-// types.Object values so that null/unknown/known states are represented
-// correctly (a plain Go struct cannot represent "unknown").
 var workloadConfigurationAttrTypes = map[string]attr.Type{
 	"spiffe_id_template":             types.StringType,
 	"workload_registration_policies": types.ListType{ElemType: types.StringType},
@@ -71,9 +66,6 @@ func NewNodeGroupResource() resource.Resource {
 	}
 }
 
-// buildWorkloadConfiguration converts the Terraform model to the API client WorkloadConfiguration.
-// An unknown or null object is treated as "not configured" (nil), which means the
-// request will omit workload_configuration entirely and let the server decide.
 func buildWorkloadConfiguration(ctx context.Context, wcObj types.Object) (*swaclient.WorkloadConfiguration, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	wc := modelFromObject[WorkloadConfigurationModel](ctx, wcObj, &diags)
@@ -146,15 +138,11 @@ func (r *NodeGroupResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				MarkdownDescription: "Workload configuration for the node group.",
 				Optional:            true,
 				Computed:            true,
-				// Intentionally no UseStateForUnknown plan modifier: this attribute
-				// must be able to transition from a known object back to null when a
-				// user removes the block from their configuration (to reset defaults).
-				// UseStateForUnknown would instead carry the prior known value forward,
-				// making an explicit "clear" indistinguishable from "never configured".
 				Attributes: map[string]schema.Attribute{
 					"spiffe_id_template": schema.StringAttribute{
-						MarkdownDescription: "SPIFFE ID template for workload identification. Uses Go template syntax.",
+						MarkdownDescription: "SPIFFE ID template for workload identification. Uses Go template syntax. When omitted, the server applies a default for the node group's `workload_type`, which is reported in state. Removing a previously set template from the configuration keeps the current value; removing the whole `workload_configuration` block resets it to the default.",
 						Optional:            true,
+						Computed:            true,
 					},
 					"workload_registration_policies": schema.ListAttribute{
 						MarkdownDescription: "List of CEL expressions for workload registration policies.",

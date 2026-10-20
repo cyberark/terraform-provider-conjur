@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [0.9.15] - 2026-10-20
+### Fixed
+- `conjur_swa_node_group` no longer shows a permanent in-place change for `workload_configuration`
+  when the block is not configured, and no longer fails after apply with "Provider produced
+  inconsistent result" when the block omits `spiffe_id_template` (for example only
+  `workload_registration_policies`, or an empty block). `spiffe_id_template` is now computed: the
+  server's default for the node group's `workload_type` is reported in state.
+
 ## [0.9.14] - 2026-10-16
 ### Added
 - Added support for CA configuration in SWA Trust Domain.
