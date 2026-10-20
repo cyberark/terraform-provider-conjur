@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	tfresource "github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -1181,6 +1182,254 @@ resource "conjur_swa_node_group" "test" {
 			},
 		},
 	})
+}
+
+// nodeGroupServerDefaults is what the server reports for a unix node group that
+// has no workload configuration of its own: the default template, no policies.
+func nodeGroupServerDefaults(now time.Time) *swaclient.NodeGroupResponse {
+	tmpl := "spiffe://{{ .trustdomain }}/{{ .nodegroup }}/workload/{{ .unix.user }}"
+	return &swaclient.NodeGroupResponse{
+		Name: "test-ng", WorkloadType: "unix", CreatedAt: now, UpdatedAt: now,
+		WorkloadConfiguration: swaclient.WorkloadConfiguration{SpiffeIdTemplate: &tmpl},
+	}
+}
+
+// A node group created without the block gets a default template from the server.
+// Without ModifyPlan every following plan reported that attribute as "known after
+// apply", an in-place change that applying never removed.
+func TestNodeGroupResource_NoBlock_PlansCleanAfterCreate(t *testing.T) {
+	t.Parallel()
+
+	mockClient := swamocks.NewMockClientWithResponsesInterface(t)
+	now := time.Now()
+	defaults := nodeGroupServerDefaults(now)
+
+	mockClient.EXPECT().
+		PostNodeGroupsWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything, mock.Anything).
+		Return(&swaclient.PostNodeGroupsResponse{
+			HTTPResponse:                    makeHTTPResponse(http.StatusCreated),
+			ApplicationxSecretsmgrV2JSON201: defaults,
+		}, nil).Times(1)
+	mockClient.EXPECT().
+		GetNodeGroupWithResponse(mock.Anything, "test-td", "test-sg", "test-ng", mock.Anything).
+		Return(&swaclient.GetNodeGroupResponse{
+			HTTPResponse:                    makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: defaults,
+		}, nil).Maybe()
+	mockClient.EXPECT().
+		DeleteNodeGroupWithResponse(mock.Anything, "test-td", "test-sg", "test-ng", mock.Anything).
+		Return(&swaclient.DeleteNodeGroupResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
+
+	cfg := `
+resource "conjur_swa_node_group" "test" {
+  name              = "test-ng"
+  trust_domain_name = "test-td"
+  server_group_name = "test-sg"
+  workload_type     = "unix"
+}
+`
+	tfresource.Test(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
+		// The harness plans again after every apply step and fails the step when that
+		// plan is not empty, so one step is the whole assertion.
+		Steps: []tfresource.TestStep{{Config: cfg}},
+	})
+}
+
+// A block the user wrote is not touched by ModifyPlan and also plans clean.
+func TestNodeGroupResource_WithBlock_PlansCleanAfterCreate(t *testing.T) {
+	t.Parallel()
+
+	mockClient := swamocks.NewMockClientWithResponsesInterface(t)
+	now := time.Now()
+	tmpl := "spiffe://{{ .trustdomain }}/{{ .nodegroup }}/custom/{{ .unix.user }}"
+	policies := []string{"unix.uid == 1000"}
+	custom := &swaclient.NodeGroupResponse{
+		Name: "test-ng", WorkloadType: "unix", CreatedAt: now, UpdatedAt: now,
+		WorkloadConfiguration: swaclient.WorkloadConfiguration{SpiffeIdTemplate: &tmpl, WorkloadRegistrationPolicies: &policies},
+	}
+
+	mockClient.EXPECT().
+		PostNodeGroupsWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything, mock.Anything).
+		Return(&swaclient.PostNodeGroupsResponse{
+			HTTPResponse:                    makeHTTPResponse(http.StatusCreated),
+			ApplicationxSecretsmgrV2JSON201: custom,
+		}, nil).Times(1)
+	mockClient.EXPECT().
+		GetNodeGroupWithResponse(mock.Anything, "test-td", "test-sg", "test-ng", mock.Anything).
+		Return(&swaclient.GetNodeGroupResponse{
+			HTTPResponse:                    makeHTTPResponse(http.StatusOK),
+			ApplicationxSecretsmgrV2JSON200: custom,
+		}, nil).Maybe()
+	mockClient.EXPECT().
+		DeleteNodeGroupWithResponse(mock.Anything, "test-td", "test-sg", "test-ng", mock.Anything).
+		Return(&swaclient.DeleteNodeGroupResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
+
+	cfg := `
+resource "conjur_swa_node_group" "test" {
+  name              = "test-ng"
+  trust_domain_name = "test-td"
+  server_group_name = "test-sg"
+  workload_type     = "unix"
+  workload_configuration = {
+    spiffe_id_template             = "spiffe://{{ .trustdomain }}/{{ .nodegroup }}/custom/{{ .unix.user }}"
+    workload_registration_policies = ["unix.uid == 1000"]
+  }
+}
+`
+	tfresource.Test(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
+		Steps:                    []tfresource.TestStep{{Config: cfg}},
+	})
+}
+
+// Removing a block that was configured is still a reset to server defaults: the
+// plan must show the change, the PATCH must carry the empty object, and once the
+// server reports its defaults the plan must settle.
+func TestNodeGroupResource_RemovedBlock_ResetsThenPlansClean(t *testing.T) {
+	t.Parallel()
+
+	mockClient := swamocks.NewMockClientWithResponsesInterface(t)
+	now := time.Now()
+	customTmpl := "spiffe://{{ .trustdomain }}/{{ .nodegroup }}/custom/{{ .unix.user }}"
+	policies := []string{"unix.uid == 1000"}
+	custom := &swaclient.NodeGroupResponse{
+		Name: "test-ng", WorkloadType: "unix", CreatedAt: now, UpdatedAt: now,
+		WorkloadConfiguration: swaclient.WorkloadConfiguration{SpiffeIdTemplate: &customTmpl, WorkloadRegistrationPolicies: &policies},
+	}
+	defaults := nodeGroupServerDefaults(now)
+
+	mockClient.EXPECT().
+		PostNodeGroupsWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything, mock.Anything).
+		Return(&swaclient.PostNodeGroupsResponse{
+			HTTPResponse:                    makeHTTPResponse(http.StatusCreated),
+			ApplicationxSecretsmgrV2JSON201: custom,
+		}, nil).Times(1)
+
+	// Reads return the custom configuration until the PATCH has happened.
+	patched := false
+	mockClient.EXPECT().
+		GetNodeGroupWithResponse(mock.Anything, "test-td", "test-sg", "test-ng", mock.Anything).
+		RunAndReturn(func(context.Context, string, string, string, *swaclient.GetNodeGroupParams, ...swaclient.RequestEditorFn) (*swaclient.GetNodeGroupResponse, error) {
+			body := custom
+			if patched {
+				body = defaults
+			}
+			return &swaclient.GetNodeGroupResponse{HTTPResponse: makeHTTPResponse(http.StatusOK), ApplicationxSecretsmgrV2JSON200: body}, nil
+		}).Maybe()
+	mockClient.EXPECT().
+		PatchNodeGroupWithResponse(mock.Anything, "test-td", "test-sg", "test-ng", mock.Anything, mock.MatchedBy(func(b swaclient.PatchNodeGroupJSONRequestBody) bool {
+			return b.WorkloadConfiguration != nil &&
+				b.WorkloadConfiguration.SpiffeIdTemplate == nil &&
+				b.WorkloadConfiguration.WorkloadRegistrationPolicies == nil
+		})).
+		RunAndReturn(func(context.Context, string, string, string, *swaclient.PatchNodeGroupParams, swaclient.PatchNodeGroupJSONRequestBody, ...swaclient.RequestEditorFn) (*swaclient.PatchNodeGroupResponse, error) {
+			patched = true
+			return &swaclient.PatchNodeGroupResponse{HTTPResponse: makeHTTPResponse(http.StatusOK), ApplicationxSecretsmgrV2JSON200: defaults}, nil
+		}).Times(1)
+	mockClient.EXPECT().
+		DeleteNodeGroupWithResponse(mock.Anything, "test-td", "test-sg", "test-ng", mock.Anything).
+		Return(&swaclient.DeleteNodeGroupResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
+
+	withBlock := `
+resource "conjur_swa_node_group" "test" {
+  name              = "test-ng"
+  trust_domain_name = "test-td"
+  server_group_name = "test-sg"
+  workload_type     = "unix"
+  workload_configuration = {
+    spiffe_id_template             = "spiffe://{{ .trustdomain }}/{{ .nodegroup }}/custom/{{ .unix.user }}"
+    workload_registration_policies = ["unix.uid == 1000"]
+  }
+}
+`
+	withoutBlock := `
+resource "conjur_swa_node_group" "test" {
+  name              = "test-ng"
+  trust_domain_name = "test-td"
+  server_group_name = "test-sg"
+  workload_type     = "unix"
+}
+`
+	tfresource.Test(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
+		Steps: []tfresource.TestStep{
+			{Config: withBlock},
+			{
+				Config: withoutBlock,
+				ConfigPlanChecks: tfresource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectResourceAction("conjur_swa_node_group.test", plancheck.ResourceActionUpdate)},
+				},
+				Check: tfresource.TestCheckResourceAttr("conjur_swa_node_group.test", "workload_configuration.spiffe_id_template", *defaults.WorkloadConfiguration.SpiffeIdTemplate),
+			},
+		},
+	})
+}
+
+// A block that omits spiffe_id_template still gets the server's default template.
+// The attribute is Computed, so that value is accepted instead of failing after
+// apply with "inconsistent result: spiffe_id_template: was null, but now ...".
+func TestNodeGroupResource_BlockWithoutTemplate_AcceptsServerDefault(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		config string
+	}{
+		{
+			name: "only registration policies",
+			config: `
+  workload_configuration = {
+    workload_registration_policies = ["unix.uid > 1000"]
+  }`,
+		},
+		{name: "empty block", config: `
+  workload_configuration = {}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockClient := swamocks.NewMockClientWithResponsesInterface(t)
+			now := time.Now()
+			defaults := nodeGroupServerDefaults(now)
+			if tt.name == "only registration policies" {
+				defaults.WorkloadConfiguration.WorkloadRegistrationPolicies = &[]string{"unix.uid > 1000"}
+			}
+
+			mockClient.EXPECT().
+				PostNodeGroupsWithResponse(mock.Anything, "test-td", "test-sg", mock.Anything, mock.Anything).
+				Return(&swaclient.PostNodeGroupsResponse{
+					HTTPResponse:                    makeHTTPResponse(http.StatusCreated),
+					ApplicationxSecretsmgrV2JSON201: defaults,
+				}, nil).Times(1)
+			mockClient.EXPECT().
+				GetNodeGroupWithResponse(mock.Anything, "test-td", "test-sg", "test-ng", mock.Anything).
+				Return(&swaclient.GetNodeGroupResponse{
+					HTTPResponse:                    makeHTTPResponse(http.StatusOK),
+					ApplicationxSecretsmgrV2JSON200: defaults,
+				}, nil).Maybe()
+			mockClient.EXPECT().
+				DeleteNodeGroupWithResponse(mock.Anything, "test-td", "test-sg", "test-ng", mock.Anything).
+				Return(&swaclient.DeleteNodeGroupResponse{HTTPResponse: makeHTTPResponse(http.StatusNoContent)}, nil).Times(1)
+
+			tfresource.Test(t, tfresource.TestCase{
+				ProtoV6ProviderFactories: swaTestProviderFactories(t, mockClient),
+				Steps: []tfresource.TestStep{{
+					Config: `
+resource "conjur_swa_node_group" "test" {
+  name              = "test-ng"
+  trust_domain_name = "test-td"
+  server_group_name = "test-sg"
+  workload_type     = "unix"` + tt.config + `
+}
+`,
+					Check: tfresource.TestCheckResourceAttr("conjur_swa_node_group.test", "workload_configuration.spiffe_id_template", *defaults.WorkloadConfiguration.SpiffeIdTemplate),
+				}},
+			})
+		})
+	}
 }
 
 func TestNodeGroupResource_InPlaceUpdate_DescriptionAndWorkloadConfig(t *testing.T) {

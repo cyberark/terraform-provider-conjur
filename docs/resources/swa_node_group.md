@@ -63,7 +63,7 @@ resource "conjur_swa_node_group" "k8s_nodes" {
 
 Optional:
 
-- `spiffe_id_template` (String) SPIFFE ID template for workload identification. Uses Go template syntax.
+- `spiffe_id_template` (String) SPIFFE ID template for workload identification. Uses Go template syntax. When omitted, the server applies a default for the node group's `workload_type`, which is reported in state. Removing a previously set template from the configuration keeps the current value; removing the whole `workload_configuration` block resets it to the default.
 - `workload_registration_policies` (List of String) List of CEL expressions for workload registration policies.
 
 ## Import
